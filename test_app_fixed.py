@@ -514,13 +514,14 @@ def chat_history_sidebar():
     if st.button("✨ New Chat", key="new_chat_btn", use_container_width=True, help="Start a fresh conversation"):
         start_new_chat()
     
+    # Recent Conversations section
+    st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-title">Recent Conversations</div>', unsafe_allow_html=True)
+    
     if memory:
         try:
             # Get conversation sessions
             sessions = get_conversation_sessions(DEFAULT_USER, limit=10)
-            
-            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-            st.markdown('<div class="sidebar-title">Recent Conversations</div>', unsafe_allow_html=True)
             
             if sessions:
                 conversation_count = 0
@@ -555,13 +556,12 @@ def chat_history_sidebar():
             else:
                 st.markdown('<div class="topic-item">No conversations yet</div>', unsafe_allow_html=True)
             
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-            st.markdown('<div class="sidebar-title">Neural Network</div>', unsafe_allow_html=True)
-            st.markdown('<div class="topic-item">Connecting...</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        except Exception:
+            st.markdown('<div class="topic-item">Connecting to neural network...</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="topic-item">Neural memory system offline</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 
