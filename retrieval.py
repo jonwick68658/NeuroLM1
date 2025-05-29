@@ -45,19 +45,29 @@ class MemoryRetriever:
             if not memory_timestamp:
                 return 0.0
                 
-            # Handle Neo4j DateTime objects and strings
-            if hasattr(memory_timestamp, 'to_native'):
-                # Neo4j DateTime object
+            # Handle different timestamp formats from Neo4j
+            from neo4j.time import DateTime as Neo4jDateTime
+            
+            if isinstance(memory_timestamp, Neo4jDateTime):
+                # Neo4j DateTime object - convert to native Python datetime
+                memory_time = memory_timestamp.to_native()
+            elif hasattr(memory_timestamp, 'to_native'):
+                # Other Neo4j temporal types
                 memory_time = memory_timestamp.to_native()
             elif isinstance(memory_timestamp, str):
                 memory_time = datetime.fromisoformat(memory_timestamp.replace('Z', '+00:00'))
             else:
                 memory_time = memory_timestamp
                 
-            # Ensure both times are timezone-aware or naive
+            # Ensure both times are compatible for subtraction
             now = datetime.now()
             if hasattr(memory_time, 'tzinfo') and memory_time.tzinfo:
-                now = datetime.now(memory_time.tzinfo)
+                # If memory_time is timezone-aware, make now timezone-aware too
+                import pytz
+                now = datetime.now(pytz.UTC)
+            elif hasattr(memory_time, 'tzinfo') and memory_time.tzinfo is None:
+                # If memory_time is naive, ensure now is also naive
+                now = datetime.now()
             
             # Calculate days since memory creation
             days_old = (now - memory_time).days

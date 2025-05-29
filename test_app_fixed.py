@@ -124,9 +124,22 @@ def get_neural_stats(user_id):
 def neural_message(content, sender="AI", timestamp=None, sources=None):
     """Custom neural message component replacing default chat"""
     if sender == "AI":
-        timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
-          {timestamp.strftime('%H:%M') if timestamp else ''}
-        </div>""" if timestamp else ""
+        # Get current time in user's local timezone via JavaScript
+        if 'user_timezone_offset' not in st.session_state:
+            st.session_state.user_timezone_offset = 0
+            
+        timestamp_html = ""
+        if timestamp:
+            # Convert UTC timestamp to local time using browser timezone
+            timestamp_html = f"""
+            <div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);" id="timestamp-{id(timestamp)}">
+            </div>
+            <script>
+                const utcTime = new Date('{timestamp.isoformat()}Z');
+                const localTime = utcTime.toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit'}});
+                document.getElementById('timestamp-{id(timestamp)}').textContent = localTime;
+            </script>
+            """
         
         st.markdown(f"""
         <div class="neural-message" style="border-left: 3px solid var(--accent-secondary); position: relative;">
@@ -146,9 +159,18 @@ def neural_message(content, sender="AI", timestamp=None, sources=None):
         </div>
         """, unsafe_allow_html=True)
     else:
-        timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
-          {timestamp.strftime('%H:%M') if timestamp else ''}
-        </div>""" if timestamp else ""
+        timestamp_html = ""
+        if timestamp:
+            # Convert UTC timestamp to local time using browser timezone
+            timestamp_html = f"""
+            <div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);" id="timestamp-user-{id(timestamp)}">
+            </div>
+            <script>
+                const utcTime = new Date('{timestamp.isoformat()}Z');
+                const localTime = utcTime.toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit'}});
+                document.getElementById('timestamp-user-{id(timestamp)}').textContent = localTime;
+            </script>
+            """
         
         st.markdown(f"""
         <div class="neural-message" style="border-left: 3px solid #444; position: relative;">
