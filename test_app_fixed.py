@@ -709,14 +709,7 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Top navigation bar with menu
-        nav_col1, nav_col2 = st.columns([9, 1])
-        
-        with nav_col2:
-            menu_option = st.selectbox("Menu", ["⋮", "Disconnect"], key="top_menu", label_visibility="collapsed")
-            if menu_option == "Disconnect":
-                st.session_state.authenticated = False
-                st.rerun()
+
         
         # Sidebar with navigation
         with st.sidebar:
@@ -755,6 +748,32 @@ def main():
                 analytics_sidebar()
             elif st.session_state.page == "explorer":
                 explorer_sidebar()
+            
+            # User profile section at bottom of sidebar
+            st.markdown("""
+            <div style="position: fixed; bottom: 0; left: 0; width: 21rem; padding: 1.5rem; background: var(--surface-1); border-top: 1px solid #252525;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center;">
+                  <div style="width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                    <span style="color: white; font-weight: 700; font-size: 14px;">U</span>
+                  </div>
+                  <div>
+                    <div style="font-weight: 500; color: var(--text-primary);">Demo User</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">Neural Network Active</div>
+                  </div>
+                </div>
+                <button onclick="disconnectUser()" style="background: none; border: 1px solid #333; color: var(--text-secondary); padding: 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">
+                  Logout
+                </button>
+              </div>
+            </div>
+            
+            <script>
+            function disconnectUser() {
+              window.parent.postMessage({type: 'streamlit:setComponentValue', value: 'logout'}, '*');
+            }
+            </script>
+            """, unsafe_allow_html=True)
         
         # Main content based on selected page
         if st.session_state.page == "analytics":
