@@ -28,20 +28,29 @@ def get_current_user():
     """Get the current authenticated user ID"""
     return st.session_state.get("user_id", None)
 
-def create_user_account(username, password):
+def create_user_account(username, email, password):
     """Create a new user account in Neo4j"""
     if not memory:
         return False, "Memory system not available"
     
     try:
-        # Check if user already exists
-        existing_user = memory.driver.session().run(
+        # Check if username already exists
+        existing_username = memory.driver.session().run(
             "MATCH (u:User {username: $username}) RETURN u",
             username=username
         ).single()
         
-        if existing_user:
+        if existing_username:
             return False, "Username already exists"
+        
+        # Check if email already exists
+        existing_email = memory.driver.session().run(
+            "MATCH (u:User {email: $email}) RETURN u",
+            email=email
+        ).single()
+        
+        if existing_email:
+            return False, "Email already registered"
         
         # Create new user with hashed password
         import hashlib
@@ -52,12 +61,15 @@ def create_user_account(username, password):
             CREATE (u:User {
                 id: $user_id,
                 username: $username,
+                email: $email,
                 password_hash: $password_hash,
-                created_at: datetime()
+                created_at: datetime(),
+                last_login: datetime()
             })
             """,
             user_id=f"user_{username}",
             username=username,
+            email=email,
             password_hash=password_hash
         )
         
@@ -502,15 +514,21 @@ def check_login():
         
         with tab2:
             st.markdown("### Create Neural Account")
-            reg_username = st.text_input("Choose Username", key="reg_user")
-            reg_password = st.text_input("Choose Password", type="password", key="reg_pass")
-            reg_confirm = st.text_input("Confirm Password", type="password", key="reg_confirm")
+            reg_email = st.text_input("Email Address", key="reg_email", placeholder="your@email.com")
+            reg_username = st.text_input("Choose Username", key="reg_user", placeholder="username")
+            reg_password = st.text_input("Choose Password", type="password", key="reg_pass", placeholder="minimum 6 characters")
+            reg_confirm = st.text_input("Confirm Password", type="password", key="reg_confirm", placeholder="confirm password")
             
             if st.button("Create Account", use_container_width=True, key="register_btn"):
-                if reg_username and reg_password and reg_confirm:
-                    if reg_password == reg_confirm:
+                if reg_email and reg_username and reg_password and reg_confirm:
+                    # Validate email format
+                    import re
+                    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                    if not re.match(email_pattern, reg_email):
+                        st.error("Please enter a valid email address")
+                    elif reg_password == reg_confirm:
                         if len(reg_password) >= 6:
-                            success, message = create_user_account(reg_username, reg_password)
+                            success, message = create_user_account(reg_username, reg_email, reg_password)
                             if success:
                                 st.success(message)
                                 st.info("You can now login with your new account")
