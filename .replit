@@ -30,7 +30,7 @@ args = "Test App"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Test App Fixed"
+args = "NeuroLM"
 
 [[workflows.workflow]]
 name = "install_dependencies"
@@ -59,12 +59,12 @@ args = "streamlit run test_app.py --server.port 5000"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "Test App Fixed"
+name = "NeuroLM"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run test_app_fixed.py --server.port 5000"
+args = "streamlit run neurolm_app.py --server.port 5000"
 waitForPort = 5000
 
 [[ports]]
