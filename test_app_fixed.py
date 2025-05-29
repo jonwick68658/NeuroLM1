@@ -130,17 +130,28 @@ def neural_message(content, sender="AI", timestamp=None, sources=None):
             
         timestamp_html = ""
         if timestamp:
-            # Simple local time conversion (fallback to showing time without timezone conversion)
+            # Convert UTC to EST/EDT (US Eastern Time)
             try:
                 import pytz
-                # Convert to a reasonable timezone (you can make this configurable)
-                local_time = timestamp.strftime('%H:%M')
+                utc_tz = pytz.UTC
+                eastern_tz = pytz.timezone('US/Eastern')
+                
+                # Ensure timestamp is timezone aware
+                if timestamp.tzinfo is None:
+                    timestamp = utc_tz.localize(timestamp)
+                
+                # Convert to Eastern time
+                local_time = timestamp.astimezone(eastern_tz).strftime('%H:%M')
                 timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
                   {local_time}
                 </div>"""
-            except:
+            except Exception as e:
+                # Fallback to simple offset (EST is UTC-5, EDT is UTC-4)
+                from datetime import timedelta
+                adjusted_time = timestamp - timedelta(hours=5)  # EST offset
+                local_time = adjusted_time.strftime('%H:%M')
                 timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
-                  {timestamp.strftime('%H:%M') if timestamp else ''}
+                  {local_time}
                 </div>"""
         
         st.markdown(f"""
@@ -163,11 +174,29 @@ def neural_message(content, sender="AI", timestamp=None, sources=None):
     else:
         timestamp_html = ""
         if timestamp:
-            # Simple time display without timezone complexity
-            local_time = timestamp.strftime('%H:%M')
-            timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
-              {local_time}
-            </div>"""
+            # Convert UTC to EST/EDT (US Eastern Time) for user messages too
+            try:
+                import pytz
+                utc_tz = pytz.UTC
+                eastern_tz = pytz.timezone('US/Eastern')
+                
+                # Ensure timestamp is timezone aware
+                if timestamp.tzinfo is None:
+                    timestamp = utc_tz.localize(timestamp)
+                
+                # Convert to Eastern time
+                local_time = timestamp.astimezone(eastern_tz).strftime('%H:%M')
+                timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
+                  {local_time}
+                </div>"""
+            except Exception as e:
+                # Fallback to simple offset (EST is UTC-5, EDT is UTC-4)
+                from datetime import timedelta
+                adjusted_time = timestamp - timedelta(hours=5)  # EST offset
+                local_time = adjusted_time.strftime('%H:%M')
+                timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
+                  {local_time}
+                </div>"""
         
         st.markdown(f"""
         <div class="neural-message" style="border-left: 3px solid #444; position: relative;">
