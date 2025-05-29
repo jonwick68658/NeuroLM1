@@ -6,6 +6,13 @@ from datetime import datetime, timedelta
 import logging
 import openai
 import re
+import threading
+import time
+import schedule
+from retrieval import MemoryRetriever
+from consolidation import MemoryConsolidator
+from association import AssociationEngine
+import config
 
 class Neo4jMemory:
     def __init__(self):
@@ -28,7 +35,15 @@ class Neo4jMemory:
                 base_url="https://openrouter.ai/api/v1"
             )
             
-            logging.info("Neo4j connection established successfully")
+            # Initialize advanced memory components
+            self.retriever = MemoryRetriever(self.driver, config.DEFAULT_RETRIEVAL_WEIGHTS)
+            self.consolidator = MemoryConsolidator(self.driver)
+            self.associator = AssociationEngine(self.driver)
+            
+            # Start background services
+            self.start_background_jobs()
+            
+            logging.info("Neo4j connection and advanced memory system established successfully")
             
         except Exception as e:
             logging.error(f"Failed to connect to Neo4j: {str(e)}")
