@@ -25,107 +25,213 @@ def init_memory():
 memory = init_memory()
 DEFAULT_USER = "default_user"
 
-# NeuroLM Professional Styling
+# NeuroLM Professional Dark Theme
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-.main-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 2rem;
-    border-radius: 15px;
+/* Global Dark Theme */
+.stApp {
+    background-color: #0d1117;
+    color: #e6edf3;
+}
+
+.main > div {
+    background-color: #0d1117;
+}
+
+/* Header Styling */
+.neuro-header {
+    background: linear-gradient(135deg, #4c9aff 0%, #7b68ee 50%, #ff6b9d 100%);
+    padding: 3rem 2rem;
+    border-radius: 20px;
     margin-bottom: 2rem;
     text-align: center;
     color: white;
+    position: relative;
+    overflow: hidden;
 }
 
-.main-title {
+.neuro-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+}
+
+.neuro-title {
     font-family: 'Inter', sans-serif;
-    font-size: 3rem;
+    font-size: 4rem;
     font-weight: 700;
     margin: 0;
-    letter-spacing: -1px;
+    letter-spacing: -2px;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
-.main-subtitle {
+.neuro-subtitle {
     font-family: 'Inter', sans-serif;
-    font-size: 1.2rem;
+    font-size: 1.4rem;
     font-weight: 300;
     margin: 0.5rem 0 0 0;
-    opacity: 0.9;
+    opacity: 0.95;
+    position: relative;
+    z-index: 1;
 }
 
+/* Login Page Styling */
+.login-container {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 2rem;
+    background: #161b22;
+    border-radius: 16px;
+    border: 1px solid #30363d;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+/* Input Styling */
 .stTextInput > div > div > input {
-    background-color: #1e1e1e;
-    color: white;
-    border: 1px solid #333;
-    border-radius: 8px;
-    font-family: 'Inter', sans-serif;
+    background-color: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 8px !important;
+    font-family: 'Inter', sans-serif !important;
+    padding: 0.75rem 1rem !important;
 }
 
+.stTextInput > div > div > input:focus {
+    border-color: #4c9aff !important;
+    box-shadow: 0 0 0 3px rgba(76, 154, 255, 0.1) !important;
+}
+
+/* Button Styling */
 .stButton > button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 8px;
-    border: none;
-    font-family: 'Inter', sans-serif;
-    font-weight: 500;
-    transition: all 0.3s ease;
+    background: linear-gradient(135deg, #4c9aff 0%, #7b68ee 100%) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    border: none !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 500 !important;
+    padding: 0.75rem 2rem !important;
+    transition: all 0.3s ease !important;
+    width: 100% !important;
 }
 
 .stButton > button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px rgba(76, 154, 255, 0.4) !important;
 }
 
+/* Navigation Buttons */
+.nav-button {
+    background: #21262d !important;
+    border: 1px solid #30363d !important;
+    color: #e6edf3 !important;
+    padding: 0.75rem 1.5rem !important;
+    border-radius: 8px !important;
+    font-family: 'Inter', sans-serif !important;
+    margin-right: 0.5rem !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+.nav-button:hover {
+    background: #30363d !important;
+    border-color: #4c9aff !important;
+}
+
+.nav-button.active {
+    background: linear-gradient(135deg, #4c9aff 0%, #7b68ee 100%) !important;
+    color: white !important;
+    border: none !important;
+}
+
+/* Sidebar Styling */
 .sidebar-section {
-    background-color: #f8f9fa;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1rem;
-    border-left: 4px solid #667eea;
+    background-color: #161b22;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    border: 1px solid #30363d;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
 .sidebar-title {
     font-family: 'Inter', sans-serif;
     font-weight: 600;
-    color: #333;
-    margin-bottom: 0.5rem;
+    color: #e6edf3;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
 }
 
 .topic-item {
     font-family: 'Inter', sans-serif;
     font-size: 0.9rem;
-    color: #666;
-    margin: 0.25rem 0;
+    color: #8b949e;
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background-color: #21262d;
+    border-radius: 6px;
+    border-left: 3px solid #4c9aff;
 }
 
 .chat-item {
     font-family: 'Inter', sans-serif;
     font-size: 0.85rem;
-    color: #555;
-    padding: 0.5rem;
-    background-color: #f1f3f4;
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
+    color: #e6edf3;
+    padding: 0.75rem;
+    background-color: #21262d;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
     cursor: pointer;
+    border: 1px solid #30363d;
+    transition: all 0.3s ease;
 }
 
-.nav-button {
-    background: transparent;
-    border: 1px solid #ddd;
-    color: #666;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-family: 'Inter', sans-serif;
-    margin-right: 0.5rem;
-    cursor: pointer;
+.chat-item:hover {
+    background-color: #30363d;
+    border-color: #4c9aff;
 }
 
-.nav-button.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
+/* Chat Message Styling */
+.stChatMessage {
+    background-color: #161b22 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 12px !important;
+}
+
+/* Success/Error Messages */
+.stSuccess {
+    background-color: #1a472a !important;
+    color: #4cc9f0 !important;
+    border: 1px solid #46954a !important;
+}
+
+.stError {
+    background-color: #490008 !important;
+    color: #ff6b9d !important;
+    border: 1px solid #da1e37 !important;
+}
+
+.stWarning {
+    background-color: #4d2d00 !important;
+    color: #ffa500 !important;
+    border: 1px solid #ff8500 !important;
+}
+
+/* Metrics */
+.metric-container {
+    background-color: #161b22;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #30363d;
+    margin-bottom: 1rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -136,23 +242,34 @@ def check_login():
         st.session_state.authenticated = False
     
     if not st.session_state.authenticated:
-        st.title("🔐 Second Brain AI - Login")
-        st.write("Please enter your credentials to access your AI assistant.")
+        # NeuroLM Login Header
+        st.markdown("""
+        <div class="neuro-header">
+            <h1 class="neuro-title">NeuroLM</h1>
+            <p class="neuro-subtitle">Your Personal Neural Language Model</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+        # Login Container
+        st.markdown('<div class="login-container">', unsafe_allow_html=True)
+        st.markdown("### Access Your Neural Network")
+        st.markdown("Enter your credentials to continue")
         
-        if st.button("Login"):
+        username = st.text_input("Username", placeholder="Enter username")
+        password = st.text_input("Password", type="password", placeholder="Enter password")
+        
+        if st.button("Connect to NeuroLM"):
             app_username = os.getenv("APP_USERNAME")
             app_password = os.getenv("APP_PASSWORD")
             
             if username == app_username and password == app_password:
                 st.session_state.authenticated = True
-                st.success("Login successful!")
+                st.success("Neural connection established")
                 st.rerun()
             else:
-                st.error("Invalid credentials. Please try again.")
+                st.error("Invalid credentials. Access denied.")
         
+        st.markdown('</div>', unsafe_allow_html=True)
         return False
     
     return True
@@ -267,27 +384,33 @@ def main():
         
         # Header
         st.markdown("""
-        <div class="main-header">
-            <h1 class="main-title">NeuroLM</h1>
-            <p class="main-subtitle">Your Personal Neural Language Model</p>
+        <div class="neuro-header">
+            <h1 class="neuro-title">NeuroLM</h1>
+            <p class="neuro-subtitle">Your Personal Neural Language Model</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Navigation buttons
-        col1, col2, col3, col4 = st.columns([1, 1, 1, 8])
+        # Navigation
+        nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([2, 2, 2, 6])
         
-        with col1:
-            if st.button("Chat", key="nav_chat"):
+        with nav_col1:
+            chat_class = "nav-button active" if st.session_state.page == "chat" else "nav-button"
+            if st.button("💬 Chat", key="nav_chat", help="Chat interface"):
                 st.session_state.page = "chat"
+                st.rerun()
         
-        with col2:
-            if st.button("Settings", key="nav_settings"):
+        with nav_col2:
+            settings_class = "nav-button active" if st.session_state.page == "settings" else "nav-button"
+            if st.button("⚙️ Neural Settings", key="nav_settings", help="Neural system controls"):
                 st.session_state.page = "settings"
+                st.rerun()
         
-        with col3:
-            if st.button("Logout", key="nav_logout"):
+        with nav_col3:
+            if st.button("🚪 Disconnect", key="nav_logout", help="Logout"):
                 st.session_state.authenticated = False
                 st.rerun()
+        
+        st.markdown("---")
         
         # Sidebar content
         with st.sidebar:
