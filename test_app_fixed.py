@@ -617,7 +617,8 @@ def chat_history_sidebar():
     if memory:
         try:
             # Get conversation sessions
-            sessions = get_conversation_sessions(DEFAULT_USER, limit=10)
+            current_user = get_current_user()
+            sessions = get_conversation_sessions(current_user, limit=10)
             
             if sessions:
                 conversation_count = 0
@@ -667,7 +668,7 @@ def analytics_sidebar():
     """Analytics page sidebar content"""
     if memory:
         try:
-            stats = memory.get_memory_stats(DEFAULT_USER)
+            stats = memory.get_memory_stats(get_current_user())
             
             st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
             st.markdown('<div class="sidebar-title">Memory Insights</div>', unsafe_allow_html=True)
@@ -695,7 +696,7 @@ def explorer_sidebar():
         
         if search_query:
             try:
-                results = memory.get_relevant_memories(search_query, DEFAULT_USER, limit=5)
+                results = memory.get_relevant_memories(search_query, get_current_user(), limit=5)
                 if results:
                     for result in results:
                         preview = result[:40] + "..." if len(result) > 40 else result
@@ -709,11 +710,11 @@ def explorer_sidebar():
 
 def analytics_dashboard():
     """Analytics dashboard with real data"""
-    neural_activity_widget(DEFAULT_USER)
+    neural_activity_widget(get_current_user())
     
     if memory:
         try:
-            stats = memory.get_memory_stats(DEFAULT_USER)
+            stats = memory.get_memory_stats(get_current_user())
             
             col1, col2 = st.columns(2)
             
@@ -742,12 +743,12 @@ def memory_explorer():
     if memory:
         try:
             # Get all memories for exploration
-            memory_count = memory.get_memory_count(DEFAULT_USER)
+            memory_count = memory.get_memory_count(get_current_user())
             st.info(f"Exploring {memory_count} stored memories")
             
             # Simple memory browser
             if memory_count > 0:
-                recent_memories = memory.get_conversation_history(DEFAULT_USER, limit=10)
+                recent_memories = memory.get_conversation_history(get_current_user(), limit=10)
                 
                 if recent_memories:
                     st.markdown("### Recent Memories")
@@ -798,7 +799,7 @@ def chat_interface():
         # Store user message in memory
         if memory:
             try:
-                memory.store_chat(DEFAULT_USER, "user", prompt)
+                memory.store_chat(get_current_user(), "user", prompt)
             except Exception as e:
                 st.warning(f"Memory storage issue: {str(e)}")
         
@@ -807,7 +808,7 @@ def chat_interface():
         if memory:
             with st.spinner("Accessing neural network..."):
                 try:
-                    context = memory.get_relevant_memories(prompt, DEFAULT_USER)
+                    context = memory.get_relevant_memories(prompt, get_current_user())
                 except Exception as e:
                     st.warning(f"Memory retrieval issue: {str(e)}")
         
@@ -871,7 +872,7 @@ You are an intelligent AI assistant designed to act as the user's neural memory 
             
             if memory:
                 try:
-                    memory.store_chat(DEFAULT_USER, "assistant", full_response)
+                    memory.store_chat(get_current_user(), "assistant", full_response)
                 except Exception as e:
                     st.warning(f"Failed to store AI response: {str(e)}")
                     
