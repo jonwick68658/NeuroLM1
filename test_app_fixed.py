@@ -749,27 +749,25 @@ def main():
             elif st.session_state.page == "explorer":
                 explorer_sidebar()
             
-            # User profile section at bottom of sidebar
-            st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
+            # Push content to bottom
+            st.markdown("<div style='flex: 1;'></div>", unsafe_allow_html=True)
             
+            # Compact user profile at bottom
             st.markdown("""
-            <div style="padding: 1.5rem; background: var(--surface-1); border-top: 1px solid #252525; margin-top: auto;">
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center;">
-                  <div style="width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; margin-right: 12px;">
-                    <span style="color: white; font-weight: 700; font-size: 14px;">U</span>
-                  </div>
-                  <div>
-                    <div style="font-weight: 500; color: var(--text-primary);">Demo User</div>
-                    <div style="font-size: 0.9rem; color: var(--text-secondary);">Neural Network Active</div>
-                  </div>
+            <div style="padding: 0.75rem; background: rgba(18, 18, 18, 0.6); border-top: 1px solid #333; margin: 0 -1rem -1rem -1rem;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 24px; height: 24px; border-radius: 4px; background: rgba(127, 90, 240, 0.3); display: flex; align-items: center; justify-content: center;">
+                  <span style="color: var(--accent-primary); font-weight: 600; font-size: 10px;">U</span>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-size: 0.8rem; color: var(--text-primary); opacity: 0.9;">Demo User</div>
                 </div>
               </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Logout button as a proper Streamlit button
-            if st.button("Logout", key="logout_btn", use_container_width=True):
+            # Small logout button
+            if st.button("Logout", key="logout_btn", help="Disconnect from NeuroLM"):
                 st.session_state.authenticated = False
                 st.rerun()
         
