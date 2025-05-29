@@ -45,17 +45,25 @@ class MemoryRetriever:
             if not memory_timestamp:
                 return 0.0
                 
-            # Handle both datetime and string timestamps
-            if isinstance(memory_timestamp, str):
+            # Handle Neo4j DateTime objects and strings
+            if hasattr(memory_timestamp, 'to_native'):
+                # Neo4j DateTime object
+                memory_time = memory_timestamp.to_native()
+            elif isinstance(memory_timestamp, str):
                 memory_time = datetime.fromisoformat(memory_timestamp.replace('Z', '+00:00'))
             else:
                 memory_time = memory_timestamp
                 
+            # Ensure both times are timezone-aware or naive
+            now = datetime.now()
+            if hasattr(memory_time, 'tzinfo') and memory_time.tzinfo:
+                now = datetime.now(memory_time.tzinfo)
+            
             # Calculate days since memory creation
-            days_old = (datetime.now().replace(tzinfo=memory_time.tzinfo) - memory_time).days
+            days_old = (now - memory_time).days
             
             # Exponential decay: newer memories score higher
-            temporal_score = math.exp(-days_old / decay_days)
+            temporal_score = math.exp(-max(0, days_old) / decay_days)
             
             return min(1.0, temporal_score)
             
