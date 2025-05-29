@@ -19,55 +19,61 @@ def init_memory():
     try:
         return Neo4jMemory()
     except Exception as e:
-        st.sidebar.warning(f"Neo4j connection issue: {str(e)}")
+        st.error(f"Memory initialization failed: {str(e)}")
         return None
 
 memory = init_memory()
 DEFAULT_USER = "default_user"
 
-# This line was moved to fix the Streamlit configuration error
-
 # Custom CSS for sleek interface
 st.markdown("""
 <style>
-    .stApp {
-        background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
-        color: white;
-    }
-    .stSidebar {
-        background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
-    }
+.stTextInput > div > div > input {
+    background-color: #2b2b2b;
+    color: white;
+    border-radius: 10px;
+}
+.stButton > button {
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 10px;
+    border: none;
+    padding: 0.5rem 1rem;
+    transition: background-color 0.3s;
+}
+.stButton > button:hover {
+    background-color: #45a049;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Simple login check
 def check_login():
+    """Handle user login"""
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
     
     if not st.session_state.authenticated:
-        with st.sidebar:
-            st.markdown("### 🔐 Second Brain Access")
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
+        st.title("🔐 Second Brain AI - Login")
+        st.write("Please enter your credentials to access your AI assistant.")
+        
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        
+        if st.button("Login"):
+            app_username = os.getenv("APP_USERNAME")
+            app_password = os.getenv("APP_PASSWORD")
             
-            if st.button("🧠 Access Brain"):
-                app_user = os.getenv("APP_USERNAME")
-                app_pass = os.getenv("APP_PASSWORD")
-                
-                if not app_user or not app_pass:
-                    st.error("App credentials not configured")
-                    return False
-                
-                if username == app_user and password == app_pass:
-                    st.session_state.authenticated = True
-                    st.rerun()
-                else:
-                    st.error("Invalid credentials")
+            if username == app_username and password == app_password:
+                st.session_state.authenticated = True
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error("Invalid credentials. Please try again.")
+        
         return False
+    
     return True
 
-# Main interface
 def main():
     if check_login():
         st.title("🧠 Second Brain AI")
