@@ -331,68 +331,7 @@ def chat_history_sidebar():
             st.markdown('<div class="topic-item">Connecting...</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-def neural_settings_page():
-    """Neural system settings and controls"""
-    st.markdown("""
-    <div class="main-header">
-        <h1 class="main-title">Neural Settings</h1>
-        <p class="main-subtitle">Configure your personal neural language model</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Memory System Status")
-        
-        if memory:
-            try:
-                stats = memory.get_memory_stats(DEFAULT_USER)
-                
-                st.metric("Total Memories", stats["total_memories"])
-                st.metric("Strong Memories", stats["strong_memories"])
-                st.metric("Average Confidence", f"{stats['avg_confidence']*100:.1f}%")
-                st.metric("Total Accesses", stats["total_accesses"])
-                st.metric("Neural Connections", stats.get("total_links", 0))
-                
-                st.success("Neural network active")
-                
-            except Exception as e:
-                st.warning(f"Memory system status: {str(e)}")
-        else:
-            st.info("Session memory mode")
-    
-    with col2:
-        st.subheader("Neural Operations")
-        
-        if st.button("Strengthen Memory Pathways"):
-            if memory:
-                with st.spinner("Consolidating neural pathways..."):
-                    memory.reinforce_memories(DEFAULT_USER)
-                st.success("Memory consolidation complete")
-            else:
-                st.warning("Neural memory system not available")
-        
-        if st.button("Clear Memory Cache"):
-            if memory:
-                if st.checkbox("Confirm memory reset"):
-                    memory.clear_user_memories(DEFAULT_USER)
-                    st.success("Memory cache cleared")
-            else:
-                st.warning("Neural memory system not available")
-        
-        if st.button("Run System Diagnostics"):
-            if memory:
-                with st.spinner("Running neural diagnostics..."):
-                    # Test memory retrieval
-                    test_memories = memory.get_relevant_memories("test", DEFAULT_USER, 1)
-                    st.info(f"Memory retrieval: {len(test_memories)} results")
-                    
-                    # Test database connection
-                    count = memory.get_memory_count(DEFAULT_USER)
-                    st.info(f"Database connection: {count} memories stored")
-            else:
-                st.warning("Neural memory system not available")
+
 
 def main():
     if check_login():
@@ -408,23 +347,12 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Navigation
-        nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([2, 2, 2, 6])
-        
-        with nav_col1:
-            chat_class = "nav-button active" if st.session_state.page == "chat" else "nav-button"
-            if st.button("💬 Chat", key="nav_chat", help="Chat interface"):
-                st.session_state.page = "chat"
-                st.rerun()
+        # Top navigation bar with menu
+        nav_col1, nav_col2 = st.columns([9, 1])
         
         with nav_col2:
-            settings_class = "nav-button active" if st.session_state.page == "settings" else "nav-button"
-            if st.button("⚙️ Neural Settings", key="nav_settings", help="Neural system controls"):
-                st.session_state.page = "settings"
-                st.rerun()
-        
-        with nav_col3:
-            if st.button("🚪 Disconnect", key="nav_logout", help="Logout"):
+            menu_option = st.selectbox("", ["⋮", "Disconnect"], key="top_menu", label_visibility="collapsed")
+            if menu_option == "Disconnect":
                 st.session_state.authenticated = False
                 st.rerun()
         
@@ -434,11 +362,8 @@ def main():
         with st.sidebar:
             chat_history_sidebar()
         
-        # Page content
-        if st.session_state.page == "settings":
-            neural_settings_page()
-        else:
-            chat_interface()
+        # Main chat interface
+        chat_interface()
 
 def chat_interface():
     """Main chat interface"""
