@@ -148,8 +148,8 @@ class Neo4jMemory:
                 ON CREATE SET r.relevance = 1.0, r.created = datetime($timestamp)
                 
                 // Enhanced associative linking
-                WITH m, u
-                MATCH (u)-[:CREATED]->(prev:Memory)
+                WITH m
+                MATCH (u:User {id: $user_id})-[:CREATED]->(prev:Memory)
                 WHERE prev.timestamp < datetime($timestamp) AND prev.type = 'chat'
                 
                 // Calculate semantic similarity and temporal proximity
