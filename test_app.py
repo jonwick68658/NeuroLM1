@@ -161,12 +161,7 @@ def init_memory():
 memory = init_memory()
 DEFAULT_USER = "default_user"
 
-# Configure page
-st.set_page_config(
-    page_title="Second-Brain-AI",
-    page_icon="🧠",
-    layout="wide"
-)
+# This line was moved to fix the Streamlit configuration error
 
 # Custom CSS for sleek interface
 st.markdown("""
