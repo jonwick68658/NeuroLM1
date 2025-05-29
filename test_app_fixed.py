@@ -130,16 +130,18 @@ def neural_message(content, sender="AI", timestamp=None, sources=None):
             
         timestamp_html = ""
         if timestamp:
-            # Convert UTC timestamp to local time using browser timezone
-            timestamp_html = f"""
-            <div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);" id="timestamp-{id(timestamp)}">
-            </div>
-            <script>
-                const utcTime = new Date('{timestamp.isoformat()}Z');
-                const localTime = utcTime.toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit'}});
-                document.getElementById('timestamp-{id(timestamp)}').textContent = localTime;
-            </script>
-            """
+            # Simple local time conversion (fallback to showing time without timezone conversion)
+            try:
+                import pytz
+                # Convert to a reasonable timezone (you can make this configurable)
+                local_time = timestamp.strftime('%H:%M')
+                timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
+                  {local_time}
+                </div>"""
+            except:
+                timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
+                  {timestamp.strftime('%H:%M') if timestamp else ''}
+                </div>"""
         
         st.markdown(f"""
         <div class="neural-message" style="border-left: 3px solid var(--accent-secondary); position: relative;">
@@ -161,16 +163,11 @@ def neural_message(content, sender="AI", timestamp=None, sources=None):
     else:
         timestamp_html = ""
         if timestamp:
-            # Convert UTC timestamp to local time using browser timezone
-            timestamp_html = f"""
-            <div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);" id="timestamp-user-{id(timestamp)}">
-            </div>
-            <script>
-                const utcTime = new Date('{timestamp.isoformat()}Z');
-                const localTime = utcTime.toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit'}});
-                document.getElementById('timestamp-user-{id(timestamp)}').textContent = localTime;
-            </script>
-            """
+            # Simple time display without timezone complexity
+            local_time = timestamp.strftime('%H:%M')
+            timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
+              {local_time}
+            </div>"""
         
         st.markdown(f"""
         <div class="neural-message" style="border-left: 3px solid #444; position: relative;">
