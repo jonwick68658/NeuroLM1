@@ -455,9 +455,13 @@ def get_conversation_sessions(user_id, limit=10):
                 content = str(msg)
                 role = "unknown"
             
-            # Filter out technical content
-            if content and not any(keyword in content.lower() for keyword in ["match", "return", "session.run", "cypher"]):
-                current_session.append({"content": content, "role": role})
+            # Strict filtering for valid content
+            if (content and 
+                content.strip() and 
+                len(content.strip()) > 3 and
+                not any(keyword in content.lower() for keyword in ["match", "return", "session.run", "cypher", "neo4j", "driver"])):
+                
+                current_session.append({"content": content.strip(), "role": role})
                 
                 # Start new session every 15 messages to create logical breaks
                 if len(current_session) >= 15:
@@ -465,10 +469,18 @@ def get_conversation_sessions(user_id, limit=10):
                         sessions.append(current_session)
                     current_session = []
         
-        if current_session:
+        # Only add session if it has meaningful content
+        if current_session and len(current_session) > 0:
             sessions.append(current_session)
         
-        return sessions[:limit]
+        # Filter out sessions with no user messages
+        valid_sessions = []
+        for session in sessions:
+            has_user_message = any(msg["role"] == "user" for msg in session)
+            if has_user_message and len(session) > 0:
+                valid_sessions.append(session)
+        
+        return valid_sessions[:limit]
     except Exception:
         return []
 
