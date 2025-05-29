@@ -249,6 +249,8 @@ def chat_interface():
         context_str = "\n\n".join([f"- {mem}" for mem in context]) if context else ""
         enhancements = " (Enhanced by your personal knowledge)" if context else ""
         
+        context_section = f'Relevant Context from Knowledge Base:\n{context_str}' if context_str else ''
+        
         system_prompt = f"""You are a sophisticated second brain assistant{enhancements} with access to the user's conversation history and uploaded knowledge.
         
 Your role is to:
@@ -257,7 +259,7 @@ Your role is to:
 3. Provide thoughtful, contextual responses
 4. Build on previous discussions to create continuity
 
-{f'Relevant Context from Knowledge Base:\\n{context_str}' if context_str else ''}
+{context_section}
 
 Current conversation context: {len(st.session_state.messages)} messages in this session.
 """

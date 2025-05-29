@@ -5,6 +5,12 @@ description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
     "streamlit>=1.45.1",
+    "openai>=1.0.0",
+    "neo4j>=5.0.0",
+    "python-dotenv>=1.0.0",
+    "PyPDF2>=3.0.0",
+    "docx2txt>=0.8",
+    "pytz>=2023.3",
 ]
 
 [[tool.uv.index]]
