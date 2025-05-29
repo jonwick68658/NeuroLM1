@@ -3,9 +3,9 @@ import os
 import re
 import hashlib
 
-# Simple fallback embedding function using hash-based approach
+# Enhanced embedding function with multiple fallback methods
 def generate_embedding(text):
-    """Generate simple hash-based embedding for text"""
+    """Generate embedding with multiple fallback methods"""
     if not text or not text.strip():
         return [0.0] * 384  # Return zero vector for empty text
     
@@ -15,17 +15,45 @@ def generate_embedding(text):
         if not cleaned_text:
             return [0.0] * 384
         
-        # Create a simple hash-based embedding (384 dimensions)
-        # This is a temporary solution until we can install sentence-transformers
-        text_hash = hashlib.md5(cleaned_text.encode()).hexdigest()
-        embedding = []
+        # Attempt 1: Try sentence-transformers if available
+        try:
+            from sentence_transformers import SentenceTransformer
+            model = SentenceTransformer('all-MiniLM-L6-v2')
+            return model.encode(cleaned_text).tolist()
+        except Exception:
+            pass
         
-        # Generate 384 float values from the hash
-        for i in range(0, 384):
-            # Use different parts of the hash to create varied values
-            hash_part = text_hash[(i % len(text_hash))]
-            embedding.append(float(int(hash_part, 16)) / 15.0)  # Normalize to 0-1
+        # Attempt 2: Try TF-IDF with sklearn if available
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            import numpy as np
             
+            # Create a simple TF-IDF representation
+            vectorizer = TfidfVectorizer(max_features=384, stop_words='english')
+            # Need to fit on a corpus, so we'll use the text itself with some common words
+            corpus = [cleaned_text, "the quick brown fox jumps over lazy dog"]
+            tfidf_matrix = vectorizer.fit_transform(corpus)
+            embedding = tfidf_matrix[0].toarray()[0].tolist()
+            
+            # Pad or truncate to 384 dimensions
+            if len(embedding) < 384:
+                embedding.extend([0.0] * (384 - len(embedding)))
+            else:
+                embedding = embedding[:384]
+            
+            return embedding
+        except Exception:
+            pass
+        
+        # Final fallback: Enhanced hash-based embedding
+        embedding = []
+        for i in range(384):
+            # Create multiple hash values for better distribution
+            hash_input = f"{cleaned_text}_{i}_embedding_salt"
+            hash_value = hash(hash_input) % 10000
+            normalized_value = (hash_value / 10000.0) * 2 - 1  # Scale to -1 to 1
+            embedding.append(normalized_value)
+        
         return embedding
         
     except Exception as e:

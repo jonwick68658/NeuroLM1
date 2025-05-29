@@ -212,69 +212,25 @@ class Neo4jMemory:
         """Retrieve relevant memories using enhanced associative biomemetic search"""
         try:
             query_embedding = generate_embedding(query)
-            current_time = datetime.now(pytz.utc).isoformat()
             
             with self.driver.session() as session:
+                # SIMPLIFIED AND CORRECTED QUERY
                 results = session.run("""
-                // Primary vector similarity search
-                CALL db.index.vector.queryNodes('memory_embeddings', $limit_expanded, $query_embedding) 
+                CALL db.index.vector.queryNodes('memory_embeddings', $limit, $query_embedding) 
                 YIELD node, score
                 MATCH (node)<-[:CREATED]-(:User {id: $user_id})
-                WHERE score > 0.3
-                
-                // Calculate biomemetic relevance score
-                WITH node, score,
-                     // Recency factor (more recent = higher score)
-                     CASE WHEN node.timestamp IS NOT NULL 
-                          THEN 1.0 - (duration.between(node.timestamp, datetime($current_time)).days / 365.0)
-                          ELSE 0.5 END AS recency_factor,
-                     // Confidence factor
-                     coalesce(node.confidence, 1.0) AS confidence_factor,
-                     // Access frequency factor
-                     (coalesce(node.access_count, 0) * 0.1 + 1.0) AS frequency_factor
-                
-                // Enhanced associative boost - find connected memories
-                OPTIONAL MATCH (node)-[assoc:ASSOCIATED_WITH]-(related:Memory)<-[:CREATED]-(:User {id: $user_id})
-                WITH node, score, recency_factor, confidence_factor, frequency_factor,
-                     // Associative strength bonus
-                     1.0 + sum(coalesce(assoc.strength, 0)) * 0.3 AS associative_boost
-                
-                // Combined enhanced biomemetic score
-                WITH node, 
-                     score * recency_factor * confidence_factor * frequency_factor * associative_boost AS final_score
                 
                 // Update access tracking for retrieved memories
                 SET node.access_count = coalesce(node.access_count, 0) + 1,
-                    node.last_accessed = datetime($current_time),
-                    node.importance_score = coalesce(node.importance_score, 0.5) + 0.05
+                    node.last_accessed = datetime()
                 
-                RETURN node.content AS content, final_score, node.timestamp AS timestamp
-                ORDER BY final_score DESC
+                RETURN node.content AS content, score
+                ORDER BY score DESC
                 LIMIT $limit
-                
-                UNION
-                
-                // Secondary: Include highly connected memories even if not directly similar
-                MATCH (seed:Memory)<-[:CREATED]-(:User {id: $user_id})
-                WHERE seed.content CONTAINS $query_keywords
-                MATCH (seed)-[assoc:ASSOCIATED_WITH*1..2]-(connected:Memory)<-[:CREATED]-(:User {id: $user_id})
-                WHERE assoc.strength > 0.5
-                WITH connected, avg([r IN assoc | r.strength]) AS connection_strength
-                WHERE connection_strength > 0.6
-                
-                SET connected.access_count = coalesce(connected.access_count, 0) + 1,
-                    connected.last_accessed = datetime($current_time)
-                
-                RETURN connected.content AS content, connection_strength AS final_score, connected.timestamp AS timestamp
-                ORDER BY final_score DESC
-                LIMIT 2
                 """, 
                 query_embedding=query_embedding,
                 user_id=user_id,
-                limit=limit,
-                limit_expanded=limit * 2,
-                current_time=current_time,
-                query_keywords=query.lower()[:50]  # Simple keyword matching
+                limit=limit
                 )
                 
                 memories = [record["content"] for record in results]
