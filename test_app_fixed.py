@@ -301,7 +301,6 @@ def main():
 
 def chat_interface():
     """Main chat interface"""
-    # Chat interface
     if "messages" not in st.session_state:
         st.session_state.messages = []
     
@@ -336,14 +335,12 @@ def chat_interface():
         # Get AI response
         with st.chat_message("assistant"):
             try:
-                # Build context string
                 context_str = "\n\n".join([f"- {mem}" for mem in context]) if context else ""
                 enhancements = " with access to your personal knowledge" if context else ""
-                
                 context_section = f'Relevant Context:\n{context_str}' if context_str else ''
                 
                 system_prompt = f"""You are NeuroLM, an advanced neural language model{enhancements}.
-                
+
 Your capabilities:
 1. Recall and reference past conversations naturally
 2. Connect information across different discussions
@@ -352,8 +349,7 @@ Your capabilities:
 
 {context_section}
 
-You are an intelligent AI assistant designed to act as the user's second brain.
-"""
+You are an intelligent AI assistant designed to act as the user's second brain."""
                 
                 response = openai_client.chat.completions.create(
                     model="gpt-4o-mini-2024-07-18",
@@ -377,7 +373,6 @@ You are an intelligent AI assistant designed to act as the user's second brain.
                 message_placeholder.markdown(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 
-                # Store AI response in Neo4j
                 if memory:
                     try:
                         memory.store_chat(DEFAULT_USER, "assistant", full_response)
