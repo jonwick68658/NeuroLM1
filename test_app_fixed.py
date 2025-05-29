@@ -466,22 +466,7 @@ def chat_history_sidebar():
             
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Popular topics
-            stats = memory.get_memory_stats(DEFAULT_USER)
-            
-            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-            st.markdown('<div class="sidebar-title">Most Discussed Topics</div>', unsafe_allow_html=True)
-            
-            if stats and stats.get("top_topics"):
-                for topic, count in stats["top_topics"][:5]:
-                    if isinstance(topic, str) and len(topic.strip()) > 0:
-                        # Filter out any code or query strings
-                        if not any(keyword in topic.lower() for keyword in ["match", "return", "session", "cypher"]):
-                            st.markdown(f'<div class="topic-item">{topic} ({count})</div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="topic-item">No topics identified yet</div>', unsafe_allow_html=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+
             
         except Exception as e:
             st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
