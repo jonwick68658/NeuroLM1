@@ -81,19 +81,43 @@ def main():
                 st.session_state.authenticated = False
                 st.rerun()
             
-            # Advanced Memory Stats
+            # Enhanced Associative Memory Stats
             if memory:
                 try:
                     stats = memory.get_memory_stats(DEFAULT_USER)
-                    st.metric("🧠 Total Memories", stats["total_memories"])
-                    st.metric("💪 Strong Memories", stats["strong_memories"])
-                    st.metric("📊 Avg Confidence", f"{stats['avg_confidence']*100:.1f}%")
-                    st.metric("🔄 Total Accesses", stats["total_accesses"])
-                    st.success("✅ Biomemetic Brain Active")
+                    
+                    # Core memory metrics
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("🧠 Total Memories", stats["total_memories"])
+                        st.metric("💪 Strong Memories", stats["strong_memories"])
+                    with col2:
+                        st.metric("📊 Avg Confidence", f"{stats['avg_confidence']*100:.1f}%")
+                        st.metric("🔄 Total Accesses", stats["total_accesses"])
+                    
+                    # Associative connection metrics  
+                    st.markdown("**🔗 Neural Connections**")
+                    col3, col4 = st.columns(2)
+                    with col3:
+                        st.metric("🕸️ Total Links", stats["total_connections"])
+                        st.metric("⚡ Strong Links", stats["strong_connections"])
+                    with col4:
+                        connection_pct = f"{stats['avg_connection_strength']*100:.1f}%"
+                        st.metric("🎯 Link Strength", connection_pct)
+                        
+                        # Brain connectivity indicator
+                        if stats["total_connections"] > 10:
+                            st.success("🧠 Highly Connected Brain")
+                        elif stats["total_connections"] > 5:
+                            st.info("🌱 Growing Neural Network")
+                        else:
+                            st.info("🌟 Building Connections")
+                    
+                    st.success("✅ Enhanced Associative Brain Active")
                     
                     # Memory reinforcement button
                     if st.button("🧠 Strengthen Memories"):
-                        with st.spinner("Consolidating memories..."):
+                        with st.spinner("Consolidating neural pathways..."):
                             memory.reinforce_memories(DEFAULT_USER)
                         st.success("Memory reinforcement complete!")
                         st.rerun()

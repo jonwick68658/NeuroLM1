@@ -78,15 +78,41 @@ class Neo4jMemory:
                 })
                 CREATE (u)-[:CREATED]->(m)
                 
-                // Link to recent memories for associative connections
+                // Enhanced associative linking
                 WITH m, u
                 MATCH (u)-[:CREATED]->(prev:Memory)
                 WHERE prev.timestamp < datetime($timestamp) AND prev.type = 'chat'
-                WITH m, prev ORDER BY prev.timestamp DESC LIMIT 3
-                FOREACH (p IN CASE WHEN prev IS NOT NULL THEN [prev] ELSE [] END |
-                    MERGE (p)-[link:ASSOCIATED_WITH]->(m)
-                    ON CREATE SET link.strength = 0.6, link.created = datetime($timestamp)
-                )
+                
+                // Calculate semantic similarity and temporal proximity
+                WITH m, prev,
+                     // Temporal factor - recent conversations get stronger links
+                     1.0 - (duration.between(prev.timestamp, datetime($timestamp)).hours / 168.0) AS temporal_factor,
+                     // Content similarity (simplified - later enhanced with embeddings)
+                     CASE WHEN size(apoc.text.split(toLower(prev.content), ' ')) > 0 AND 
+                               size(apoc.coll.intersection(
+                                   apoc.text.split(toLower(prev.content), ' '),
+                                   apoc.text.split(toLower($content), ' ')
+                               )) > 0
+                          THEN toFloat(size(apoc.coll.intersection(
+                                   apoc.text.split(toLower(prev.content), ' '),
+                                   apoc.text.split(toLower($content), ' ')
+                               ))) / size(apoc.text.split(toLower(prev.content), ' '))
+                          ELSE 0.1 END AS content_similarity
+                
+                // Create stronger links for more related content
+                WITH m, prev, temporal_factor * content_similarity AS link_strength
+                WHERE link_strength > 0.2
+                ORDER BY link_strength DESC
+                LIMIT 5
+                
+                MERGE (prev)-[link:ASSOCIATED_WITH]->(m)
+                ON CREATE SET 
+                    link.strength = link_strength,
+                    link.created = datetime($timestamp),
+                    link.type = 'semantic'
+                ON MATCH SET 
+                    link.strength = link.strength * 0.9 + link_strength * 0.1,
+                    link.last_reinforced = datetime($timestamp)
                 """, 
                 user_id=user_id, 
                 role=role, 
@@ -131,13 +157,14 @@ class Neo4jMemory:
             raise Exception(f"Knowledge storage failed: {str(e)}")
     
     def get_relevant_memories(self, query, user_id, limit=7):
-        """Retrieve relevant memories using enhanced biomemetic search"""
+        """Retrieve relevant memories using enhanced associative biomemetic search"""
         try:
             query_embedding = generate_embedding(query)
             current_time = datetime.now(pytz.utc).isoformat()
             
             with self.driver.session() as session:
                 results = session.run("""
+                // Primary vector similarity search
                 CALL db.index.vector.queryNodes('memory_embeddings', $limit_expanded, $query_embedding) 
                 YIELD node, score
                 MATCH (node)<-[:CREATED]-(:User {id: $user_id})
@@ -154,28 +181,52 @@ class Neo4jMemory:
                      // Access frequency factor
                      (coalesce(node.access_count, 0) * 0.1 + 1.0) AS frequency_factor
                 
-                // Combined biomemetic score
+                // Enhanced associative boost - find connected memories
+                OPTIONAL MATCH (node)-[assoc:ASSOCIATED_WITH]-(related:Memory)<-[:CREATED]-(:User {id: $user_id})
+                WITH node, score, recency_factor, confidence_factor, frequency_factor,
+                     // Associative strength bonus
+                     1.0 + sum(coalesce(assoc.strength, 0)) * 0.3 AS associative_boost
+                
+                // Combined enhanced biomemetic score
                 WITH node, 
-                     score * recency_factor * confidence_factor * frequency_factor AS final_score
+                     score * recency_factor * confidence_factor * frequency_factor * associative_boost AS final_score
                 
                 // Update access tracking for retrieved memories
                 SET node.access_count = coalesce(node.access_count, 0) + 1,
                     node.last_accessed = datetime($current_time),
                     node.importance_score = coalesce(node.importance_score, 0.5) + 0.05
                 
-                RETURN node.content AS content, final_score
+                RETURN node.content AS content, final_score, node.timestamp AS timestamp
                 ORDER BY final_score DESC
                 LIMIT $limit
+                
+                UNION
+                
+                // Secondary: Include highly connected memories even if not directly similar
+                MATCH (seed:Memory)<-[:CREATED]-(:User {id: $user_id})
+                WHERE seed.content CONTAINS $query_keywords
+                MATCH (seed)-[assoc:ASSOCIATED_WITH*1..2]-(connected:Memory)<-[:CREATED]-(:User {id: $user_id})
+                WHERE assoc.strength > 0.5
+                WITH connected, avg([r IN assoc | r.strength]) AS connection_strength
+                WHERE connection_strength > 0.6
+                
+                SET connected.access_count = coalesce(connected.access_count, 0) + 1,
+                    connected.last_accessed = datetime($current_time)
+                
+                RETURN connected.content AS content, connection_strength AS final_score, connected.timestamp AS timestamp
+                ORDER BY final_score DESC
+                LIMIT 2
                 """, 
                 query_embedding=query_embedding,
                 user_id=user_id,
                 limit=limit,
-                limit_expanded=limit * 2,  # Search broader then rank
-                current_time=current_time
+                limit_expanded=limit * 2,
+                current_time=current_time,
+                query_keywords=query.lower()[:50]  # Simple keyword matching
                 )
                 
                 memories = [record["content"] for record in results]
-                return memories
+                return memories[:limit]  # Ensure we don't exceed limit
                 
         except Exception as e:
             logging.error(f"Failed to retrieve memories: {str(e)}")
@@ -261,16 +312,20 @@ class Neo4jMemory:
             logging.error(f"Failed to reinforce memories: {str(e)}")
 
     def get_memory_stats(self, user_id):
-        """Get advanced memory statistics"""
+        """Get advanced biomemetic memory statistics including associative connections"""
         try:
             with self.driver.session() as session:
                 result = session.run("""
                 MATCH (u:User {id: $user_id})-[:CREATED]->(m:Memory)
+                OPTIONAL MATCH (m)-[assoc:ASSOCIATED_WITH]-(connected:Memory)
                 RETURN 
-                    count(m) AS total_memories,
+                    count(DISTINCT m) AS total_memories,
                     avg(coalesce(m.confidence, 1.0)) AS avg_confidence,
                     sum(coalesce(m.access_count, 0)) AS total_accesses,
-                    count(CASE WHEN coalesce(m.access_count, 0) > 3 THEN 1 END) AS strong_memories
+                    count(CASE WHEN coalesce(m.access_count, 0) > 3 THEN 1 END) AS strong_memories,
+                    count(DISTINCT assoc) AS total_connections,
+                    avg(coalesce(assoc.strength, 0)) AS avg_connection_strength,
+                    count(CASE WHEN coalesce(assoc.strength, 0) > 0.7 THEN 1 END) AS strong_connections
                 """, user_id=user_id)
                 
                 record = result.single()
@@ -279,13 +334,24 @@ class Neo4jMemory:
                         "total_memories": record["total_memories"],
                         "avg_confidence": round(record["avg_confidence"] or 0, 3),
                         "total_accesses": record["total_accesses"],
-                        "strong_memories": record["strong_memories"]
+                        "strong_memories": record["strong_memories"],
+                        "total_connections": record["total_connections"],
+                        "avg_connection_strength": round(record["avg_connection_strength"] or 0, 3),
+                        "strong_connections": record["strong_connections"]
                     }
-                return {"total_memories": 0, "avg_confidence": 0, "total_accesses": 0, "strong_memories": 0}
+                return {
+                    "total_memories": 0, "avg_confidence": 0, "total_accesses": 0, 
+                    "strong_memories": 0, "total_connections": 0, 
+                    "avg_connection_strength": 0, "strong_connections": 0
+                }
                 
         except Exception as e:
             logging.error(f"Failed to get memory stats: {str(e)}")
-            return {"total_memories": 0, "avg_confidence": 0, "total_accesses": 0, "strong_memories": 0}
+            return {
+                "total_memories": 0, "avg_confidence": 0, "total_accesses": 0, 
+                "strong_memories": 0, "total_connections": 0, 
+                "avg_connection_strength": 0, "strong_connections": 0
+            }
 
     def clear_user_memories(self, user_id):
         """Clear all memories for a user (useful for testing)"""
