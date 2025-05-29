@@ -940,14 +940,17 @@ def main():
             st.markdown("<div style='flex: 1;'></div>", unsafe_allow_html=True)
             
             # Compact user profile at bottom
-            st.markdown("""
+            current_username = st.session_state.get("username", "User")
+            user_initial = current_username[0].upper() if current_username else "U"
+            
+            st.markdown(f"""
             <div style="padding: 0.75rem; background: rgba(18, 18, 18, 0.6); border-top: 1px solid #333; margin: 0 -1rem -1rem -1rem;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <div style="width: 24px; height: 24px; border-radius: 4px; background: rgba(127, 90, 240, 0.3); display: flex; align-items: center; justify-content: center;">
-                  <span style="color: var(--accent-primary); font-weight: 600; font-size: 10px;">U</span>
+                  <span style="color: var(--accent-primary); font-weight: 600; font-size: 10px;">{user_initial}</span>
                 </div>
                 <div style="flex: 1;">
-                  <div style="font-size: 0.8rem; color: var(--text-primary); opacity: 0.9;">Demo User</div>
+                  <div style="font-size: 0.8rem; color: var(--text-primary); opacity: 0.9;">{current_username}</div>
                 </div>
               </div>
             </div>
