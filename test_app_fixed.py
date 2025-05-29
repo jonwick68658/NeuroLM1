@@ -284,10 +284,25 @@ def chat_history_sidebar():
             st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
             st.markdown('<div class="sidebar-title">Recent Conversations</div>', unsafe_allow_html=True)
             
-            if recent_chats:
+            if recent_chats and isinstance(recent_chats, list):
                 for chat in recent_chats[:5]:
-                    preview = chat[:60] + "..." if len(chat) > 60 else chat
-                    st.markdown(f'<div class="chat-item">{preview}</div>', unsafe_allow_html=True)
+                    # Handle both string and dict formats
+                    if isinstance(chat, dict):
+                        content = chat.get("content", "")
+                        role = chat.get("role", "user")
+                        role_icon = "🤖" if role == "assistant" else "👤"
+                    else:
+                        content = str(chat)
+                        role_icon = "💬"
+                    
+                    # Clean the content and create preview
+                    if content and len(content.strip()) > 0:
+                        # Remove any code or query content
+                        if not any(keyword in content.lower() for keyword in ["match", "return", "session.run", "cypher", "neo4j"]):
+                            preview = content[:50] + "..." if len(content) > 50 else content
+                            preview = preview.replace('\n', ' ').strip()
+                            if preview:
+                                st.markdown(f'<div class="chat-item">{role_icon} {preview}</div>', unsafe_allow_html=True)
             else:
                 st.markdown('<div class="topic-item">No conversations yet</div>', unsafe_allow_html=True)
             
@@ -299,9 +314,12 @@ def chat_history_sidebar():
             st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
             st.markdown('<div class="sidebar-title">Most Discussed Topics</div>', unsafe_allow_html=True)
             
-            if stats.get("top_topics"):
+            if stats and stats.get("top_topics"):
                 for topic, count in stats["top_topics"][:5]:
-                    st.markdown(f'<div class="topic-item">{topic} ({count})</div>', unsafe_allow_html=True)
+                    if isinstance(topic, str) and len(topic.strip()) > 0:
+                        # Filter out any code or query strings
+                        if not any(keyword in topic.lower() for keyword in ["match", "return", "session", "cypher"]):
+                            st.markdown(f'<div class="topic-item">{topic} ({count})</div>', unsafe_allow_html=True)
             else:
                 st.markdown('<div class="topic-item">No topics identified yet</div>', unsafe_allow_html=True)
             
@@ -309,8 +327,8 @@ def chat_history_sidebar():
             
         except Exception as e:
             st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-            st.markdown('<div class="sidebar-title">Memory System</div>', unsafe_allow_html=True)
-            st.markdown('<div class="topic-item">Loading...</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sidebar-title">Neural Network</div>', unsafe_allow_html=True)
+            st.markdown('<div class="topic-item">Connecting...</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
 def neural_settings_page():
