@@ -1,4 +1,12 @@
 import streamlit as st
+
+# Configure page first - must be the very first Streamlit command
+st.set_page_config(
+    page_title="Second-Brain-AI",
+    page_icon="🧠",
+    layout="wide"
+)
+
 import openai
 import os
 from dotenv import load_dotenv
@@ -27,13 +35,6 @@ def init_memory():
 
 memory = init_memory()
 DEFAULT_USER = "default_user"
-
-# Configure page
-st.set_page_config(
-    page_title="Second-Brain-AI",
-    page_icon="🧠",
-    layout="wide"
-)
 
 # Custom CSS for sleek interface
 st.markdown("""
