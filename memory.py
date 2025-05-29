@@ -147,40 +147,22 @@ class Neo4jMemory:
                 MERGE (m)-[r:ABOUT]->(t)
                 ON CREATE SET r.relevance = 1.0, r.created = datetime($timestamp)
                 
-                // Enhanced associative linking
+                // Enhanced associative linking with recent memories
                 WITH m
-                MATCH (u:User {id: $user_id})-[:CREATED]->(prev:Memory)
+                OPTIONAL MATCH (u2:User {id: $user_id})-[:CREATED]->(prev:Memory)
                 WHERE prev.timestamp < datetime($timestamp) AND prev.type = 'chat'
-                
-                // Calculate semantic similarity and temporal proximity
-                WITH m, prev,
-                     // Temporal factor - recent conversations get stronger links
-                     1.0 - (duration.between(prev.timestamp, datetime($timestamp)).hours / 168.0) AS temporal_factor,
-                     // Content similarity (simplified - later enhanced with embeddings)
-                     CASE WHEN size(apoc.text.split(toLower(prev.content), ' ')) > 0 AND 
-                               size(apoc.coll.intersection(
-                                   apoc.text.split(toLower(prev.content), ' '),
-                                   apoc.text.split(toLower($content), ' ')
-                               )) > 0
-                          THEN toFloat(size(apoc.coll.intersection(
-                                   apoc.text.split(toLower(prev.content), ' '),
-                                   apoc.text.split(toLower($content), ' ')
-                               ))) / size(apoc.text.split(toLower(prev.content), ' '))
-                          ELSE 0.1 END AS content_similarity
-                
-                // Create stronger links for more related content
-                WITH m, prev, temporal_factor * content_similarity AS link_strength
-                WHERE link_strength > 0.2
-                ORDER BY link_strength DESC
-                LIMIT 5
+                WITH m, prev
+                ORDER BY prev.timestamp DESC
+                LIMIT 3
+                WHERE prev IS NOT NULL
                 
                 MERGE (prev)-[link:ASSOCIATED_WITH]->(m)
                 ON CREATE SET 
-                    link.strength = link_strength,
+                    link.strength = 0.6,
                     link.created = datetime($timestamp),
-                    link.type = 'semantic'
+                    link.type = 'temporal'
                 ON MATCH SET 
-                    link.strength = link.strength * 0.9 + link_strength * 0.1,
+                    link.strength = link.strength * 0.9 + 0.1,
                     link.last_reinforced = datetime($timestamp)
                 """, 
                 user_id=user_id, 
