@@ -1,9 +1,16 @@
 import streamlit as st
+import openai
 import os
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Initialize OpenRouter client
+openai_client = openai.OpenAI(
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1"
+)
 
 # Configure page
 st.set_page_config(
@@ -71,15 +78,52 @@ def main():
             with st.chat_message(message["role"]):
                 st.write(message["content"])
         
-        if prompt := st.chat_input("Say hello to test the interface"):
+        if prompt := st.chat_input("Share your thoughts with your Second Brain..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.write(prompt)
             
-            response = f"Echo: {prompt} (This is a test response - full AI integration pending)"
-            st.session_state.messages.append({"role": "assistant", "content": response})
+            # Get AI response with streaming
             with st.chat_message("assistant"):
-                st.write(response)
+                try:
+                    system_prompt = """You are a sophisticated second brain assistant. Help the user with thoughtful, contextual responses. 
+                    
+Your role is to:
+1. Provide helpful and insightful responses
+2. Remember context from this conversation
+3. Be engaging and supportive
+4. Think step by step when solving problems
+
+You are an intelligent AI assistant designed to act as the user's second brain.
+"""
+                    
+                    response = openai_client.chat.completions.create(
+                        model="gpt-4o-mini-2024-07-18",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": prompt}
+                        ],
+                        stream=True,
+                        temperature=0.7,
+                        max_tokens=1000
+                    )
+                    
+                    message_placeholder = st.empty()
+                    full_response = ""
+                    
+                    for chunk in response:
+                        if chunk.choices[0].delta.content:
+                            full_response += chunk.choices[0].delta.content
+                            message_placeholder.markdown(full_response + "▌")
+                    
+                    message_placeholder.markdown(full_response)
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                        
+                except Exception as e:
+                    st.error(f"AI Response Error: {str(e)}")
+                    error_response = "I apologize, but I'm experiencing technical difficulties. Please check your OpenRouter API key and try again."
+                    st.markdown(error_response)
+                    st.session_state.messages.append({"role": "assistant", "content": error_response})
 
 if __name__ == "__main__":
     main()
