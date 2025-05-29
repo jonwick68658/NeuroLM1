@@ -2,7 +2,7 @@ from neo4j import GraphDatabase
 import os
 from utils import generate_embedding
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 class Neo4jMemory:
@@ -55,7 +55,7 @@ class Neo4jMemory:
                 # Continue even if constraints already exist
     
     def store_chat(self, user_id, role, content):
-        """Store chat message with vector embedding"""
+        """Store chat message with vector embedding and biomemetic properties"""
         try:
             embedding = generate_embedding(content)
             timestamp = datetime.now(pytz.utc).isoformat()
@@ -70,9 +70,23 @@ class Neo4jMemory:
                     type: 'chat',
                     content: $content,
                     timestamp: datetime($timestamp),
-                    embedding: $embedding
+                    embedding: $embedding,
+                    confidence: 1.0,
+                    access_count: 0,
+                    last_accessed: datetime($timestamp),
+                    importance_score: 0.5
                 })
                 CREATE (u)-[:CREATED]->(m)
+                
+                // Link to recent memories for associative connections
+                WITH m, u
+                MATCH (u)-[:CREATED]->(prev:Memory)
+                WHERE prev.timestamp < datetime($timestamp) AND prev.type = 'chat'
+                WITH m, prev ORDER BY prev.timestamp DESC LIMIT 3
+                FOREACH (p IN CASE WHEN prev IS NOT NULL THEN [prev] ELSE [] END |
+                    MERGE (p)-[link:ASSOCIATED_WITH]->(m)
+                    ON CREATE SET link.strength = 0.6, link.created = datetime($timestamp)
+                )
                 """, 
                 user_id=user_id, 
                 role=role, 
@@ -117,22 +131,47 @@ class Neo4jMemory:
             raise Exception(f"Knowledge storage failed: {str(e)}")
     
     def get_relevant_memories(self, query, user_id, limit=7):
-        """Retrieve relevant memories using vector similarity search"""
+        """Retrieve relevant memories using enhanced biomemetic search"""
         try:
             query_embedding = generate_embedding(query)
+            current_time = datetime.now(pytz.utc).isoformat()
             
             with self.driver.session() as session:
                 results = session.run("""
-                CALL db.index.vector.queryNodes('memory_embeddings', $limit, $query_embedding) 
+                CALL db.index.vector.queryNodes('memory_embeddings', $limit_expanded, $query_embedding) 
                 YIELD node, score
                 MATCH (node)<-[:CREATED]-(:User {id: $user_id})
                 WHERE score > 0.3
-                RETURN node.content AS content, score
-                ORDER BY score DESC
+                
+                // Calculate biomemetic relevance score
+                WITH node, score,
+                     // Recency factor (more recent = higher score)
+                     CASE WHEN node.timestamp IS NOT NULL 
+                          THEN 1.0 - (duration.between(node.timestamp, datetime($current_time)).days / 365.0)
+                          ELSE 0.5 END AS recency_factor,
+                     // Confidence factor
+                     coalesce(node.confidence, 1.0) AS confidence_factor,
+                     // Access frequency factor
+                     (coalesce(node.access_count, 0) * 0.1 + 1.0) AS frequency_factor
+                
+                // Combined biomemetic score
+                WITH node, 
+                     score * recency_factor * confidence_factor * frequency_factor AS final_score
+                
+                // Update access tracking for retrieved memories
+                SET node.access_count = coalesce(node.access_count, 0) + 1,
+                    node.last_accessed = datetime($current_time),
+                    node.importance_score = coalesce(node.importance_score, 0.5) + 0.05
+                
+                RETURN node.content AS content, final_score
+                ORDER BY final_score DESC
+                LIMIT $limit
                 """, 
                 query_embedding=query_embedding,
                 user_id=user_id,
-                limit=limit
+                limit=limit,
+                limit_expanded=limit * 2,  # Search broader then rank
+                current_time=current_time
                 )
                 
                 memories = [record["content"] for record in results]
@@ -184,6 +223,70 @@ class Neo4jMemory:
             logging.error(f"Failed to get conversation history: {str(e)}")
             return []
     
+    def reinforce_memories(self, user_id):
+        """Biomemetic memory consolidation - strengthen/weaken memories based on usage"""
+        try:
+            with self.driver.session() as session:
+                current_time = datetime.now(pytz.utc).isoformat()
+                
+                # Strengthen frequently accessed memories
+                session.run("""
+                MATCH (m:Memory)<-[:CREATED]-(:User {id: $user_id})
+                WHERE coalesce(m.access_count, 0) > 2
+                SET m.confidence = least(1.0, coalesce(m.confidence, 1.0) * 1.05),
+                    m.importance_score = least(1.0, coalesce(m.importance_score, 0.5) + 0.1)
+                """, user_id=user_id)
+                
+                # Weaken memories that haven't been accessed recently
+                session.run("""
+                MATCH (m:Memory)<-[:CREATED]-(:User {id: $user_id})
+                WHERE m.last_accessed < datetime($cutoff_time)
+                SET m.confidence = greatest(0.1, coalesce(m.confidence, 1.0) * 0.95),
+                    m.importance_score = greatest(0.1, coalesce(m.importance_score, 0.5) * 0.98)
+                """, 
+                user_id=user_id,
+                cutoff_time=(datetime.now(pytz.utc) - timedelta(days=7)).isoformat()
+                )
+                
+                # Remove very weak memories (optional - commented out for safety)
+                # session.run("""
+                # MATCH (m:Memory)<-[:CREATED]-(:User {id: $user_id})
+                # WHERE coalesce(m.confidence, 1.0) < 0.2
+                # DETACH DELETE m
+                # """, user_id=user_id)
+                
+                logging.info(f"Memory reinforcement completed for user {user_id}")
+                
+        except Exception as e:
+            logging.error(f"Failed to reinforce memories: {str(e)}")
+
+    def get_memory_stats(self, user_id):
+        """Get advanced memory statistics"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                MATCH (u:User {id: $user_id})-[:CREATED]->(m:Memory)
+                RETURN 
+                    count(m) AS total_memories,
+                    avg(coalesce(m.confidence, 1.0)) AS avg_confidence,
+                    sum(coalesce(m.access_count, 0)) AS total_accesses,
+                    count(CASE WHEN coalesce(m.access_count, 0) > 3 THEN 1 END) AS strong_memories
+                """, user_id=user_id)
+                
+                record = result.single()
+                if record:
+                    return {
+                        "total_memories": record["total_memories"],
+                        "avg_confidence": round(record["avg_confidence"] or 0, 3),
+                        "total_accesses": record["total_accesses"],
+                        "strong_memories": record["strong_memories"]
+                    }
+                return {"total_memories": 0, "avg_confidence": 0, "total_accesses": 0, "strong_memories": 0}
+                
+        except Exception as e:
+            logging.error(f"Failed to get memory stats: {str(e)}")
+            return {"total_memories": 0, "avg_confidence": 0, "total_accesses": 0, "strong_memories": 0}
+
     def clear_user_memories(self, user_id):
         """Clear all memories for a user (useful for testing)"""
         try:

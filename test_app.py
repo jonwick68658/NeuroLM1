@@ -217,12 +217,23 @@ def main():
                 st.session_state.authenticated = False
                 st.rerun()
             
-            # Memory stats
+            # Advanced Memory Stats
             if memory:
                 try:
-                    memory_count = memory.get_memory_count(DEFAULT_USER)
-                    st.metric("🧠 Total Memories", memory_count)
-                    st.success("✅ Neo4j Memory Active")
+                    stats = memory.get_memory_stats(DEFAULT_USER)
+                    st.metric("🧠 Total Memories", stats["total_memories"])
+                    st.metric("💪 Strong Memories", stats["strong_memories"])
+                    st.metric("📊 Avg Confidence", f"{stats['avg_confidence']*100:.1f}%")
+                    st.metric("🔄 Total Accesses", stats["total_accesses"])
+                    st.success("✅ Biomemetic Brain Active")
+                    
+                    # Memory reinforcement button
+                    if st.button("🧠 Strengthen Memories"):
+                        with st.spinner("Consolidating memories..."):
+                            memory.reinforce_memories(DEFAULT_USER)
+                        st.success("Memory reinforcement complete!")
+                        st.rerun()
+                        
                 except Exception as e:
                     st.warning(f"Memory system issue: {str(e)}")
             else:
