@@ -113,6 +113,19 @@ def main():
                         else:
                             st.info("🌟 Building Connections")
                     
+                    # Topic organization display
+                    st.markdown("**🏷️ Topic Intelligence**")
+                    col5, col6 = st.columns(2)
+                    with col5:
+                        st.metric("📚 Total Topics", stats.get("total_topics", 0))
+                    with col6:
+                        if stats.get("top_topics"):
+                            st.markdown("**Top Topics:**")
+                            for topic in stats["top_topics"][:3]:
+                                st.write(f"• {topic['topic'].title()} ({topic['count']})")
+                        else:
+                            st.info("Building topic map...")
+                    
                     st.success("✅ Enhanced Associative Brain Active")
                     
                     # Memory reinforcement button

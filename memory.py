@@ -4,6 +4,8 @@ from utils import generate_embedding
 import pytz
 from datetime import datetime, timedelta
 import logging
+import openai
+import re
 
 class Neo4jMemory:
     def __init__(self):
@@ -19,6 +21,13 @@ class Neo4jMemory:
                 session.run("RETURN 1")
             
             self._init_db()
+            
+            # Initialize OpenRouter client for topic detection
+            self.openai_client = openai.OpenAI(
+                api_key=os.getenv("OPENROUTER_API_KEY"),
+                base_url="https://openrouter.ai/api/v1"
+            )
+            
             logging.info("Neo4j connection established successfully")
             
         except Exception as e:
@@ -38,6 +47,11 @@ class Neo4jMemory:
                 CREATE CONSTRAINT memory_id IF NOT EXISTS FOR (m:Memory) REQUIRE m.id IS UNIQUE
                 """)
                 
+                # Topic constraints for hybrid topic detection
+                session.run("""
+                CREATE CONSTRAINT topic_name IF NOT EXISTS FOR (t:Topic) REQUIRE t.name IS UNIQUE
+                """)
+                
                 # Create vector index for embeddings
                 session.run("""
                 CREATE VECTOR INDEX memory_embeddings IF NOT EXISTS
@@ -48,19 +62,65 @@ class Neo4jMemory:
                 }}
                 """)
                 
-                logging.info("Database schema initialized successfully")
+                logging.info("Enhanced database schema initialized successfully")
                 
             except Exception as e:
                 logging.warning(f"Schema initialization warning: {str(e)}")
                 # Continue even if constraints already exist
-    
+
+    def extract_topics_hybrid(self, content):
+        """Hybrid topic extraction using OpenRouter AI + keyword fallback"""
+        topics = []
+        
+        try:
+            # Primary: Smart topic extraction using OpenRouter
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4o-mini-2024-07-18",
+                messages=[{
+                    "role": "user", 
+                    "content": f"Extract 2-3 main topics from this text as single words or short phrases (max 20 chars each). Return only the topics separated by commas, no explanations:\n\n{content[:500]}"
+                }],
+                temperature=0.3,
+                max_tokens=50
+            )
+            
+            ai_topics = response.choices[0].message.content.strip()
+            topics.extend([topic.strip().lower() for topic in ai_topics.split(',') if topic.strip()])
+            
+        except Exception as e:
+            logging.warning(f"AI topic extraction failed, using keyword fallback: {str(e)}")
+        
+        # Secondary: Keyword extraction fallback
+        if not topics:
+            # Simple keyword extraction
+            words = re.findall(r'\b[a-zA-Z]{4,}\b', content.lower())
+            # Filter common words and take most frequent
+            stop_words = {'that', 'this', 'with', 'have', 'will', 'from', 'they', 'been', 'said', 'each', 'which', 'their', 'time', 'could', 'would', 'should', 'about', 'after', 'first', 'never', 'these', 'think', 'where', 'being', 'every'}
+            keywords = [word for word in words if word not in stop_words]
+            word_freq = {}
+            for word in keywords:
+                word_freq[word] = word_freq.get(word, 0) + 1
+            topics = sorted(word_freq.keys(), key=lambda x: word_freq[x], reverse=True)[:3]
+        
+        # Clean and limit topics
+        clean_topics = []
+        for topic in topics[:3]:
+            if topic and len(topic) > 2 and len(topic) < 25:
+                clean_topics.append(topic.lower().strip())
+        
+        return clean_topics or ['general']
+
     def store_chat(self, user_id, role, content):
         """Store chat message with vector embedding and biomemetic properties"""
         try:
             embedding = generate_embedding(content)
             timestamp = datetime.now(pytz.utc).isoformat()
             
+            # Extract topics using hybrid approach
+            topics = self.extract_topics_hybrid(content)
+            
             with self.driver.session() as session:
+                # Store memory with topic relationships
                 session.run("""
                 MERGE (u:User {id: $user_id})
                 WITH u
@@ -77,6 +137,15 @@ class Neo4jMemory:
                     importance_score: 0.5
                 })
                 CREATE (u)-[:CREATED]->(m)
+                
+                // Create topic relationships
+                WITH m
+                UNWIND $topics AS topic_name
+                MERGE (t:Topic {name: topic_name})
+                ON CREATE SET t.created = datetime($timestamp), t.mention_count = 1
+                ON MATCH SET t.mention_count = coalesce(t.mention_count, 0) + 1, t.last_mentioned = datetime($timestamp)
+                MERGE (m)-[r:ABOUT]->(t)
+                ON CREATE SET r.relevance = 1.0, r.created = datetime($timestamp)
                 
                 // Enhanced associative linking
                 WITH m, u
@@ -118,7 +187,8 @@ class Neo4jMemory:
                 role=role, 
                 content=content,
                 timestamp=timestamp,
-                embedding=embedding
+                embedding=embedding,
+                topics=topics
                 )
                 
         except Exception as e:
@@ -284,8 +354,8 @@ class Neo4jMemory:
                 session.run("""
                 MATCH (m:Memory)<-[:CREATED]-(:User {id: $user_id})
                 WHERE coalesce(m.access_count, 0) > 2
-                SET m.confidence = least(1.0, coalesce(m.confidence, 1.0) * 1.05),
-                    m.importance_score = least(1.0, coalesce(m.importance_score, 0.5) + 0.1)
+                SET m.confidence = CASE WHEN coalesce(m.confidence, 1.0) * 1.05 > 1.0 THEN 1.0 ELSE coalesce(m.confidence, 1.0) * 1.05 END,
+                    m.importance_score = CASE WHEN coalesce(m.importance_score, 0.5) + 0.1 > 1.0 THEN 1.0 ELSE coalesce(m.importance_score, 0.5) + 0.1 END
                 """, user_id=user_id)
                 
                 # Weaken memories that haven't been accessed recently
@@ -312,12 +382,13 @@ class Neo4jMemory:
             logging.error(f"Failed to reinforce memories: {str(e)}")
 
     def get_memory_stats(self, user_id):
-        """Get advanced biomemetic memory statistics including associative connections"""
+        """Get advanced biomemetic memory statistics including topics and connections"""
         try:
             with self.driver.session() as session:
                 result = session.run("""
                 MATCH (u:User {id: $user_id})-[:CREATED]->(m:Memory)
                 OPTIONAL MATCH (m)-[assoc:ASSOCIATED_WITH]-(connected:Memory)
+                OPTIONAL MATCH (m)-[:ABOUT]->(t:Topic)
                 RETURN 
                     count(DISTINCT m) AS total_memories,
                     avg(coalesce(m.confidence, 1.0)) AS avg_confidence,
@@ -325,8 +396,20 @@ class Neo4jMemory:
                     count(CASE WHEN coalesce(m.access_count, 0) > 3 THEN 1 END) AS strong_memories,
                     count(DISTINCT assoc) AS total_connections,
                     avg(coalesce(assoc.strength, 0)) AS avg_connection_strength,
-                    count(CASE WHEN coalesce(assoc.strength, 0) > 0.7 THEN 1 END) AS strong_connections
+                    count(CASE WHEN coalesce(assoc.strength, 0) > 0.7 THEN 1 END) AS strong_connections,
+                    count(DISTINCT t) AS total_topics
                 """, user_id=user_id)
+                
+                # Get top topics
+                topics_result = session.run("""
+                MATCH (u:User {id: $user_id})-[:CREATED]->(m:Memory)-[:ABOUT]->(t:Topic)
+                RETURN t.name AS topic, count(m) AS frequency
+                ORDER BY frequency DESC
+                LIMIT 5
+                """, user_id=user_id)
+                
+                top_topics = [{"topic": record["topic"], "count": record["frequency"]} 
+                            for record in topics_result]
                 
                 record = result.single()
                 if record:
@@ -337,12 +420,15 @@ class Neo4jMemory:
                         "strong_memories": record["strong_memories"],
                         "total_connections": record["total_connections"],
                         "avg_connection_strength": round(record["avg_connection_strength"] or 0, 3),
-                        "strong_connections": record["strong_connections"]
+                        "strong_connections": record["strong_connections"],
+                        "total_topics": record["total_topics"],
+                        "top_topics": top_topics
                     }
                 return {
                     "total_memories": 0, "avg_confidence": 0, "total_accesses": 0, 
                     "strong_memories": 0, "total_connections": 0, 
-                    "avg_connection_strength": 0, "strong_connections": 0
+                    "avg_connection_strength": 0, "strong_connections": 0,
+                    "total_topics": 0, "top_topics": []
                 }
                 
         except Exception as e:
@@ -350,7 +436,8 @@ class Neo4jMemory:
             return {
                 "total_memories": 0, "avg_confidence": 0, "total_accesses": 0, 
                 "strong_memories": 0, "total_connections": 0, 
-                "avg_connection_strength": 0, "strong_connections": 0
+                "avg_connection_strength": 0, "strong_connections": 0,
+                "total_topics": 0, "top_topics": []
             }
 
     def clear_user_memories(self, user_id):
