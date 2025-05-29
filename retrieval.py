@@ -83,9 +83,9 @@ class MemoryRetriever:
         try:
             with self.driver.session() as session:
                 result = session.run("""
-                MATCH (m:Memory {id: $memory_id, user_id: $user_id})
+                MATCH (m:Memory {id: $memory_id})<-[:CREATED]-(:User {id: $user_id})
                 OPTIONAL MATCH (m)-[r:ASSOCIATED_WITH]-(other:Memory)
-                WHERE other.user_id = $user_id
+                WHERE EXISTS((other)<-[:CREATED]-(:User {id: $user_id}))
                 WITH m, CASE 
                     WHEN count(r) > 0 THEN avg(r.strength) 
                     ELSE 0.0 
@@ -152,11 +152,11 @@ class MemoryRetriever:
             
             # Get candidate memories using vector index
             with self.driver.session() as session:
-                # First get vector candidates
+                # First get vector candidates (fixed for existing schema)
                 vector_results = session.run("""
                 CALL db.index.vector.queryNodes('memory_embeddings', $candidates, $embedding)
                 YIELD node AS memory, score AS vector_score
-                WHERE memory.user_id = $user_id
+                WHERE EXISTS((memory)<-[:CREATED]-(:User {id: $user_id}))
                 RETURN memory {
                     .*, 
                     id: memory.id,
@@ -197,8 +197,8 @@ class MemoryRetriever:
                 memory_ids = [m['id'] for m in top_memories]
                 if memory_ids:
                     session.run("""
-                    MATCH (m:Memory)
-                    WHERE m.id IN $memory_ids AND m.user_id = $user_id
+                    MATCH (m:Memory)<-[:CREATED]-(:User {id: $user_id})
+                    WHERE m.id IN $memory_ids
                     SET m.access_count = COALESCE(m.access_count, 0) + 1,
                         m.last_accessed = datetime()
                     """, memory_ids=memory_ids, user_id=user_id)
