@@ -726,28 +726,11 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Navigation menu
-            pages = ["chat", "analytics", "explorer"]
-            page_names = ["Neuro Chat", "Memory Analytics", "Memory Explorer"]
-            page_icons = ["💬", "📊", "🔍"]
-            
-            for i, (page, name, icon) in enumerate(zip(pages, page_names, page_icons)):
-                active_class = "nav-item active" if st.session_state.page == page else "nav-item"
-                
-                if st.button(f"{icon} {name}", key=f"nav_{page}", use_container_width=True):
-                    st.session_state.page = page
-                    st.rerun()
-            
             # Add some spacing before sidebar content
             st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
             
-            # Sidebar content based on page
-            if st.session_state.page == "chat":
-                chat_history_sidebar()
-            elif st.session_state.page == "analytics":
-                analytics_sidebar()
-            elif st.session_state.page == "explorer":
-                explorer_sidebar()
+            # Sidebar content for chat
+            chat_history_sidebar()
             
             # Push content to bottom
             st.markdown("<div style='flex: 1;'></div>", unsafe_allow_html=True)
@@ -771,13 +754,8 @@ def main():
                 st.session_state.authenticated = False
                 st.rerun()
         
-        # Main content based on selected page
-        if st.session_state.page == "analytics":
-            analytics_dashboard()
-        elif st.session_state.page == "explorer":
-            memory_explorer()
-        else:
-            chat_interface()
+        # Main chat interface
+        chat_interface()
 
 if __name__ == "__main__":
     main()
