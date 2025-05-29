@@ -790,14 +790,11 @@ def main():
         if "page" not in st.session_state:
             st.session_state.page = "chat"
         
-        # Header with brain image
+        # Header
         st.markdown("""
-        <div class="neuro-header" style="background: linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%); position: relative; display: flex; align-items: center; justify-content: center; min-height: 200px;">
-            <div style="position: absolute; left: 50px; top: 50%; transform: translateY(-50%); width: 120px; height: 120px; background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxkZWZzPgo8bGluZWFyR3JhZGllbnQgaWQ9ImJyYWluR3JhZGllbnQiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgo8c3RvcCBvZmZzZXQ9IjAlIiBzdHlsZT0ic3RvcC1jb2xvcjojN0Y1QUYwO3N0b3Atb3BhY2l0eToxIiAvPgo8c3RvcCBvZmZzZXQ9IjUwJSIgc3R5bGU9InN0b3AtY29sb3I6IzJFQzRCNjtzdG9wLW9wYWNpdHk6MSIgLz4KPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojRkYzMzY2O3N0b3Atb3BhY2l0eToxIiAvPgo8L2xpbmVhckdyYWRpZW50Pgo8L2RlZnM+CjxwYXRoIGQ9Ik02MCA4QzM1IDggMTUgMjggMTUgNTNDMTUgNjggMjAgODAgMzAgODhDMzUgOTUgNDUgMTAwIDYwIDEwMEM3NSAxMDAgODUgOTUgOTAgODhDMTAwIDgwIDEwNSA2OCAxMDUgNTNDMTA1IDI4IDg1IDggNjAgOFoiIGZpbGw9InVybCgjYnJhaW5HcmFkaWVudCkiIGZpbGwtb3BhY2l0eT0iMC44IiBzdHJva2U9InVybCgjYnJhaW5HcmFkaWVudCkiIHN0cm9rZS13aWR0aD0iMiIgLz4KPHBhdGggZD0iTTQ1IDM1QzQ1IDMwIDUwIDI1IDU1IDI1QzYwIDI1IDY1IDMwIDY1IDM1QzY1IDQwIDcwIDQ1IDc1IDQ1QzgwIDQ1IDg1IDUwIDg1IDU1QzgwIDYwIDc1IDY1IDcwIDY1QzY1IDY1IDYwIDcwIDU1IDcwQzUwIDcwIDQ1IDY1IDQ1IDYwQzQ1IDU1IDQ1IDUwIDQ1IDQ1QzQ1IDQwIDQ1IDM1IDQ1IDM1WiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2JyYWluR3JhZGllbnQpIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIwLjciIC8+Cjwvc3ZnPgo=') center/contain no-repeat;"></div>
-            <div style="text-align: center; z-index: 2;">
-                <h1 class="neuro-title" style="margin-left: 60px;">NeuroLM</h1>
-                <p class="neuro-subtitle" style="margin-left: 60px;">Your Personal Neural Language Model</p>
-            </div>
+        <div class="neuro-header">
+            <h1 class="neuro-title">NeuroLM</h1>
+            <p class="neuro-subtitle">Your Personal Neural Language Model</p>
         </div>
         """, unsafe_allow_html=True)
         
