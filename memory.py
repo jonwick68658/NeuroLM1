@@ -68,6 +68,50 @@ class Neo4jMemory:
                 logging.warning(f"Schema initialization warning: {str(e)}")
                 # Continue even if constraints already exist
 
+    def repair_schema(self):
+        """Fix database schema issues and repair broken embeddings"""
+        try:
+            with self.driver.session() as session:
+                # Drop and recreate vector index if needed
+                try:
+                    session.run("DROP INDEX memory_embeddings IF EXISTS")
+                except:
+                    pass
+                
+                session.run("""
+                CREATE VECTOR INDEX memory_embeddings IF NOT EXISTS
+                FOR (m:Memory) ON m.embedding
+                OPTIONS {indexConfig: {
+                    `vector.dimensions`: 384, 
+                    `vector.similarity_function`: 'cosine'
+                }}
+                """)
+                
+                # Fix any memories with empty or invalid embeddings
+                result = session.run("""
+                MATCH (m:Memory)
+                WHERE m.embedding IS NULL OR size(m.embedding) <> 384
+                RETURN count(m) as broken_count
+                """)
+                broken_count = result.single()["broken_count"]
+                
+                if broken_count > 0:
+                    logging.info(f"Repairing {broken_count} memories with broken embeddings")
+                    
+                    # Update broken embeddings
+                    session.run("""
+                    MATCH (m:Memory)
+                    WHERE m.embedding IS NULL OR size(m.embedding) <> 384
+                    SET m.embedding = $default_embedding
+                    """, default_embedding=generate_embedding("placeholder"))
+                
+                logging.info("Schema repair completed successfully")
+                return True
+                
+        except Exception as e:
+            logging.error(f"Schema repair failed: {str(e)}")
+            return False
+
     def extract_topics_hybrid(self, content):
         """Hybrid topic extraction using OpenRouter AI + keyword fallback"""
         topics = []
