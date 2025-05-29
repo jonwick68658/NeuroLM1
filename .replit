@@ -23,6 +23,10 @@ args = "Streamlit App"
 task = "workflow.run"
 args = "install_dependencies"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Simple App Test"
+
 [[workflows.workflow]]
 name = "Streamlit App"
 author = "agent"
@@ -39,6 +43,15 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "uv add neo4j openai sentence-transformers PyPDF2 docx2txt python-dotenv pyngrok"
+
+[[workflows.workflow]]
+name = "Simple App Test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run simple_main.py --server.port 5000"
+waitForPort = 5000
 
 [[ports]]
 localPort = 5000

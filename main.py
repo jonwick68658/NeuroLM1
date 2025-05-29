@@ -90,8 +90,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Link OpenRouter
-openai.api_base = "https://openrouter.ai/api/v1"
-openai.api_key = os.getenv("OPENROUTER_API_KEY")
+openai_client = openai.OpenAI(
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1"
+)
 
 # Initialize memory system
 @st.cache_resource
@@ -267,7 +269,7 @@ Current conversation context: {len(st.session_state.messages)} messages in this 
         # Get AI response with streaming
         with st.chat_message("assistant"):
             try:
-                response = openai.chat.completions.create(
+                response = openai_client.chat.completions.create(
                     model="gpt-4o-mini-2024-07-18",
                     messages=[
                         {"role": "system", "content": system_prompt},
