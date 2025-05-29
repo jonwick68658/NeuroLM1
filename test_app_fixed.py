@@ -124,15 +124,6 @@ def get_neural_stats(user_id):
 def neural_message(content, sender="AI", timestamp=None, sources=None):
     """Custom neural message component replacing default chat"""
     if sender == "AI":
-        source_html = ""
-        if sources and len(sources) > 0:
-            # Create a simple text representation instead of HTML for sources
-            source_text = f"\n\n🧠 Neural Sources ({len(sources)}):\n"
-            for i, src in enumerate(sources[:3], 1):
-                source_text += f"• {src[:60]}...\n"
-            content = content + source_text
-            source_html = ""  # Don't add HTML sources
-        
         timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
           {timestamp.strftime('%H:%M') if timestamp else ''}
         </div>""" if timestamp else ""
@@ -152,7 +143,6 @@ def neural_message(content, sender="AI", timestamp=None, sources=None):
           <div style="color: var(--text-primary); line-height: 1.7; font-size: 1.1rem;">
             {content}
           </div>
-          {source_html}
         </div>
         """, unsafe_allow_html=True)
     else:
