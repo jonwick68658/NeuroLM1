@@ -1,38 +1,34 @@
-# Second Brain AI
+# NeuroLM - Neural Language Model
 
-A sophisticated AI chat application with biomemetic memory capabilities, leveraging Neo4j graph database technology for intelligent conversation storage, retrieval, and associative linking.
+A sophisticated AI chat application with intelligent memory capabilities, featuring multi-user authentication and persistent conversation storage using Neo4j graph database technology.
 
 ## Features
 
 ### Core Functionality
-- **Intelligent Chat Interface**: Clean Streamlit-based UI with streaming AI responses
-- **Persistent Memory Storage**: All conversations permanently stored in Neo4j Aura cloud database
-- **Secure Authentication**: Login system with environment-based credentials
+- **Clean Chat Interface**: Professional dark-themed UI with natural conversation flow
+- **Multi-User System**: Individual user accounts with email registration and secure authentication
+- **Persistent Memory Storage**: All conversations stored in Neo4j with user isolation
+- **Conversation History**: Interactive sidebar with recent chat sessions and easy navigation
 
-### Advanced Memory System
-- **Memory Reinforcement**: Frequently accessed memories become stronger over time
-- **Associative Linking**: Related conversations automatically connect through semantic similarity
-- **Confidence Scoring**: Each memory has a reliability score that evolves with usage
-- **Access Tracking**: System monitors how often memories are retrieved and referenced
+### User Management
+- **Secure Registration**: Email collection with username/password authentication
+- **Data Isolation**: Complete separation between user accounts in database
+- **User Profiles**: Personalized sidebar with username display and first letter avatar
+- **Session Management**: Secure login/logout with persistent sessions
 
-### Topic Intelligence
-- **Hybrid Topic Detection**: Uses OpenRouter API with keyword extraction fallback
-- **Automatic Categorization**: Conversations organized by 2-3 main topics per message
-- **Topic Networking**: Memories with shared topics form stronger connections
-- **Topic Analytics**: Dashboard shows most discussed subjects and frequency
-
-### Neural Network Visualization
-- **Connection Mapping**: View total links between memories
-- **Strength Analysis**: Monitor average connection strength across your knowledge base
-- **Growth Tracking**: Watch your neural network evolve from basic to highly connected
+### Memory Intelligence
+- **Vector Embeddings**: Semantic search using neural embeddings for context retrieval
+- **Associative Memory**: Related conversations automatically link for enhanced context
+- **Topic Organization**: AI-powered topic extraction and categorization
+- **Conversation Continuity**: Access to previous discussions for context-aware responses
 
 ## Technology Stack
 
-- **Frontend**: Streamlit web application
-- **AI Integration**: OpenRouter GPT-4o-mini for responses and topic extraction
-- **Database**: Neo4j Aura cloud database with vector embeddings
-- **Vector Search**: 384-dimensional embeddings with cosine similarity
-- **Authentication**: Environment variable-based secure login
+- **Frontend**: Streamlit web application with custom dark theme
+- **AI Integration**: OpenRouter API for intelligent responses
+- **Database**: Neo4j graph database with vector embeddings
+- **Authentication**: Multi-user system with hashed passwords
+- **Memory System**: Vector embeddings for semantic conversation retrieval
 
 ## Database Schema
 
@@ -74,8 +70,6 @@ NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your-password
 OPENROUTER_API_KEY=your-openrouter-key
-APP_USERNAME=your-username
-APP_PASSWORD=your-password
 ```
 
 ### Dependencies
@@ -85,35 +79,22 @@ pip install streamlit neo4j openai sentence-transformers PyPDF2 docx2txt python-
 
 ### Running the Application
 ```bash
-streamlit run test_app.py --server.port 5000
+streamlit run test_app_fixed.py --server.port 5000
 ```
 
-## Current Statistics
+## User Experience
 
-Based on recent analysis:
-- **Memory Nodes**: 30+ conversation entries stored
-- **Topic Nodes**: 4 discovered topics
-- **Neural Connections**: 24+ associative relationships
-- **Connection Types**: Temporal, semantic, and topic-based linking
+### Interface Design
+- **Professional Dark Theme**: Deep black backgrounds with pure white text for optimal readability
+- **Clean Chat Layout**: Focus on natural conversation without distracting elements
+- **Responsive Design**: Works seamlessly across desktop and mobile devices
+- **Intuitive Navigation**: Simple sidebar with conversation history and user profile
 
-## Dashboard Metrics
-
-### Core Memory
-- Total Memories: Complete conversation count
-- Strong Memories: Frequently accessed entries (3+ accesses)
-- Average Confidence: Overall memory reliability percentage
-- Total Accesses: Cumulative retrieval count across all memories
-
-### Neural Connections
-- Total Links: Number of associative relationships
-- Strong Links: High-strength connections (70%+ strength)
-- Link Strength: Average connection strength percentage
-- Connectivity Status: Brain development indicator
-
-### Topic Intelligence
-- Total Topics: Number of discovered conversation subjects
-- Top Topics: Most frequently discussed subjects with counts
-- Topic Evolution: How conversation themes develop over time
+### Conversation Features
+- **New Chat Button**: Start fresh conversations anytime
+- **Chat History**: Quick access to previous conversation sessions
+- **Context Awareness**: AI remembers previous discussions for continuity
+- **Natural Flow**: Clean message display without technical details
 
 ## Architecture Highlights
 
@@ -156,11 +137,12 @@ Memories connect through:
 ## File Structure
 
 ```
-├── test_app.py          # Main Streamlit application
+├── test_app_fixed.py    # Main Streamlit application with multi-user support
 ├── memory.py            # Neo4j memory management system
-├── utils.py             # Utility functions for text processing
+├── utils.py             # Utility functions for text processing and embeddings
 ├── neo4j_test.py        # Database connection verification
 ├── topic_test.py        # Topic system diagnostics
+├── clear_database.py    # Database maintenance utility
 ├── .env.example         # Environment variable template
 └── README.md            # This documentation
 ```
