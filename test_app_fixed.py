@@ -23,7 +23,74 @@ def init_memory():
         return None
 
 memory = init_memory()
-DEFAULT_USER = "default_user"
+
+def get_current_user():
+    """Get the current authenticated user ID"""
+    return st.session_state.get("user_id", None)
+
+def create_user_account(username, password):
+    """Create a new user account in Neo4j"""
+    if not memory:
+        return False, "Memory system not available"
+    
+    try:
+        # Check if user already exists
+        existing_user = memory.driver.session().run(
+            "MATCH (u:User {username: $username}) RETURN u",
+            username=username
+        ).single()
+        
+        if existing_user:
+            return False, "Username already exists"
+        
+        # Create new user with hashed password
+        import hashlib
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        
+        memory.driver.session().run(
+            """
+            CREATE (u:User {
+                id: $user_id,
+                username: $username,
+                password_hash: $password_hash,
+                created_at: datetime()
+            })
+            """,
+            user_id=f"user_{username}",
+            username=username,
+            password_hash=password_hash
+        )
+        
+        return True, "Account created successfully"
+        
+    except Exception as e:
+        return False, f"Failed to create account: {str(e)}"
+
+def authenticate_user(username, password):
+    """Authenticate user login"""
+    if not memory:
+        return False, "Memory system not available"
+    
+    try:
+        import hashlib
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        
+        user = memory.driver.session().run(
+            """
+            MATCH (u:User {username: $username, password_hash: $password_hash})
+            RETURN u.id as user_id, u.username as username
+            """,
+            username=username,
+            password_hash=password_hash
+        ).single()
+        
+        if user:
+            return True, {"user_id": user["user_id"], "username": user["username"]}
+        else:
+            return False, "Invalid username or password"
+            
+    except Exception as e:
+        return False, f"Authentication failed: {str(e)}"
 
 # Helper functions for real data integration
 def get_neural_stats(user_id):
@@ -410,22 +477,51 @@ def check_login():
         
         # Login Container
         st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        st.markdown("### Access Your Neural Network")
-        st.markdown("Enter your credentials to continue")
         
-        username = st.text_input("Username", placeholder="Enter username")
-        password = st.text_input("Password", type="password", placeholder="Enter password")
+        # Login/Register tabs
+        tab1, tab2 = st.tabs(["Login", "Create Account"])
         
-        if st.button("Connect to NeuroLM"):
-            app_username = os.getenv("APP_USERNAME")
-            app_password = os.getenv("APP_PASSWORD")
+        with tab1:
+            st.markdown("### Access Your Neural Network")
+            login_username = st.text_input("Username", key="login_user")
+            login_password = st.text_input("Password", type="password", key="login_pass")
             
-            if username == app_username and password == app_password:
-                st.session_state.authenticated = True
-                st.success("Neural connection established")
-                st.rerun()
-            else:
-                st.error("Invalid credentials. Access denied.")
+            if st.button("Connect to NeuroLM", use_container_width=True, key="login_btn"):
+                if login_username and login_password:
+                    success, result = authenticate_user(login_username, login_password)
+                    if success:
+                        st.session_state.authenticated = True
+                        st.session_state.user_id = result["user_id"]
+                        st.session_state.username = result["username"]
+                        st.success("Neural connection established!")
+                        st.rerun()
+                    else:
+                        st.error(result)
+                else:
+                    st.error("Please enter username and password")
+        
+        with tab2:
+            st.markdown("### Create Neural Account")
+            reg_username = st.text_input("Choose Username", key="reg_user")
+            reg_password = st.text_input("Choose Password", type="password", key="reg_pass")
+            reg_confirm = st.text_input("Confirm Password", type="password", key="reg_confirm")
+            
+            if st.button("Create Account", use_container_width=True, key="register_btn"):
+                if reg_username and reg_password and reg_confirm:
+                    if reg_password == reg_confirm:
+                        if len(reg_password) >= 6:
+                            success, message = create_user_account(reg_username, reg_password)
+                            if success:
+                                st.success(message)
+                                st.info("You can now login with your new account")
+                            else:
+                                st.error(message)
+                        else:
+                            st.error("Password must be at least 6 characters")
+                    else:
+                        st.error("Passwords don't match")
+                else:
+                    st.error("Please fill in all fields")
         
         st.markdown('</div>', unsafe_allow_html=True)
         return False
@@ -434,7 +530,7 @@ def check_login():
 
 def get_conversation_sessions(user_id, limit=10):
     """Get distinct conversation sessions with their latest messages"""
-    if not memory:
+    if not memory or not user_id:
         return []
     
     try:
