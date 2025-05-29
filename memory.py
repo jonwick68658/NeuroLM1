@@ -49,6 +49,59 @@ class Neo4jMemory:
             logging.error(f"Failed to connect to Neo4j: {str(e)}")
             raise Exception(f"Neo4j connection failed: {str(e)}")
     
+    def start_background_jobs(self):
+        """Start background consolidation and maintenance jobs"""
+        try:
+            # Schedule nightly consolidation at 2 AM
+            schedule.every().day.at(config.SCHEDULE_CONFIG['consolidation_time']).do(
+                self._run_consolidation_for_all_users
+            )
+            
+            # Schedule association maintenance every hour
+            schedule.every(config.SCHEDULE_CONFIG['association_interval']).minutes.do(
+                self._run_association_maintenance
+            )
+            
+            # Start scheduler thread
+            scheduler_thread = threading.Thread(target=self._run_scheduled_tasks, daemon=True)
+            scheduler_thread.start()
+            
+            logging.info("Background jobs started successfully")
+            
+        except Exception as e:
+            logging.error(f"Error starting background jobs: {e}")
+    
+    def _run_scheduled_tasks(self):
+        """Run scheduled background tasks"""
+        while True:
+            try:
+                schedule.run_pending()
+                time.sleep(config.SCHEDULE_CONFIG['schedule_check_interval'])
+            except Exception as e:
+                logging.error(f"Error in scheduled tasks: {e}")
+                time.sleep(60)  # Wait a minute before retrying
+    
+    def _run_consolidation_for_all_users(self):
+        """Run consolidation for all users"""
+        try:
+            self.consolidator.batch_process_users()
+        except Exception as e:
+            logging.error(f"Error in batch consolidation: {e}")
+    
+    def _run_association_maintenance(self):
+        """Run association maintenance for all users"""
+        try:
+            with self.driver.session() as session:
+                # Get all user IDs
+                result = session.run("MATCH (u:User) RETURN u.id AS user_id")
+                user_ids = [record['user_id'] for record in result if record['user_id']]
+                
+                for user_id in user_ids:
+                    self.associator.update_relationship_strength(user_id)
+                    
+        except Exception as e:
+            logging.error(f"Error in association maintenance: {e}")
+    
     def _init_db(self):
         """Initialize database constraints and indexes"""
         with self.driver.session() as session:
@@ -268,21 +321,37 @@ class Neo4jMemory:
             raise Exception(f"Knowledge storage failed: {str(e)}")
     
     def get_relevant_memories(self, query, user_id, limit=7):
-        """Retrieve relevant memories using enhanced associative biomemetic search"""
+        """Retrieve relevant memories using advanced weighted scoring algorithm"""
+        try:
+            # Use the advanced retrieval system
+            memories = self.retriever.get_relevant_memories(query, user_id, limit)
+            
+            # Extract content for backward compatibility
+            memory_contents = []
+            for memory in memories:
+                content = memory.get('content', '')
+                if content and len(content.strip()) > 10:
+                    memory_contents.append(content)
+            
+            return memory_contents
+                
+        except Exception as e:
+            logging.error(f"Error retrieving memories: {e}")
+            # Fallback to basic retrieval if advanced system fails
+            return self._basic_memory_retrieval(query, user_id, limit)
+    
+    def _basic_memory_retrieval(self, query, user_id, limit):
+        """Fallback basic memory retrieval method"""
         try:
             query_embedding = generate_embedding(query)
+            if not query_embedding:
+                return []
             
             with self.driver.session() as session:
-                # SIMPLIFIED AND CORRECTED QUERY
                 results = session.run("""
                 CALL db.index.vector.queryNodes('memory_embeddings', $limit, $query_embedding) 
                 YIELD node, score
                 MATCH (node)<-[:CREATED]-(:User {id: $user_id})
-                
-                // Update access tracking for retrieved memories
-                SET node.access_count = coalesce(node.access_count, 0) + 1,
-                    node.last_accessed = datetime()
-                
                 RETURN node.content AS content, score
                 ORDER BY score DESC
                 LIMIT $limit
@@ -292,12 +361,12 @@ class Neo4jMemory:
                 limit=limit
                 )
                 
-                memories = [record["content"] for record in results]
-                return memories[:limit]  # Ensure we don't exceed limit
+                memories = [record["content"] for record in results if record["content"]]
+                return memories[:limit]
                 
         except Exception as e:
-            logging.error(f"Failed to retrieve memories: {str(e)}")
-            return []  # Return empty list instead of raising exception
+            logging.error(f"Error in basic retrieval: {e}")
+            return []
     
     def get_memory_count(self, user_id):
         """Get total number of memories for a user"""
