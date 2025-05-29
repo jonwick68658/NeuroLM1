@@ -98,14 +98,14 @@ openai_client = openai.OpenAI(
 # Initialize memory system
 @st.cache_resource
 def init_memory():
-    return Neo4jMemory()
+    try:
+        return Neo4jMemory()
+    except Exception as e:
+        st.warning(f"Neo4j connection failed: {str(e)}")
+        return None
 
-try:
-    memory = init_memory()
-    DEFAULT_USER = "default_user"
-except Exception as e:
-    st.error(f"Failed to initialize Neo4j connection: {str(e)}")
-    st.stop()
+memory = init_memory()
+DEFAULT_USER = "default_user"
 
 # Authentication
 def check_login():
@@ -170,8 +170,11 @@ def document_uploader():
                     # Save to knowledge base
                     if content.strip():
                         chunks = split_text(content)
-                        for chunk in chunks:
-                            memory.store_knowledge(DEFAULT_USER, chunk, uploaded.name)
+                        if memory:
+                            for chunk in chunks:
+                                memory.store_knowledge(DEFAULT_USER, chunk, uploaded.name)
+                        else:
+                            st.info("Document processed but Neo4j storage unavailable")
                         
                         st.markdown(f"""
                         <div class="success-message">
@@ -202,11 +205,14 @@ def chat_interface():
             st.rerun()
         
         # Memory stats
-        try:
-            memory_count = memory.get_memory_count(DEFAULT_USER)
-            st.metric("🧠 Total Memories", memory_count)
-        except Exception as e:
-            st.warning(f"Could not fetch memory stats: {str(e)}")
+        if memory:
+            try:
+                memory_count = memory.get_memory_count(DEFAULT_USER)
+                st.metric("🧠 Total Memories", memory_count)
+            except Exception as e:
+                st.warning(f"Could not fetch memory stats: {str(e)}")
+        else:
+            st.info("💡 Neo4j memory system offline - using session memory")
         
         st.markdown("---")
     
@@ -227,25 +233,28 @@ def chat_interface():
         # Store and display user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         
-        try:
-            memory.store_chat(DEFAULT_USER, "user", prompt)
-        except Exception as e:
-            st.error(f"Failed to store message: {str(e)}")
+        if memory:
+            try:
+                memory.store_chat(DEFAULT_USER, "user", prompt)
+            except Exception as e:
+                st.error(f"Failed to store message: {str(e)}")
         
         with st.chat_message("user"):
             st.markdown(prompt)
         
         # Get relevant memories
-        with st.spinner("🧠 Accessing knowledge base..."):
-            try:
-                context = memory.get_relevant_memories(prompt, DEFAULT_USER)
-                if context:
-                    st.success(f"🎯 Found {len(context)} relevant memories!")
-                else:
-                    st.info("💭 Building new memories...")
-            except Exception as e:
-                st.warning(f"Memory retrieval issue: {str(e)}")
-                context = []
+        context = []
+        if memory:
+            with st.spinner("🧠 Accessing knowledge base..."):
+                try:
+                    context = memory.get_relevant_memories(prompt, DEFAULT_USER)
+                    if context:
+                        st.success(f"🎯 Found {len(context)} relevant memories!")
+                    else:
+                        st.info("💭 Building new memories...")
+                except Exception as e:
+                    st.warning(f"Memory retrieval issue: {str(e)}")
+                    context = []
         
         # Build LLM prompt with context
         context_str = "\n\n".join([f"- {mem}" for mem in context]) if context else ""
@@ -292,10 +301,11 @@ Current conversation context: {len(st.session_state.messages)} messages in this 
                 
                 # Save AI response
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
-                try:
-                    memory.store_chat(DEFAULT_USER, "assistant", full_response)
-                except Exception as e:
-                    st.warning(f"Failed to store AI response: {str(e)}")
+                if memory:
+                    try:
+                        memory.store_chat(DEFAULT_USER, "assistant", full_response)
+                    except Exception as e:
+                        st.warning(f"Failed to store AI response: {str(e)}")
                     
             except Exception as e:
                 st.error(f"❌ AI Response Error: {str(e)}")
