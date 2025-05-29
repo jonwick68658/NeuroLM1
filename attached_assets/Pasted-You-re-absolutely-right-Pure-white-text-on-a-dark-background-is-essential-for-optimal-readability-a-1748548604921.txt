@@ -1,0 +1,250 @@
+You're absolutely right. Pure white text on a dark background is essential for optimal readability and visual comfort. My previous color scheme didn't emphasize this enough. Let me refine the design with proper contrast and visual hierarchy:
+
+### Enhanced Dark Theme with Optimal Contrast
+
+**Revised Color Palette:**
+- **Background:** `#0A0A0A` (Deep Space Black)
+- **Surface:** `#121212` (Elevated Elements)
+- **Primary Text:** `#FFFFFF` (Pure White)
+- **Secondary Text:** `#B0B0B0` (Subtle Gray)
+- **Accent 1:** `#7F5AF0` (Vibrant Purple)
+- **Accent 2:** `#2EC4B6` (Electric Teal)
+- **Highlight:** `#FF3366` (Attention Grabbing Pink)
+
+**Key Improvements:**
+1. **Text Contrast:** Pure white (`#FFFFFF`) for all primary text
+2. **Background Depth:** Added layered backgrounds with subtle gradients
+3. **Visual Hierarchy:** Clear typography scale with proper spacing
+4. **Reduced Eye Strain:** Added a11y-compliant contrast ratios
+
+### Implementation Updates
+
+**1. CSS Theme Refinement (`theme.css`):**
+```css
+:root {
+  --bg-base: #0A0A0A;
+  --surface-1: #121212;
+  --surface-2: #1A1A1A;
+  --text-primary: #FFFFFF;
+  --text-secondary: #B0B0B0;
+  --accent-primary: #7F5AF0;
+  --accent-secondary: #2EC4B6;
+  --highlight: #FF3366;
+  --border-radius: 16px;
+}
+
+body {
+  background: 
+    radial-gradient(circle at 15% 30%, #1A1A1A 0%, transparent 25%),
+    radial-gradient(circle at 85% 70%, #0F0F0F 0%, transparent 25%),
+    var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+
+h1, h2, h3, h4 {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+}
+
+p, li {
+  color: var(--text-primary);
+  opacity: 0.95;
+}
+
+.stChatMessage {
+  background: var(--surface-1);
+  border: 1px solid #252525;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.stTextInput input {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid #333;
+}
+
+.stButton>button {
+  background: linear-gradient(135deg, var(--accent-primary), #5E35B1) !important;
+  color: white !important;
+}
+```
+
+**2. Typography Enhancement:**
+```python
+# Add to main.py header
+st.markdown("""
+<style>
+h1 {
+  font-size: 2.8rem;
+  letter-spacing: -0.5px;
+  background: linear-gradient(90deg, #7F5AF0, #2EC4B6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-top: 0;
+}
+
+h2 {
+  font-size: 2rem;
+  border-bottom: 2px solid #333;
+  padding-bottom: 0.5rem;
+  margin-top: 2.5rem;
+}
+
+h3 {
+  font-size: 1.6rem;
+  color: var(--accent-secondary);
+}
+
+p {
+  font-size: 1.1rem;
+  line-height: 1.8;
+}
+</style>
+""", unsafe_allow_html=True)
+```
+
+**3. Chat Message Components:**
+```python
+def neural_message(content, sender="AI"):
+    if sender == "AI":
+        st.markdown(f"""
+        <div class="stChatMessage" style="border-left: 3px solid var(--accent-secondary);">
+          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+              <span style="color: white; font-weight: 800; font-size: 14px;">NL</span>
+            </div>
+            <div>
+              <div style="font-weight: 700; color: var(--accent-secondary);">NeuroLM</div>
+              <div style="font-size: 0.85rem; color: var(--text-secondary);">Neural Memory System</div>
+            </div>
+          </div>
+          <div style="color: var(--text-primary); line-height: 1.7; font-size: 1.1rem;">
+            {content}
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="stChatMessage" style="border-left: 3px solid #444;">
+          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px; background: #252525;">
+              <span style="color: var(--text-primary); font-weight: 700; font-size: 14px;">YO</span>
+            </div>
+            <div style="font-weight: 700;">You</div>
+          </div>
+          <div style="color: var(--text-primary); line-height: 1.7; font-size: 1.1rem;">
+            {content}
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+```
+
+**4. Dashboard Visualization:**
+```python
+def neural_activity_widget():
+    st.markdown("""
+    <div style="background: var(--surface-1); border-radius: var(--border-radius); padding: 1.5rem; margin-bottom: 2rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h3 style="margin: 0;">Neural Activity</h3>
+        <div style="font-size: 0.9rem; color: var(--text-secondary);">Real-time</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem;">
+        <div style="background: var(--surface-2); border-radius: 12px; padding: 1rem; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700; color: var(--accent-primary);">42</div>
+          <div style="color: var(--text-secondary);">Memories</div>
+        </div>
+        <div style="background: var(--surface-2); border-radius: 12px; padding: 1rem; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700; color: var(--accent-secondary);">18</div>
+          <div style="color: var(--text-secondary);">Topics</div>
+        </div>
+        <div style="background: var(--surface-2); border-radius: 12px; padding: 1rem; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700; color: var(--highlight);">92%</div>
+          <div style="color: var(--text-secondary);">Confidence</div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+```
+
+**5. Sidebar Enhancement:**
+```python
+with st.sidebar:
+    st.markdown("""
+    <div style="padding: 1.5rem 0; border-bottom: 1px solid #252525;">
+      <div style="display: flex; align-items: center;">
+        <div style="font-size: 1.8rem; margin-right: 12px;">🧠</div>
+        <div>
+          <div style="font-size: 1.4rem; font-weight: 700;">NeuroLM</div>
+          <div style="color: var(--text-secondary); font-size: 0.9rem;">Neural Memory System</div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="margin-top: 1.5rem;">
+      <div style="display: flex; align-items: center; padding: 0.8rem 1rem; background: var(--surface-2); border-radius: 12px; margin-bottom: 0.5rem;">
+        <div style="margin-right: 12px; font-size: 1.2rem;">💬</div>
+        <div>Chat</div>
+      </div>
+      
+      <div style="display: flex; align-items: center; padding: 0.8rem 1rem; border-radius: 12px; margin-bottom: 0.5rem;">
+        <div style="margin-right: 12px; font-size: 1.2rem;">📊</div>
+        <div>Analytics</div>
+      </div>
+      
+      <div style="display: flex; align-items: center; padding: 0.8rem 1rem; border-radius: 12px; margin-bottom: 0.5rem;">
+        <div style="margin-right: 12px; font-size: 1.2rem;">🧩</div>
+        <div>Memory Explorer</div>
+      </div>
+    </div>
+    
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1.5rem; background: var(--surface-1); border-top: 1px solid #252525;">
+      <div style="display: flex; align-items: center;">
+        <div style="width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+          <span style="color: white; font-weight: 700;">U</span>
+        </div>
+        <div>
+          <div style="font-weight: 500;">User Profile</div>
+          <div style="font-size: 0.9rem; color: var(--text-secondary);">Active</div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+```
+
+### Key Visual Improvements:
+
+1. **Text Readability:**
+   - All primary text now pure white (`#FFFFFF`)
+   - Increased font size (1.1rem base)
+   - Enhanced line height (1.7) for better scanning
+   - Clear typographic hierarchy
+
+2. **Visual Comfort:**
+   - Darker base background (`#0A0A0A`)
+   - Subtle radial gradients for depth
+   - Reduced harsh contrasts
+   - Softer borders (`#252525`)
+
+3. **Professional Aesthetics:**
+   - Unified component styling
+   - Consistent spacing system
+   - Meaningful icon usage
+   - Gradient accents for visual interest
+
+4. **Reduced Cognitive Load:**
+   - Clear visual hierarchy
+   - Grouped related elements
+   - Minimal distractions
+   - Purposeful white space
+
+This refined design maintains the sophisticated dark theme while ensuring optimal readability through:
+- WCAG AA compliant contrast ratios
+- Appropriate font sizing
+- Careful color selection
+- Strategic use of white space
+- Purposeful typographic hierarchy
+
+The interface now has the premium, professional appearance that matches the advanced capabilities of your NeuroLM system. Would you like me to provide the complete updated file structure or any specific component in more detail?
