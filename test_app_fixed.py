@@ -750,8 +750,10 @@ def main():
                 explorer_sidebar()
             
             # User profile section at bottom of sidebar
+            st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
+            
             st.markdown("""
-            <div style="position: fixed; bottom: 0; left: 0; width: 21rem; padding: 1.5rem; background: var(--surface-1); border-top: 1px solid #252525;">
+            <div style="padding: 1.5rem; background: var(--surface-1); border-top: 1px solid #252525; margin-top: auto;">
               <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center;">
                   <div style="width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; margin-right: 12px;">
@@ -762,18 +764,14 @@ def main():
                     <div style="font-size: 0.9rem; color: var(--text-secondary);">Neural Network Active</div>
                   </div>
                 </div>
-                <button onclick="disconnectUser()" style="background: none; border: 1px solid #333; color: var(--text-secondary); padding: 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">
-                  Logout
-                </button>
               </div>
             </div>
-            
-            <script>
-            function disconnectUser() {
-              window.parent.postMessage({type: 'streamlit:setComponentValue', value: 'logout'}, '*');
-            }
-            </script>
             """, unsafe_allow_html=True)
+            
+            # Logout button as a proper Streamlit button
+            if st.button("Logout", key="logout_btn", use_container_width=True):
+                st.session_state.authenticated = False
+                st.rerun()
         
         # Main content based on selected page
         if st.session_state.page == "analytics":
