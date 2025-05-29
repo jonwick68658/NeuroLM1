@@ -24,54 +24,245 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional styling
+# Enhanced cosmic neural theme styling
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap');
+    
+    /* Global cosmic theme */
+    .stApp {
+        background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
+        color: #ffffff;
+    }
+    
+    /* Animated starfield background */
+    .cosmic-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: 
+            radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+            radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+            radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+            radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+            radial-gradient(2px 2px at 160px 30px, #ddd, transparent);
+        background-repeat: repeat;
+        background-size: 200px 100px;
+        animation: sparkle 20s linear infinite;
+        pointer-events: none;
+        z-index: -1;
+    }
+    
+    @keyframes sparkle {
+        from { transform: translateY(0px); }
+        to { transform: translateY(-100px); }
+    }
+    
+    /* Neural glow effects */
+    @keyframes neuralPulse {
+        0%, 100% { box-shadow: 0 0 20px rgba(255, 107, 157, 0.3); }
+        50% { box-shadow: 0 0 40px rgba(255, 107, 157, 0.6), 0 0 60px rgba(0, 212, 255, 0.4); }
+    }
+    
+    @keyframes synapticSpark {
+        0%, 100% { opacity: 0.6; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.1); }
+    }
+    
+    /* Cinematic welcome screen */
+    .neural-welcome {
+        position: relative;
+        text-align: center;
+        padding: 4rem 2rem;
+        background: radial-gradient(ellipse at center, rgba(26, 26, 46, 0.9) 0%, rgba(9, 10, 15, 0.95) 100%);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 107, 157, 0.2);
+        margin: 2rem 0;
+        animation: neuralPulse 4s ease-in-out infinite;
+        backdrop-filter: blur(10px);
+    }
+    
+    .neural-brain {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        animation: synapticSpark 3s ease-in-out infinite;
+        filter: drop-shadow(0 0 20px rgba(255, 107, 157, 0.8));
+    }
+    
+    .neural-title {
+        font-family: 'Orbitron', monospace;
+        font-size: 3.5rem;
+        font-weight: 900;
+        background: linear-gradient(45deg, #ff6b9d, #00d4ff, #c44569, #667eea);
+        background-size: 400% 400%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: gradientShift 6s ease infinite;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 0 30px rgba(255, 107, 157, 0.5);
+    }
+    
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    .neural-subtitle {
+        font-family: 'Exo 2', sans-serif;
+        font-size: 1.2rem;
+        color: #b8c6db;
+        font-weight: 300;
+        letter-spacing: 2px;
+        opacity: 0.9;
+    }
+    
+    /* Enhanced main headers */
     .main-header {
         text-align: center;
-        padding: 1rem 0;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem 1rem;
+        background: linear-gradient(135deg, rgba(26, 26, 46, 0.8) 0%, rgba(22, 33, 62, 0.9) 100%);
         color: white;
-        border-radius: 10px;
+        border-radius: 15px;
         margin-bottom: 2rem;
+        border: 1px solid rgba(255, 107, 157, 0.3);
+        backdrop-filter: blur(10px);
+        animation: neuralPulse 8s ease-in-out infinite;
     }
     
-    .chat-message {
+    .main-header h1, .main-header h2 {
+        font-family: 'Orbitron', monospace;
+        background: linear-gradient(45deg, #ff6b9d, #00d4ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Sidebar neural styling */
+    .sidebar-neural {
+        background: linear-gradient(180deg, rgba(26, 26, 46, 0.9) 0%, rgba(16, 21, 62, 0.95) 100%);
+        border: 1px solid rgba(255, 107, 157, 0.2);
+        border-radius: 15px;
         padding: 1rem;
-        margin: 0.5rem 0;
-        border-radius: 10px;
-        border-left: 4px solid #667eea;
-        background-color: #f8f9fa;
+        margin-bottom: 1rem;
+        animation: neuralPulse 10s ease-in-out infinite;
     }
     
-    .memory-indicator {
-        font-size: 0.8rem;
-        color: #6c757d;
-        font-style: italic;
-        margin-top: 0.5rem;
+    .sidebar-neural h3 {
+        font-family: 'Orbitron', monospace;
+        background: linear-gradient(45deg, #ff6b9d, #00d4ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin: 0;
     }
     
+    /* Enhanced conversation items */
     .conversation-item {
-        padding: 0.5rem;
-        margin: 0.2rem 0;
-        border-radius: 5px;
-        border-left: 3px solid #28a745;
-        background-color: #f8f9fa;
+        padding: 0.8rem;
+        margin: 0.3rem 0;
+        border-radius: 10px;
+        background: linear-gradient(135deg, rgba(255, 107, 157, 0.1) 0%, rgba(0, 212, 255, 0.05) 100%);
+        border-left: 3px solid #ff6b9d;
         cursor: pointer;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(5px);
     }
     
     .conversation-item:hover {
-        background-color: #e9ecef;
+        background: linear-gradient(135deg, rgba(255, 107, 157, 0.2) 0%, rgba(0, 212, 255, 0.1) 100%);
+        transform: translateX(5px);
+        box-shadow: 0 5px 15px rgba(255, 107, 157, 0.3);
     }
     
+    /* Neural stats display */
     .neural-stats {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, rgba(255, 107, 157, 0.2) 0%, rgba(0, 212, 255, 0.1) 100%);
         color: white;
-        padding: 1rem;
-        border-radius: 10px;
+        padding: 1.2rem;
+        border-radius: 15px;
         margin: 0.5rem 0;
+        border: 1px solid rgba(255, 107, 157, 0.3);
+        backdrop-filter: blur(10px);
+        animation: synapticSpark 5s ease-in-out infinite;
     }
+    
+    .neural-stats h4 {
+        font-family: 'Orbitron', monospace;
+        color: #ff6b9d;
+        margin-bottom: 0.8rem;
+        text-align: center;
+    }
+    
+    /* Memory indicators */
+    .memory-indicator {
+        font-size: 0.8rem;
+        color: #b8c6db;
+        font-style: italic;
+        margin-top: 0.5rem;
+        padding: 0.3rem 0.6rem;
+        background: rgba(255, 107, 157, 0.1);
+        border-radius: 15px;
+        border-left: 2px solid #ff6b9d;
+    }
+    
+    /* Enhanced form styling */
+    .stTextInput > div > div > input {
+        background: rgba(26, 26, 46, 0.8) !important;
+        border: 1px solid rgba(255, 107, 157, 0.3) !important;
+        color: white !important;
+        border-radius: 10px !important;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #ff6b9d !important;
+        box-shadow: 0 0 10px rgba(255, 107, 157, 0.5) !important;
+    }
+    
+    /* Button enhancements */
+    .stButton > button {
+        background: linear-gradient(45deg, #ff6b9d, #c44569) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 25px !important;
+        font-family: 'Exo 2', sans-serif !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(45deg, #c44569, #ff6b9d) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 5px 15px rgba(255, 107, 157, 0.4) !important;
+    }
+    
+    /* Chat message styling */
+    .stChatMessage {
+        background: rgba(26, 26, 46, 0.6) !important;
+        border: 1px solid rgba(255, 107, 157, 0.2) !important;
+        border-radius: 15px !important;
+        backdrop-filter: blur(10px) !important;
+    }
+    
+    /* Metrics styling */
+    .metric-container {
+        background: linear-gradient(135deg, rgba(26, 26, 46, 0.8) 0%, rgba(22, 33, 62, 0.9) 100%);
+        padding: 1.5rem;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 107, 157, 0.3);
+        text-align: center;
+        backdrop-filter: blur(10px);
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
 </style>
+
+<div class="cosmic-bg"></div>
 """, unsafe_allow_html=True)
 
 def init_memory():
@@ -100,18 +291,27 @@ def user_authentication():
     
     if not st.session_state.authenticated:
         st.markdown("""
-        <div class="main-header">
-            <h1>🧠 NeuroLM</h1>
-            <p>Your Personal Neural Language Model</p>
+        <div class="neural-welcome">
+            <div class="neural-brain">🧠</div>
+            <h1 class="neural-title">NeuroLM</h1>
+            <p class="neural-subtitle">Your Personal Neural Language Model</p>
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("### Welcome to NeuroLM")
         st.markdown("""
-        NeuroLM creates a personalized AI that learns and remembers from your conversations. 
-        Your neural network grows stronger with each interaction, building lasting memories 
-        and intelligent connections.
-        """)
+        <div style="text-align: center; padding: 2rem; background: rgba(26, 26, 46, 0.6); 
+                    border-radius: 15px; border: 1px solid rgba(255, 107, 157, 0.2); 
+                    backdrop-filter: blur(10px); margin: 1rem 0;">
+            <h3 style="color: #ff6b9d; font-family: 'Orbitron', monospace; margin-bottom: 1rem;">
+                Welcome to the Future of Personal AI
+            </h3>
+            <p style="color: #b8c6db; font-family: 'Exo 2', sans-serif; line-height: 1.6;">
+                NeuroLM creates a personalized AI that learns and remembers from your conversations.<br>
+                Your neural network grows stronger with each interaction, building lasting memories<br>
+                and intelligent connections that evolve with your unique knowledge patterns.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         
         with st.form("login_form"):
             st.subheader("Sign In")
@@ -161,10 +361,10 @@ def get_conversation_history(memory, user_id, limit=15):
 def render_sidebar(memory, user_id):
     """Render enhanced sidebar with conversation history"""
     st.sidebar.markdown("""
-    <div style="text-align: center; padding: 1rem; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
-                color: white; border-radius: 10px; margin-bottom: 1rem;">
-        <h3>🧠 NeuroLM</h3>
-        <p style="margin: 0; font-size: 0.9rem;">Neural Memory System</p>
+    <div class="sidebar-neural">
+        <div class="neural-brain" style="font-size: 2rem; text-align: center; margin-bottom: 0.5rem;">🧠</div>
+        <h3>NeuroLM</h3>
+        <p style="margin: 0; font-size: 0.9rem; text-align: center; color: #b8c6db; font-family: 'Exo 2', sans-serif;">Neural Memory System</p>
     </div>
     """, unsafe_allow_html=True)
     
