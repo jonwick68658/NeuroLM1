@@ -432,41 +432,99 @@ def check_login():
     
     return True
 
+def get_conversation_sessions(user_id, limit=10):
+    """Get distinct conversation sessions with their latest messages"""
+    if not memory:
+        return []
+    
+    try:
+        # Get recent conversations and group them into sessions
+        all_messages = memory.get_conversation_history(user_id, limit=100)
+        if not all_messages:
+            return []
+        
+        # Group messages into conversation sessions
+        sessions = []
+        current_session = []
+        
+        for msg in all_messages:
+            if isinstance(msg, dict):
+                content = msg.get("content", "")
+                role = msg.get("role", "user")
+            else:
+                content = str(msg)
+                role = "unknown"
+            
+            # Filter out technical content
+            if content and not any(keyword in content.lower() for keyword in ["match", "return", "session.run", "cypher"]):
+                current_session.append({"content": content, "role": role})
+                
+                # Start new session every 15 messages to create logical breaks
+                if len(current_session) >= 15:
+                    if current_session:
+                        sessions.append(current_session)
+                    current_session = []
+        
+        if current_session:
+            sessions.append(current_session)
+        
+        return sessions[:limit]
+    except Exception:
+        return []
+
+def load_conversation_session(session_messages):
+    """Load a conversation session into the chat interface"""
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    # Clear current messages and load the session (last 25 messages)
+    from datetime import datetime
+    st.session_state.messages = []
+    
+    for msg in session_messages[-25:]:
+        st.session_state.messages.append({
+            "role": msg["role"],
+            "content": msg["content"],
+            "timestamp": datetime.now()
+        })
+    
+    st.rerun()
+
 def chat_history_sidebar():
-    """Display recent conversations and popular topics in sidebar"""
+    """Display recent conversation sessions in sidebar"""
     if memory:
         try:
-            # Recent conversation history
-            recent_chats = memory.get_conversation_history(DEFAULT_USER, limit=10)
+            # Get conversation sessions
+            sessions = get_conversation_sessions(DEFAULT_USER, limit=10)
             
             st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
             st.markdown('<div class="sidebar-title">Recent Conversations</div>', unsafe_allow_html=True)
             
-            if recent_chats and isinstance(recent_chats, list):
-                for chat in recent_chats[:5]:
-                    # Handle both string and dict formats
-                    if isinstance(chat, dict):
-                        content = chat.get("content", "")
-                        role = chat.get("role", "user")
-                        role_icon = "🤖" if role == "assistant" else "👤"
-                    else:
-                        content = str(chat)
-                        role_icon = "💬"
-                    
-                    # Clean the content and create preview
-                    if content and len(content.strip()) > 0:
-                        # Remove any code or query content
-                        if not any(keyword in content.lower() for keyword in ["match", "return", "session.run", "cypher", "neo4j"]):
-                            preview = content[:50] + "..." if len(content) > 50 else content
+            if sessions:
+                for i, session in enumerate(sessions):
+                    if session:
+                        # Get the first user message as preview
+                        preview_msg = None
+                        for msg in session:
+                            if msg["role"] == "user":
+                                preview_msg = msg
+                                break
+                        
+                        if not preview_msg and session:
+                            preview_msg = session[0]
+                        
+                        if preview_msg:
+                            content = preview_msg["content"]
+                            preview = content[:45] + "..." if len(content) > 45 else content
                             preview = preview.replace('\n', ' ').strip()
-                            if preview:
-                                st.markdown(f'<div class="chat-item">{role_icon} {preview}</div>', unsafe_allow_html=True)
+                            
+                            # Create clickable conversation button
+                            if st.button(f"💬 {preview}", key=f"conv_{i}", use_container_width=True, help=f"Load conversation ({len(session)} messages)"):
+                                load_conversation_session(session)
             else:
                 st.markdown('<div class="topic-item">No conversations yet</div>', unsafe_allow_html=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
-            
-
             
         except Exception as e:
             st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
