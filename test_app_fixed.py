@@ -126,20 +126,12 @@ def neural_message(content, sender="AI", timestamp=None, sources=None):
     if sender == "AI":
         source_html = ""
         if sources and len(sources) > 0:
-            source_list = "\n".join(f"<li style='color: var(--text-secondary); margin: 4px 0;'>{src[:60]}...</li>" for src in sources[:3])
-            source_html = f"""
-            <div style="margin-top: 12px; font-size: 0.85rem;">
-              <div style="display: flex; align-items: center; gap: 8px; color: var(--accent-secondary);">
-                <span>Neural Sources</span>
-                <span style="background: rgba(127,90,240,0.2); border-radius: 12px; padding: 2px 8px; font-size: 0.75rem;">
-                  {len(sources)}
-                </span>
-              </div>
-              <ul style="margin: 8px 0 0 20px; padding: 0; opacity: 0.8;">
-                {source_list}
-              </ul>
-            </div>
-            """
+            # Create a simple text representation instead of HTML for sources
+            source_text = f"\n\n🧠 Neural Sources ({len(sources)}):\n"
+            for i, src in enumerate(sources[:3], 1):
+                source_text += f"• {src[:60]}...\n"
+            content = content + source_text
+            source_html = ""  # Don't add HTML sources
         
         timestamp_html = f"""<div style="position: absolute; right: 16px; top: 16px; font-size: 0.75rem; color: var(--text-secondary);">
           {timestamp.strftime('%H:%M') if timestamp else ''}
