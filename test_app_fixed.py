@@ -490,8 +490,18 @@ def load_conversation_session(session_messages):
     
     st.rerun()
 
+def start_new_chat():
+    """Start a new chat session"""
+    if "messages" in st.session_state:
+        st.session_state.messages = []
+    st.rerun()
+
 def chat_history_sidebar():
     """Display recent conversation sessions in sidebar"""
+    # New Chat button at the top
+    if st.button("✨ New Chat", key="new_chat_btn", use_container_width=True, help="Start a fresh conversation"):
+        start_new_chat()
+    
     if memory:
         try:
             # Get conversation sessions
@@ -501,26 +511,35 @@ def chat_history_sidebar():
             st.markdown('<div class="sidebar-title">Recent Conversations</div>', unsafe_allow_html=True)
             
             if sessions:
+                conversation_count = 0
                 for i, session in enumerate(sessions):
-                    if session:
+                    if session and len(session) > 0:
                         # Get the first user message as preview
                         preview_msg = None
                         for msg in session:
-                            if msg["role"] == "user":
+                            if msg["role"] == "user" and msg["content"].strip():
                                 preview_msg = msg
                                 break
                         
-                        if not preview_msg and session:
-                            preview_msg = session[0]
+                        if not preview_msg:
+                            for msg in session:
+                                if msg["content"].strip():
+                                    preview_msg = msg
+                                    break
                         
-                        if preview_msg:
-                            content = preview_msg["content"]
+                        if preview_msg and preview_msg["content"].strip():
+                            content = preview_msg["content"].strip()
                             preview = content[:45] + "..." if len(content) > 45 else content
                             preview = preview.replace('\n', ' ').strip()
                             
-                            # Create clickable conversation button
-                            if st.button(f"💬 {preview}", key=f"conv_{i}", use_container_width=True, help=f"Load conversation ({len(session)} messages)"):
-                                load_conversation_session(session)
+                            if preview:  # Only show if there's actual content
+                                # Create clickable conversation button
+                                if st.button(f"💬 {preview}", key=f"conv_{i}", use_container_width=True, help=f"Load conversation ({len(session)} messages)"):
+                                    load_conversation_session(session)
+                                conversation_count += 1
+                
+                if conversation_count == 0:
+                    st.markdown('<div class="topic-item">No conversations yet</div>', unsafe_allow_html=True)
             else:
                 st.markdown('<div class="topic-item">No conversations yet</div>', unsafe_allow_html=True)
             
