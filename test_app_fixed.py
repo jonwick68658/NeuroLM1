@@ -3,6 +3,7 @@ import openai
 import os
 from dotenv import load_dotenv
 from memory import Neo4jMemory
+from model_selector import ModelSelector
 
 # Load environment variables
 load_dotenv()
@@ -12,6 +13,9 @@ openai_client = openai.OpenAI(
     api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1"
 )
+
+# Initialize model selector
+model_selector = ModelSelector()
 
 # Initialize memory system
 @st.cache_resource
@@ -654,13 +658,20 @@ def start_new_chat():
 
 def chat_history_sidebar():
     """Display recent conversation sessions in sidebar"""
-    # New Chat button at the top
-    if st.button("✨ New Chat", key="new_chat_btn", use_container_width=True, help="Start a fresh conversation"):
+    # Model selector at the top
+    current_user = get_current_user()
+    if current_user:
+        selected_model = model_selector.render_selector(current_user)
+    
+    st.sidebar.markdown("---")
+    
+    # New Chat button
+    if st.sidebar.button("✨ New Chat", key="new_chat_btn", use_container_width=True, help="Start a fresh conversation"):
         start_new_chat()
     
     # Recent Conversations section
-    st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-title">Recent Conversations</div>', unsafe_allow_html=True)
+    st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+    st.sidebar.markdown('<div class="sidebar-title">Recent Conversations</div>', unsafe_allow_html=True)
     
     if memory:
         try:
@@ -826,6 +837,9 @@ def chat_interface():
     if "messages" not in st.session_state:
         st.session_state.messages = []
     
+    # Get current user for model selection
+    current_user = get_current_user()
+    
     # Display existing messages using neural components
     for message in st.session_state.messages:
         neural_message(
@@ -878,8 +892,11 @@ Your capabilities:
 
 You are an intelligent AI assistant designed to act as the user's neural memory system."""
             
+            # Get selected model
+            selected_model = model_selector.get_selected_model(current_user or "default_user")
+            
             response = openai_client.chat.completions.create(
-                model="gpt-4o-mini-2024-07-18",
+                model=selected_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
