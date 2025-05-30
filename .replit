@@ -22,15 +22,7 @@ args = "install_dependencies"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Simple App Test"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Test App"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Test App Fixed"
+args = "Main App"
 
 [[workflows.workflow]]
 name = "install_dependencies"
@@ -41,30 +33,12 @@ task = "shell.exec"
 args = "uv add neo4j openai sentence-transformers PyPDF2 docx2txt python-dotenv pyngrok"
 
 [[workflows.workflow]]
-name = "Simple App Test"
+name = "Main App"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run simple_main.py --server.port 5000"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Test App"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run test_app.py --server.port 5000"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Test App Fixed"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run test_app_fixed.py --server.port 5000"
+args = "streamlit run app.py --server.port 5000"
 waitForPort = 5000
 
 [[ports]]
