@@ -32,13 +32,7 @@ def generate_embedding(text):
             logging.warning(f"OpenAI embedding failed: {e}")
             pass
         
-        # Attempt 2: Try sentence-transformers if available
-        try:
-            from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer('all-MiniLM-L6-v2')
-            return model.encode(cleaned_text).tolist()
-        except Exception:
-            pass
+        # Skip sentence-transformers to avoid dependency issues
         
         # Attempt 3: Try TF-IDF with sklearn if available
         try:

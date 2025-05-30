@@ -252,7 +252,7 @@ class NeuralMemorySystem:
                 
         except Exception as e:
             print(f"Error getting topic overview: {e}")
-            return {'topics': [], 'total_topics': 0}
+            return {"topics": [], "topic_count": 0, "total_memories": 0}
     
     def get_memory_stats(self, user_id: str) -> Dict[str, Any]:
         """Get memory statistics for compatibility with app interface"""
