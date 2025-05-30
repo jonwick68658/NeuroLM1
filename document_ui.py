@@ -76,13 +76,18 @@ def document_upload_section(user_id: str, memory_system):
                         doc_storage=doc_storage
                     )
                     
-                    # Mark as processed
-                    st.session_state.processed_files.add(file_key)
-                    
-                    with status_container:
-                        st.success(f"Added {len(chunks)} chunks from {file.name}")
-                    
-                    successful_uploads += 1
+                    # Check if processing was successful
+                    if doc_id:
+                        # Mark as processed
+                        st.session_state.processed_files.add(file_key)
+                        
+                        with status_container:
+                            st.success(f"Added {len(chunks)} chunks from {file.name}")
+                        
+                        successful_uploads += 1
+                    else:
+                        with status_container:
+                            st.error(f"Failed to process {file.name}")
                     
                 except Exception as e:
                     with status_container:
