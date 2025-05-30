@@ -880,7 +880,18 @@ def chat_interface():
                 try:
                     user_id = get_current_user() or "user_Ryan"
                     unified_context = get_unified_context_for_chat(user_id, prompt, memory)
+                    
+                    # DIAGNOSTIC LOGGING - Phase 1
+                    print(f"=== CONTEXT DIAGNOSTIC ===")
+                    print(f"User ID: {user_id}")
+                    print(f"Query: {prompt}")
+                    print(f"Context Retrieved Length: {len(unified_context)}")
+                    print(f"Context Preview: {unified_context[:300]}...")
+                    print(f"Context Full: {unified_context}")
+                    print(f"=== END DIAGNOSTIC ===")
+                    
                 except Exception as e:
+                    print(f"CONTEXT RETRIEVAL ERROR: {str(e)}")
                     st.warning(f"Context retrieval issue: {str(e)}")
         
         # Generate AI response
@@ -904,15 +915,35 @@ Your capabilities:
 
 You are an intelligent AI assistant designed to act as the user's neural memory system."""
             
+            # DIAGNOSTIC LOGGING - Phase 1 System Prompt
+            print(f"=== SYSTEM PROMPT DIAGNOSTIC ===")
+            print(f"Has Context: {has_context}")
+            print(f"Context Section Length: {len(context_section)}")
+            print(f"System Prompt Length: {len(system_prompt)}")
+            print(f"System Prompt: {system_prompt}")
+            print(f"=== END SYSTEM PROMPT DIAGNOSTIC ===")
+            
+            
             # Get selected model
             selected_model = model_selector.get_selected_model(current_user or "default_user")
             
+            # DIAGNOSTIC LOGGING - Phase 1 API Call
+            messages_to_send = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ]
+            
+            print(f"=== API CALL DIAGNOSTIC ===")
+            print(f"Model: {selected_model}")
+            print(f"Messages Count: {len(messages_to_send)}")
+            print(f"System Message Length: {len(messages_to_send[0]['content'])}")
+            print(f"User Message: {messages_to_send[1]['content']}")
+            print(f"System Message Content: {messages_to_send[0]['content']}")
+            print(f"=== END API CALL DIAGNOSTIC ===")
+            
             response = openai_client.chat.completions.create(
                 model=selected_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
+                messages=messages_to_send,
                 stream=True,
                 temperature=0.7,
                 max_tokens=1000

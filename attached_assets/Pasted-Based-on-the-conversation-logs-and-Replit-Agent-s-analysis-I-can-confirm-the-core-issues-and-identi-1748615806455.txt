@@ -1,0 +1,110 @@
+Based on the conversation logs and Replit Agent's analysis, I can confirm the core issues and identify additional problems. Here's a technical assessment:
+
+**Confirmed Replit Agent Findings ✅**
+1. **Context Disconnect**: Neo4j retrieval is working but context isn't reaching the LLM
+2. **Metadata Corruption**: Document filenames are inconsistent/hallucinated (`no_231121_061901.pdf` vs actual uploads)
+3. **State Inconsistency**: Document count oscillates between 2 and 3
+4. **Conversation Amnesia**: LLM doesn't retain context across turns
+
+**Additional Critical Issues 🔍**  
+5. **Prompt Injection Failure**:  
+   - Evidence: When user requested revision with citations, LLM replied "please provide the text"  
+   - Indicates the core RAG pattern (retrieve → augment → generate) is breaking
+
+6. **Vector Search Contamination**:  
+   - Negotiation query returned phantom filename suggests:  
+     a) Outdated vector embeddings  
+     b) Chunk-document linkage errors in Neo4j  
+     c) Hybrid search mixing semantic + lexical retrieval incorrectly
+
+7. **Session Context Bleed**:  
+   - LLM remembers past conversation structures ("previously mentioned document") but not actual entities  
+   - Suggests weighted context priority issues
+
+**Root Cause Analysis**  
+The failure occurs at three layers:
+
+```mermaid
+graph LR
+A[Neo4j] -->|Correct context| B[Middleware]
+B -->|Drops/filters context| C[LLM Prompt]
+C -->|No context| D[LLM Response]
+```
+
+1. **Middleware Gap** (Critical):  
+   Retrieved context is discarded before prompt assembly due to:  
+   - Improper variable handling
+   - Pipeline stage misconfiguration
+   - Overzealous sanitization
+
+2. **LLM Instruction Failure**:  
+   System prompts aren't enforcing:  
+   ```python
+   # MISSING IN PROMPT ENGINEERING
+   "ALWAYS reference provided context from Neo4j. Never hallucinate filenames."
+   ```
+
+3. **GraphDB Schema Issues**:  
+   Likely improper relationships between:
+   - User → UploadedDocuments
+   - DocumentChunks → SourceFiles
+
+**Repair Strategy (High Impact Fixes)**  
+
+1. **Middleware Debugging**:  
+   ```python
+   # Add diagnostic logging
+   def build_prompt(user_query, context):
+       print(f"CONTEXT PASSED TO LLM: {context}")  # Verify pre-prompt content
+       return f"""
+       SYSTEM: You ALWAYS use this context:
+       {context}
+       USER: {user_query}
+       """
+   ```
+
+2. **Context Anchoring Fix**:  
+   - Prepend persistent context header to every LLM call:  
+   ```
+   [User: Ryan][Docs: 100m-Offers.pdf, Way_of_Wolf.pdf, <3rd_filename>.pdf]
+   ```
+
+3. **Neo4j Data Sanitization**:  
+   ```cypher
+   MATCH (d:Document)
+   WHERE not exists(d.valid) OR d.filename CONTAINS " "
+   SET d.valid = false, d.created_at = datetime()
+   ```
+   + Re-embed validated documents only
+
+4. **Prompt Hardening**:  
+   ```markdown
+   SYSTEM RULES:
+   1. ANSWER ONLY using context from Documents: ${document_list}
+   2. REFUSE speculation about unspecified documents
+   3. VERBATIM filenames: NEVER modify or abbreviate
+   ```
+
+**Effort Assessment**  
+- Critical middleware fixes: **1-2 hours** (logging → validation → context piping)  
+- Data cleanup: **30 min** (Neo4j hygiene)  
+- Prompt engineering: **20 min** (rule enforcement)  
+
+**Verification Test Plan**  
+After fixes:  
+```gherkin
+Scenario: Context consistency check
+  When User asks "What do you know about me?"
+  Then System responds "Your name is Ryan" from Neo4j context
+
+Scenario: Document recognition
+  When User asks "List business suggestions from all documents"
+  Then System cites EXACT filenames:
+    - "100m-Offers.pdf"
+    - "Way_of_Wolf.pdf"
+    - "verified_filename_3.pdf"
+```
+
+The core issue is indeed in the context-passing middleware layer - not in Neo4j or LLM. Focus remediation there first before adjusting vector search parameters. Prioritize the diagnostic logging to capture exactly where context drops occur in the pipeline.
+
+**Should be resolved in under 4 hours of focused debugging on the pipeline integration layer.** Start by validating what actual data your middleware receives from Neo4j before building the LLM prompt.
