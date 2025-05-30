@@ -155,9 +155,20 @@ class DocumentStorage:
             return result.single()['deleted_count'] > 0
     
     def search_documents(self, user_id: str, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Search through document content using text matching"""
-        # Use text-based search for now - can enhance with embeddings later
-        return self._text_search_documents(user_id, query, limit)
+        """Search through document content using semantic vector similarity"""
+        try:
+            from utils import generate_embedding
+            query_embedding = generate_embedding(query)
+            
+            # If embedding generation fails, fall back to text search
+            if not query_embedding or all(x == 0.0 for x in query_embedding):
+                return self._text_search_documents(user_id, query, limit)
+            
+            return self._vector_search_documents(user_id, query_embedding, limit)
+            
+        except Exception as e:
+            # Fallback to text search if vector search fails
+            return self._text_search_documents(user_id, query, limit)
     
     def _text_search_documents(self, user_id: str, query: str, limit: int) -> List[Dict[str, Any]]:
         """Enhanced text-based search with multiple strategies"""
@@ -216,6 +227,38 @@ class DocumentStorage:
                         })
             
             return matches
+    
+    def _vector_search_documents(self, user_id: str, query_embedding: List[float], limit: int) -> List[Dict[str, Any]]:
+        """Vector similarity search for document chunks"""
+        with self.driver.session() as session:
+            try:
+                result = session.run("""
+                CALL db.index.vector.queryNodes('document_embeddings', $limit, $query_embedding)
+                YIELD node AS chunk, score AS similarity
+                WHERE chunk.user_id = $user_id
+                MATCH (chunk)-[:BELONGS_TO]->(d:Document)
+                RETURN d.id AS doc_id, d.filename AS filename,
+                       chunk.content AS chunk_content, chunk.chunk_index AS chunk_index,
+                       similarity
+                ORDER BY similarity DESC
+                LIMIT $limit
+                """, query_embedding=query_embedding, user_id=user_id, limit=limit)
+                
+                matches = []
+                for record in result:
+                    matches.append({
+                        'doc_id': record['doc_id'],
+                        'filename': record['filename'],
+                        'chunk_content': record['chunk_content'],
+                        'chunk_index': record['chunk_index'],
+                        'similarity': record['similarity']
+                    })
+                
+                return matches
+                
+            except Exception as e:
+                # If vector search fails, fall back to text search
+                return []
     
     def _get_recent_document_chunks(self, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Get recent document chunks when no search results found"""

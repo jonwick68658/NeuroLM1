@@ -881,7 +881,7 @@ def chat_interface():
                 try:
                     context = memory.get_relevant_memories(prompt, get_current_user())
                     # Also get relevant document context
-                    user_id = get_current_user() or "default_user"
+                    user_id = get_current_user() or "user_Ryan"
                     document_context = get_document_context_for_chat(user_id, prompt, memory)
                     
                     # Debug: If no document context found, try a broader search
