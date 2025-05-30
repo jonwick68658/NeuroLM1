@@ -2,7 +2,7 @@ import streamlit as st
 import openai
 import os
 from dotenv import load_dotenv
-from simple_memory import SimpleMemorySystem
+from neural_memory import NeuralMemorySystem
 from simple_model_selector import SimpleModelSelector
 # Document processing removed for simplicity
 
@@ -22,7 +22,7 @@ model_selector = SimpleModelSelector()
 @st.cache_resource
 def init_memory():
     try:
-        return SimpleMemorySystem()
+        return NeuralMemorySystem()
     except Exception as e:
         st.error(f"Memory initialization failed: {str(e)}")
         return None
@@ -863,22 +863,23 @@ def chat_interface():
         # Display user message
         neural_message(content=prompt, sender="user", timestamp=datetime.now())
         
-        # Store user message in memory
+        # Store user message in neural memory system
         if memory:
             try:
-                memory.store_chat(get_current_user(), "user", prompt)
+                user_id = get_current_user() or "user_Ryan"
+                # Ensure user exists
+                memory.create_user(user_id, "Ryan")
+                memory.store_conversation(user_id, "user", prompt)
             except Exception as e:
                 st.warning(f"Memory storage issue: {str(e)}")
         
-        # Get context from memory only
+        # Get context from neural memory using topic hierarchy
         unified_context = ""
         if memory:
             with st.spinner("Accessing neural network..."):
                 try:
                     user_id = get_current_user() or "user_Ryan"
-                    memories = memory.get_relevant_memories(prompt, user_id, limit=5)
-                    if memories:
-                        unified_context = "From your conversation history:\n" + "\n".join([f"- {mem}" for mem in memories])
+                    unified_context = memory.retrieve_context(user_id, prompt, limit=5)
                 except Exception as e:
                     st.warning(f"Context retrieval issue: {str(e)}")
         
