@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from memory import Neo4jMemory
 from simple_model_selector import SimpleModelSelector
+from document_ui import document_upload_section, document_library_interface, get_document_context_for_chat, display_document_stats_in_sidebar
 
 # Load environment variables
 load_dotenv()
@@ -665,6 +666,13 @@ def chat_history_sidebar():
     
     st.sidebar.markdown("---")
     
+    # Document upload section
+    if current_user and memory:
+        document_upload_section(current_user, memory)
+        display_document_stats_in_sidebar(current_user, memory)
+    
+    st.sidebar.markdown("---")
+    
     # New Chat button
     if st.sidebar.button("✨ New Chat", key="new_chat_btn", use_container_width=True, help="Start a fresh conversation"):
         start_new_chat()
@@ -867,10 +875,13 @@ def chat_interface():
         
         # Get relevant memories for context
         context = []
+        document_context = ""
         if memory:
             with st.spinner("Accessing neural network..."):
                 try:
                     context = memory.get_relevant_memories(prompt, get_current_user())
+                    # Also get relevant document context
+                    document_context = get_document_context_for_chat(get_current_user() or "default_user", prompt, memory)
                 except Exception as e:
                     st.warning(f"Memory retrieval issue: {str(e)}")
         
@@ -878,15 +889,21 @@ def chat_interface():
         try:
             context_str = "\n\n".join([f"- {mem}" for mem in context]) if context else ""
             enhancements = " with access to your personal neural network" if context else ""
+            if document_context:
+                enhancements += " and uploaded knowledge documents"
+            
             context_section = f'Relevant Neural Context:\n{context_str}' if context_str else ''
+            if document_context:
+                context_section += f'\n\n{document_context}'
             
             system_prompt = f"""You are NeuroLM, an advanced neural language model{enhancements}.
 
 Your capabilities:
 1. Recall and reference past conversations naturally
 2. Connect information across different discussions
-3. Provide thoughtful, contextual responses
-4. Build on previous discussions to create continuity
+3. Access knowledge from uploaded documents
+4. Provide thoughtful, contextual responses
+5. Build on previous discussions to create continuity
 
 {context_section}
 
