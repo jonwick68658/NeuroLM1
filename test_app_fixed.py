@@ -3,7 +3,7 @@ import openai
 import os
 from dotenv import load_dotenv
 from memory import Neo4jMemory
-from model_selector import ModelSelector
+from simple_model_selector import SimpleModelSelector
 
 # Load environment variables
 load_dotenv()
@@ -15,7 +15,7 @@ openai_client = openai.OpenAI(
 )
 
 # Initialize model selector
-model_selector = ModelSelector()
+model_selector = SimpleModelSelector()
 
 # Initialize memory system
 @st.cache_resource
