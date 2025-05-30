@@ -881,7 +881,22 @@ def chat_interface():
                 try:
                     context = memory.get_relevant_memories(prompt, get_current_user())
                     # Also get relevant document context
-                    document_context = get_document_context_for_chat(get_current_user() or "default_user", prompt, memory)
+                    user_id = get_current_user() or "default_user"
+                    document_context = get_document_context_for_chat(user_id, prompt, memory)
+                    
+                    # Debug: If no document context found, try a broader search
+                    if not document_context and any(word in prompt.lower() for word in ['document', 'uploaded', 'file', 'title', 'about']):
+                        try:
+                            from document_storage import DocumentStorage
+                            doc_storage = DocumentStorage(memory.driver)
+                            recent_chunks = doc_storage._get_recent_document_chunks(user_id, limit=2)
+                            if recent_chunks:
+                                context_parts = []
+                                for chunk in recent_chunks:
+                                    context_parts.append(f"From {chunk['filename']}: {chunk['chunk_content'][:300]}...")
+                                document_context = "\n\nUploaded document content:\n" + "\n".join(context_parts)
+                        except Exception as debug_error:
+                            pass
                 except Exception as e:
                     st.warning(f"Memory retrieval issue: {str(e)}")
         
