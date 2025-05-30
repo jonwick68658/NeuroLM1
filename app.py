@@ -873,49 +873,23 @@ def chat_interface():
             except Exception as e:
                 st.warning(f"Memory storage issue: {str(e)}")
         
-        # Get relevant memories for context
-        context = []
-        document_context = ""
+        # Get unified context from both memory and documents
+        unified_context = ""
         if memory:
             with st.spinner("Accessing neural network..."):
                 try:
-                    context = memory.get_relevant_memories(prompt, get_current_user())
-                    # Also get relevant document context
                     user_id = get_current_user() or "user_Ryan"
-                    document_context = get_document_context_for_chat(user_id, prompt, memory)
-                    
-                    # Debug: If no document context found, try a broader search
-                    if not document_context and any(word in prompt.lower() for word in ['document', 'uploaded', 'file', 'title', 'about']):
-                        try:
-                            from document_storage import DocumentStorage
-                            doc_storage = DocumentStorage(memory.driver)
-                            
-                            # Try different user IDs in case of mismatch
-                            potential_users = [user_id, "user_Ryan", "default_user"]
-                            
-                            for test_user in potential_users:
-                                recent_chunks = doc_storage._get_recent_document_chunks(test_user, limit=2)
-                                if recent_chunks:
-                                    context_parts = []
-                                    for chunk in recent_chunks:
-                                        context_parts.append(f"From {chunk['filename']}: {chunk['chunk_content'][:400]}...")
-                                    document_context = "\n\nUploaded document content:\n" + "\n".join(context_parts)
-                                    break
-                        except Exception as debug_error:
-                            pass
+                    unified_context = get_unified_context_for_chat(user_id, prompt, memory)
                 except Exception as e:
-                    st.warning(f"Memory retrieval issue: {str(e)}")
+                    st.warning(f"Context retrieval issue: {str(e)}")
         
         # Generate AI response
         try:
-            context_str = "\n\n".join([f"- {mem}" for mem in context]) if context else ""
-            enhancements = " with access to your personal neural network" if context else ""
-            if document_context:
-                enhancements += " and uploaded knowledge documents"
+            # Determine what type of context we have
+            has_context = bool(unified_context.strip())
+            enhancements = " with access to your personal neural network and knowledge documents" if has_context else ""
             
-            context_section = f'Relevant Neural Context:\n{context_str}' if context_str else ''
-            if document_context:
-                context_section += f'\n\n{document_context}'
+            context_section = f'Relevant Context:\n{unified_context}' if has_context else ''
             
             system_prompt = f"""You are NeuroLM, an advanced neural language model{enhancements}.
 
@@ -957,7 +931,7 @@ You are an intelligent AI assistant designed to act as the user's neural memory 
                             content=full_response + "▌",
                             sender="AI",
                             timestamp=datetime.now(),
-                            sources=context[:3] if context else None
+                            sources=[unified_context[:100] + "..."] if unified_context else None
                         )
             
             # Final response display
@@ -966,7 +940,7 @@ You are an intelligent AI assistant designed to act as the user's neural memory 
                     content=full_response,
                     sender="AI",
                     timestamp=datetime.now(),
-                    sources=context[:3] if context else None
+                    sources=[unified_context[:100] + "..."] if unified_context else None
                 )
             
             # Add to session and store in memory
