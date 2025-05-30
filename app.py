@@ -2,9 +2,9 @@ import streamlit as st
 import openai
 import os
 from dotenv import load_dotenv
-from integrated_memory import IntegratedMemorySystem
+from simple_memory import SimpleMemorySystem
 from simple_model_selector import SimpleModelSelector
-from document_ui import document_upload_section, document_library_interface, display_document_stats_in_sidebar
+# Document processing removed for simplicity
 
 # Load environment variables
 load_dotenv()
@@ -666,10 +666,7 @@ def chat_history_sidebar():
     
     st.sidebar.markdown("---")
     
-    # Document upload section
-    if current_user and memory:
-        document_upload_section(current_user, memory)
-        display_document_stats_in_sidebar(current_user, memory)
+    # Document processing removed for simplicity
     
     st.sidebar.markdown("---")
     
@@ -873,13 +870,15 @@ def chat_interface():
             except Exception as e:
                 st.warning(f"Memory storage issue: {str(e)}")
         
-        # Get unified context from both memory and documents
+        # Get context from memory only
         unified_context = ""
         if memory:
             with st.spinner("Accessing neural network..."):
                 try:
                     user_id = get_current_user() or "user_Ryan"
-                    unified_context = memory.get_unified_context(user_id, prompt)
+                    memories = memory.get_relevant_memories(prompt, user_id, limit=5)
+                    if memories:
+                        unified_context = "From your conversation history:\n" + "\n".join([f"- {mem}" for mem in memories])
                 except Exception as e:
                     st.warning(f"Context retrieval issue: {str(e)}")
         

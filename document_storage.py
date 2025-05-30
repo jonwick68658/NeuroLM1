@@ -66,18 +66,17 @@ class DocumentStorage:
             logging.warning(f"Failed to generate embedding for chunk {chunk_index}: {str(e)}")
             embedding = None
         
-        # Store chunk as both Memory and DocumentChunk for compatibility
+        # Store chunk as DocumentChunk only
         session.run("""
         MATCH (d:Document {id: $doc_id})
-        CREATE (c:Memory:DocumentChunk {
+        CREATE (c:DocumentChunk {
             id: $chunk_id,
             user_id: $user_id,
             content: $content,
-            source: $filename,
-            role: 'document',
-            created_at: datetime(),
+            filename: $filename,
             chunk_index: $chunk_index,
             embedding: $embedding,
+            created_at: datetime(),
             access_count: 0,
             confidence: 1.0,
             last_accessed: datetime()
