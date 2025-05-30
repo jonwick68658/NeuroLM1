@@ -1,7 +1,6 @@
 import streamlit as st
 from file_processor import DocumentProcessor
 from document_storage import DocumentStorage
-from batch_processor import batch_processor
 import os
 import time
 from typing import List, Dict, Any
@@ -65,29 +64,21 @@ def document_upload_section(user_id: str, memory_system):
                     with status_container:
                         st.info(f"Processing {file.name}...")
                     
-                    # Process file into chunks
+                    # Process and store
                     chunks = processor.process_file(file, user_id)
-                    
-                    # Use fast batch processing for embedding generation
-                    doc_id = batch_processor.process_document_fast(
-                        user_id=user_id,
+                    doc_id, chunk_ids = doc_storage.store_document(
+                        user_id=user_id, 
                         filename=file.name, 
-                        content_chunks=chunks,
-                        doc_storage=doc_storage
+                        chunks=chunks
                     )
                     
-                    # Check if processing was successful
-                    if doc_id:
-                        # Mark as processed
-                        st.session_state.processed_files.add(file_key)
-                        
-                        with status_container:
-                            st.success(f"Added {len(chunks)} chunks from {file.name}")
-                        
-                        successful_uploads += 1
-                    else:
-                        with status_container:
-                            st.error(f"Failed to process {file.name}")
+                    # Mark as processed
+                    st.session_state.processed_files.add(file_key)
+                    
+                    with status_container:
+                        st.success(f"Added {len(chunks)} chunks from {file.name}")
+                    
+                    successful_uploads += 1
                     
                 except Exception as e:
                     with status_container:
@@ -219,119 +210,23 @@ def preview_document(doc_id: str, user_id: str, doc_storage: DocumentStorage):
                 st.success("Added to conversation context!")
 
 def get_unified_context_for_chat(user_id: str, query: str, memory_system) -> str:
-    """Get unified context combining both memory and document searches with debugging"""
-    if not hasattr(memory_system, 'driver'):
+    """Get context from memory system only"""
+    if not memory_system:
         return ""
     
     try:
-        context_parts = []
-        
-        # Get memory context with detailed error handling
-        memory_context = []
-        try:
-            # For name queries, search specifically for name-providing conversations
-            if any(word in query.lower() for word in ['name', 'who', 'ryan']):
-                # Use direct database search to find name conversations
-                from neo4j import GraphDatabase
-                import os
-                
-                driver = GraphDatabase.driver(os.getenv('NEO4J_URI'), auth=(os.getenv('NEO4J_USER'), os.getenv('NEO4J_PASSWORD')))
-                with driver.session() as session:
-                    # Search for memories containing "Ryan" or "my name is"
-                    result = session.run('''
-                    MATCH (u:User {id: $user_id})-[:CREATED]->(m:Memory)
-                    WHERE toLower(m.content) CONTAINS "ryan" 
-                       OR toLower(m.content) CONTAINS "my name is"
-                       OR toLower(m.content) CONTAINS "name is"
-                    RETURN m.content as content, m.timestamp as timestamp, m.role as role
-                    ORDER BY m.timestamp ASC
-                    ''', user_id=user_id)
-                    
-                    name_memories = list(result)
-                    if name_memories:
-                        memory_context = [mem['content'] for mem in name_memories]
-                        context_parts.append("From your conversation history:")
-                        for mem in name_memories:
-                            context_parts.append(f"- {mem['role']}: {mem['content']}")
-                    else:
-                        # Fallback to recent conversation history
-                        recent_memories = memory_system.get_conversation_history(user_id, limit=10)
-                        if recent_memories:
-                            memory_context = [mem.get('content', '') for mem in recent_memories if mem.get('content')]
-                            context_parts.append("From your conversation history:")
-                            for memory in memory_context[:5]:
-                                context_parts.append(f"- {memory[:400]}")
-                driver.close()
-            else:
-                # Use semantic search for other queries
-                memory_results = memory_system.get_relevant_memories(query, user_id, limit=5)
-                if memory_results:
-                    memory_context = memory_results
-                    context_parts.append("From your conversation history:")
-                    for memory in memory_context[:3]:
-                        context_parts.append(f"- {memory[:250]}...")
-                        
-        except Exception as e:
-            # Log memory retrieval failure but continue
-            context_parts.append(f"Memory search failed: {str(e)[:100]}")
-        
-        # Get document context with error handling
-        document_results = []
-        try:
-            doc_storage = DocumentStorage(memory_system.driver)
-            document_results = doc_storage.search_documents(user_id, query, limit=3)
-            
-            if document_results:
-                context_parts.append("\nFrom your uploaded documents:")
-                for result in document_results:
-                    filename = result.get('filename', 'Unknown Document')
-                    content = result.get('chunk_content', '')
-                    similarity = result.get('similarity', 0)
-                    context_parts.append(f"- From {filename} (relevance: {similarity:.2f}): {content[:300]}...")
-        except Exception as e:
-            context_parts.append(f"\nDocument search failed: {str(e)[:100]}")
-        
-        # If no results, provide debugging info
-        if not memory_context and not document_results:
-            try:
-                # Get recent memories for debugging
-                recent_memories = memory_system.get_conversation_history(user_id, limit=3)
-                if recent_memories:
-                    context_parts.append("\nRecent conversation (debug):")
-                    for memory in recent_memories[:2]:
-                        content = memory.get('content', '')[:150]
-                        role = memory.get('role', 'unknown')
-                        context_parts.append(f"- {role}: {content}...")
-                
-                # Get recent documents for debugging
-                try:
-                    doc_storage = DocumentStorage(memory_system.driver)
-                    recent_docs = doc_storage._get_recent_document_chunks(user_id, limit=2)
-                    if recent_docs:
-                        context_parts.append("\nRecent documents (debug):")
-                        for doc in recent_docs:
-                            filename = doc.get('filename', 'Unknown')
-                            content = doc.get('chunk_content', '')[:150]
-                            context_parts.append(f"- From {filename}: {content}...")
-                except Exception:
-                    pass
-                        
-            except Exception as debug_e:
-                context_parts.append(f"\nDebug search also failed: {str(debug_e)[:100]}")
-        
-        final_context = "\n".join(context_parts) if context_parts else ""
-        
-        # Add context quality indicator
-        quality_indicator = f"\n\nContext quality: {len(memory_context)} memories, {len(document_results)} documents found"
-        return final_context + quality_indicator
-        
-    except Exception as e:
-        return f"Context retrieval completely failed: {str(e)[:200]}"
-
+        memories = memory_system.get_relevant_memories(query, user_id, limit=5)
+        if memories:
+            context_parts = ["From your conversation history:"]
+            context_parts.extend([f"- {mem}" for mem in memories])
+            return "\n".join(context_parts)
+        return ""
+    except Exception:
+        return ""
 
 def get_document_context_for_chat(user_id: str, query: str, memory_system) -> str:
-    """Get relevant document context for chat responses - DEPRECATED, use get_unified_context_for_chat"""
-    return get_unified_context_for_chat(user_id, query, memory_system)
+    """DEPRECATED - returns empty string"""
+    return ""
 
 def display_document_stats_in_sidebar(user_id: str, memory_system):
     """Display document statistics in sidebar"""
