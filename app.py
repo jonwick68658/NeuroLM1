@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from integrated_memory import IntegratedMemorySystem
 from simple_model_selector import SimpleModelSelector
-from document_ui import document_upload_section, document_library_interface, display_document_stats_in_sidebar
+from optimized_document_ui import optimized_document_upload_section, optimized_document_library_interface
 
 # Load environment variables
 load_dotenv()
@@ -668,8 +668,7 @@ def chat_history_sidebar():
     
     # Document upload section
     if current_user and memory:
-        document_upload_section(current_user, memory)
-        display_document_stats_in_sidebar(current_user, memory)
+        optimized_document_upload_section(current_user, memory)
     
     st.sidebar.markdown("---")
     
