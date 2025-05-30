@@ -186,49 +186,61 @@ def preview_document(doc_id: str, user_id: str, doc_storage: DocumentStorage):
                 }
                 st.success("Added to conversation context!")
 
-def get_document_context_for_chat(user_id: str, query: str, memory_system) -> str:
-    """Get relevant document context for chat responses"""
+def get_unified_context_for_chat(user_id: str, query: str, memory_system) -> str:
+    """Get unified context combining both memory and document searches"""
     if not hasattr(memory_system, 'driver'):
         return ""
     
     try:
+        # Get memory context
+        memory_context = []
+        try:
+            memory_results = memory_system.get_relevant_memories(query, user_id, limit=3)
+            memory_context = memory_results if memory_results else []
+        except Exception:
+            memory_context = []
+        
+        # Get document context 
         doc_storage = DocumentStorage(memory_system.driver)
+        document_results = doc_storage.search_documents(user_id, query, limit=3)
         
-        # For questions about document title/content, try broader searches
-        search_terms = [query]
-        if "title" in query.lower():
-            search_terms.extend(["document", "implementation", "plan", "processing"])
-        
-        all_results = []
-        for term in search_terms:
-            results = doc_storage.search_documents(user_id, term, limit=2)
-            all_results.extend(results)
-        
-        # Remove duplicates based on chunk_index and doc_id
-        seen = set()
-        unique_results = []
-        for result in all_results:
-            key = f"{result['doc_id']}_{result['chunk_index']}"
-            if key not in seen:
-                seen.add(key)
-                unique_results.append(result)
-        
-        if not unique_results:
-            # If no specific matches, get some recent document chunks
-            recent_results = doc_storage._get_recent_document_chunks(user_id, limit=2)
-            unique_results.extend(recent_results)
-        
+        # Build unified context
         context_parts = []
-        for result in unique_results[:3]:  # Limit to 3 chunks
-            context_parts.append(f"From {result['filename']}: {result['chunk_content'][:400]}...")
         
-        if context_parts:
-            return "\n\nRelevant document knowledge:\n" + "\n".join(context_parts)
+        # Add memory context
+        if memory_context:
+            context_parts.append("From conversation history:")
+            for memory in memory_context[:2]:  # Limit to 2 memories
+                context_parts.append(f"- {memory[:200]}...")
         
-        return ""
+        # Add document context
+        if document_results:
+            context_parts.append("\nFrom uploaded documents:")
+            for result in document_results:
+                filename = result.get('filename', 'Unknown Document')
+                content = result.get('chunk_content', '')[:300]
+                context_parts.append(f"- From {filename}: {content}...")
+        
+        # If no specific results found, try broader searches
+        if not memory_context and not document_results:
+            # Try broader document search
+            broad_results = doc_storage._get_recent_document_chunks(user_id, limit=2)
+            if broad_results:
+                context_parts.append("\nRecent document content:")
+                for result in broad_results:
+                    filename = result.get('filename', 'Unknown Document')
+                    content = result.get('chunk_content', '')[:300]
+                    context_parts.append(f"- From {filename}: {content}...")
+        
+        return "\n".join(context_parts) if context_parts else ""
         
     except Exception as e:
         return ""
+
+
+def get_document_context_for_chat(user_id: str, query: str, memory_system) -> str:
+    """Get relevant document context for chat responses - DEPRECATED, use get_unified_context_for_chat"""
+    return get_unified_context_for_chat(user_id, query, memory_system)
 
 def display_document_stats_in_sidebar(user_id: str, memory_system):
     """Display document statistics in sidebar"""

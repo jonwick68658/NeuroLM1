@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from memory import Neo4jMemory
 from simple_model_selector import SimpleModelSelector
-from document_ui import document_upload_section, document_library_interface, get_document_context_for_chat, display_document_stats_in_sidebar
+from document_ui import document_upload_section, document_library_interface, get_unified_context_for_chat, display_document_stats_in_sidebar
 
 # Load environment variables
 load_dotenv()
