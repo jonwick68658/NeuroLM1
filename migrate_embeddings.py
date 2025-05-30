@@ -14,15 +14,14 @@ def migrate_document_embeddings():
     )
     
     with driver.session() as session:
-        # Find document chunks without embeddings
+        # Find all document chunks to regenerate embeddings with OpenAI
         result = session.run("""
         MATCH (c:DocumentChunk)
-        WHERE c.embedding IS NULL
         RETURN c.id AS chunk_id, c.content AS content
         """)
         
         chunks_to_update = list(result)
-        print(f"Found {len(chunks_to_update)} document chunks without embeddings")
+        print(f"Found {len(chunks_to_update)} document chunks to regenerate with OpenAI embeddings")
         
         if not chunks_to_update:
             print("All document chunks already have embeddings")

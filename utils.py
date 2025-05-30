@@ -15,21 +15,21 @@ def generate_embedding(text):
         if not cleaned_text:
             return [0.0] * 1536
         
-        # Attempt 1: Try OpenAI embeddings if available
+        # Attempt 1: Try OpenAI embeddings with direct API
         try:
             import openai
             import os
             
             client = openai.OpenAI(
-                api_key=os.getenv("OPENROUTER_API_KEY"),
-                base_url="https://openrouter.ai/api/v1"
+                api_key=os.getenv("OPENAI_API_KEY")
             )
             response = client.embeddings.create(
                 model="text-embedding-3-small",
                 input=cleaned_text
             )
             return response.data[0].embedding
-        except Exception:
+        except Exception as e:
+            logging.warning(f"OpenAI embedding failed: {e}")
             pass
         
         # Attempt 2: Try sentence-transformers if available
