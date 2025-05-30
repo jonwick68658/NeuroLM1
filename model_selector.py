@@ -41,7 +41,7 @@ class ModelSelector:
         
         return "".join(badges)
     
-    def _render_model_card(self, model: Dict, is_selected: bool, user_id: str) -> bool:
+    def _render_model_card(self, model: Dict, is_selected: bool, user_id: str, unique_suffix: str = "") -> bool:
         """Render a single model card and return True if selected"""
         bg_color = "#2A2A40" if is_selected else "#1A1A2E"
         border_color = "#BB86FC" if is_selected else "#333350"
@@ -111,7 +111,11 @@ class ModelSelector:
                 button_type = "primary" if is_selected else "secondary"
                 button_label = "✓ Selected" if is_selected else "Select"
                 
-                if st.button(button_label, key=f"select_{model['id']}", type=button_type, use_container_width=True):
+                # Create unique key by adding suffix and hash of model ID
+                safe_model_id = model['id'].replace('/', '_').replace('-', '_')
+                unique_key = f"select_{safe_model_id}_{unique_suffix}_{hash(model['id']) % 10000}"
+                
+                if st.button(button_label, key=unique_key, type=button_type, use_container_width=True):
                     return True
             
             return False
@@ -217,18 +221,18 @@ class ModelSelector:
             for category, category_models in categories.items():
                 if category_models:
                     with st.sidebar.expander(f"📂 {category} ({len(category_models)})", expanded=(category == "Featured")):
-                        for model in category_models:
+                        for i, model in enumerate(category_models):
                             is_selected = (model['id'] == current_model)
-                            if self._render_model_card(model, is_selected, user_id):
+                            if self._render_model_card(model, is_selected, user_id, f"{category}_{i}"):
                                 st.session_state.selected_model = model['id']
                                 self._save_user_preference(user_id, model['id'])
                                 st.rerun()
         else:
             # Show filtered list
             if filtered_models:
-                for model in filtered_models:
+                for i, model in enumerate(filtered_models):
                     is_selected = (model['id'] == current_model)
-                    if self._render_model_card(model, is_selected, user_id):
+                    if self._render_model_card(model, is_selected, user_id, f"filtered_{i}"):
                         st.session_state.selected_model = model['id']
                         self._save_user_preference(user_id, model['id'])
                         st.rerun()
