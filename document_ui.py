@@ -220,16 +220,39 @@ def get_unified_context_for_chat(user_id: str, query: str, memory_system) -> str
         # Get memory context with detailed error handling
         memory_context = []
         try:
-            # For name queries, get broader conversation history
+            # For name queries, search specifically for name-providing conversations
             if any(word in query.lower() for word in ['name', 'who', 'ryan']):
-                # Get recent conversation history that might contain the name
-                recent_memories = memory_system.get_conversation_history(user_id, limit=10)
-                if recent_memories:
-                    memory_context = [mem.get('content', '') for mem in recent_memories if mem.get('content')]
-                    context_parts.append("From your conversation history:")
-                    for memory in memory_context[:5]:
-                        # Don't truncate as much for name queries
-                        context_parts.append(f"- {memory[:400]}")
+                # Use direct database search to find name conversations
+                from neo4j import GraphDatabase
+                import os
+                
+                driver = GraphDatabase.driver(os.getenv('NEO4J_URI'), auth=(os.getenv('NEO4J_USER'), os.getenv('NEO4J_PASSWORD')))
+                with driver.session() as session:
+                    # Search for memories containing "Ryan" or "my name is"
+                    result = session.run('''
+                    MATCH (u:User {id: $user_id})-[:CREATED]->(m:Memory)
+                    WHERE toLower(m.content) CONTAINS "ryan" 
+                       OR toLower(m.content) CONTAINS "my name is"
+                       OR toLower(m.content) CONTAINS "name is"
+                    RETURN m.content as content, m.timestamp as timestamp, m.role as role
+                    ORDER BY m.timestamp ASC
+                    ''', user_id=user_id)
+                    
+                    name_memories = list(result)
+                    if name_memories:
+                        memory_context = [mem['content'] for mem in name_memories]
+                        context_parts.append("From your conversation history:")
+                        for mem in name_memories:
+                            context_parts.append(f"- {mem['role']}: {mem['content']}")
+                    else:
+                        # Fallback to recent conversation history
+                        recent_memories = memory_system.get_conversation_history(user_id, limit=10)
+                        if recent_memories:
+                            memory_context = [mem.get('content', '') for mem in recent_memories if mem.get('content')]
+                            context_parts.append("From your conversation history:")
+                            for memory in memory_context[:5]:
+                                context_parts.append(f"- {memory[:400]}")
+                driver.close()
             else:
                 # Use semantic search for other queries
                 memory_results = memory_system.get_relevant_memories(query, user_id, limit=5)
