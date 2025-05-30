@@ -41,7 +41,7 @@ def create_user_account(username, email, password):
         ).single()
         
         if existing_username:
-            return False, "Username already exists"
+            return False, "Username already taken"
         
         # Check if email already exists
         existing_email = memory.driver.session().run(

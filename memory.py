@@ -112,6 +112,14 @@ class Neo4jMemory:
                 """)
                 
                 session.run("""
+                CREATE CONSTRAINT user_username IF NOT EXISTS FOR (u:User) REQUIRE u.username IS UNIQUE
+                """)
+                
+                session.run("""
+                CREATE CONSTRAINT user_email IF NOT EXISTS FOR (u:User) REQUIRE u.email IS UNIQUE
+                """)
+                
+                session.run("""
                 CREATE CONSTRAINT memory_id IF NOT EXISTS FOR (m:Memory) REQUIRE m.id IS UNIQUE
                 """)
                 
