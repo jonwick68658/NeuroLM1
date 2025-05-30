@@ -71,9 +71,10 @@ class SimpleModelSelector:
         
         # Search functionality
         search_query = st.sidebar.text_input(
-            "🔍 Search models",
+            "Search models",
             placeholder="Type to search...",
-            key="model_search"
+            key="model_search",
+            label_visibility="collapsed"
         )
         
         # Filter models based on search
@@ -95,10 +96,11 @@ class SimpleModelSelector:
                 current_model = filtered_options[current_display]
             
             selected_display = st.sidebar.selectbox(
-                "Select Model",
+                "Model",
                 options=filtered_display_names,
                 index=filtered_display_names.index(current_display) if current_display in filtered_display_names else 0,
-                key="model_selectbox"
+                key="model_selectbox",
+                label_visibility="collapsed"
             )
             
             # Update selected model
@@ -113,14 +115,12 @@ class SimpleModelSelector:
         else:
             st.sidebar.warning("No models match your search")
         
-        # Show current model info
+        # Show current model info in a compact way
         current_model_info = self.model_service.get_model_by_id(current_model)
         if current_model_info:
-            provider = current_model_info.get('provider', 'Unknown')
             context = current_model_info.get('context_length', 0)
-            st.sidebar.success(f"**Selected**: {provider}")
             if context > 0:
-                st.sidebar.info(f"Context: {context:,} tokens")
+                st.sidebar.caption(f"Context: {context:,} tokens")
         
         return current_model
     
