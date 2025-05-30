@@ -160,6 +160,50 @@ class IntegratedMemorySystem:
         
         return "\n".join(context_parts)
 
+    def get_memory_count(self, user_id: str) -> int:
+        """Get total memory count for user"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                MATCH (u:User {id: $user_id})-[:CREATED]->(m:Memory)
+                RETURN count(m) as count
+                """, user_id=user_id)
+                
+                record = result.single()
+                return record['count'] if record else 0
+                
+        except Exception as e:
+            print(f"Error getting memory count: {e}")
+            return 0
+
+    def get_memory_stats(self, user_id: str) -> dict:
+        """Get memory statistics for user"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                MATCH (u:User {id: $user_id})-[:CREATED]->(m:Memory)
+                RETURN 
+                    count(m) as total_memories,
+                    count(CASE WHEN m.role = 'user' THEN 1 END) as user_messages,
+                    count(CASE WHEN m.role = 'assistant' THEN 1 END) as assistant_messages,
+                    avg(m.access_count) as avg_access_count
+                """, user_id=user_id)
+                
+                record = result.single()
+                if record:
+                    return {
+                        'total_memories': record['total_memories'],
+                        'user_messages': record['user_messages'], 
+                        'assistant_messages': record['assistant_messages'],
+                        'avg_access_count': record['avg_access_count'] or 0
+                    }
+                else:
+                    return {'total_memories': 0, 'user_messages': 0, 'assistant_messages': 0, 'avg_access_count': 0}
+                    
+        except Exception as e:
+            print(f"Error getting memory stats: {e}")
+            return {'total_memories': 0, 'user_messages': 0, 'assistant_messages': 0, 'avg_access_count': 0}
+
     def close(self):
         """Close database connection"""
         if self.driver:

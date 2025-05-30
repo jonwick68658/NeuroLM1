@@ -2,9 +2,9 @@ import streamlit as st
 import openai
 import os
 from dotenv import load_dotenv
-from memory import Neo4jMemory
+from integrated_memory import IntegratedMemorySystem
 from simple_model_selector import SimpleModelSelector
-from document_ui import document_upload_section, document_library_interface, get_unified_context_for_chat, display_document_stats_in_sidebar
+from document_ui import document_upload_section, document_library_interface, display_document_stats_in_sidebar
 
 # Load environment variables
 load_dotenv()
@@ -22,7 +22,7 @@ model_selector = SimpleModelSelector()
 @st.cache_resource
 def init_memory():
     try:
-        return Neo4jMemory()
+        return IntegratedMemorySystem()
     except Exception as e:
         st.error(f"Memory initialization failed: {str(e)}")
         return None
@@ -879,19 +879,8 @@ def chat_interface():
             with st.spinner("Accessing neural network..."):
                 try:
                     user_id = get_current_user() or "user_Ryan"
-                    unified_context = get_unified_context_for_chat(user_id, prompt, memory)
-                    
-                    # DIAGNOSTIC LOGGING - Phase 1
-                    print(f"=== CONTEXT DIAGNOSTIC ===")
-                    print(f"User ID: {user_id}")
-                    print(f"Query: {prompt}")
-                    print(f"Context Retrieved Length: {len(unified_context)}")
-                    print(f"Context Preview: {unified_context[:300]}...")
-                    print(f"Context Full: {unified_context}")
-                    print(f"=== END DIAGNOSTIC ===")
-                    
+                    unified_context = memory.get_unified_context(user_id, prompt)
                 except Exception as e:
-                    print(f"CONTEXT RETRIEVAL ERROR: {str(e)}")
                     st.warning(f"Context retrieval issue: {str(e)}")
         
         # Generate AI response
