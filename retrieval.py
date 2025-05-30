@@ -174,7 +174,7 @@ class MemoryRetriever:
                 vector_results = session.run("""
                 CALL db.index.vector.queryNodes('memory_embeddings', $candidates, $embedding)
                 YIELD node AS memory, score AS vector_score
-                WHERE EXISTS((memory)<-[:CREATED]-(:User {id: $user_id}))
+                MATCH (user:User {id: $user_id})-[:CREATED]->(memory)
                 RETURN memory {
                     .*, 
                     id: memory.id,
