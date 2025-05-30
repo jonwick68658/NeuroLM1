@@ -1,6 +1,7 @@
 import streamlit as st
 from file_processor import DocumentProcessor
 from document_storage import DocumentStorage
+from batch_processor import batch_processor
 import os
 import time
 from typing import List, Dict, Any
@@ -64,12 +65,15 @@ def document_upload_section(user_id: str, memory_system):
                     with status_container:
                         st.info(f"Processing {file.name}...")
                     
-                    # Process and store
+                    # Process file into chunks
                     chunks = processor.process_file(file, user_id)
-                    doc_id, chunk_ids = doc_storage.store_document(
-                        user_id=user_id, 
+                    
+                    # Use fast batch processing for embedding generation
+                    doc_id = batch_processor.process_document_fast(
+                        user_id=user_id,
                         filename=file.name, 
-                        chunks=chunks
+                        content_chunks=chunks,
+                        doc_storage=doc_storage
                     )
                     
                     # Mark as processed
