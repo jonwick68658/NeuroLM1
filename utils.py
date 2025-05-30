@@ -7,15 +7,32 @@ import hashlib
 def generate_embedding(text):
     """Generate embedding with multiple fallback methods"""
     if not text or not text.strip():
-        return [0.0] * 384  # Return zero vector for empty text
+        return [0.0] * 1536  # Return zero vector for empty text (OpenAI dimension)
     
     try:
         # Clean and normalize text
         cleaned_text = clean_text(text)
         if not cleaned_text:
-            return [0.0] * 384
+            return [0.0] * 1536
         
-        # Attempt 1: Try sentence-transformers if available
+        # Attempt 1: Try OpenAI embeddings if available
+        try:
+            import openai
+            import os
+            
+            client = openai.OpenAI(
+                api_key=os.getenv("OPENROUTER_API_KEY"),
+                base_url="https://openrouter.ai/api/v1"
+            )
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=cleaned_text
+            )
+            return response.data[0].embedding
+        except Exception:
+            pass
+        
+        # Attempt 2: Try sentence-transformers if available
         try:
             from sentence_transformers import SentenceTransformer
             model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -23,23 +40,23 @@ def generate_embedding(text):
         except Exception:
             pass
         
-        # Attempt 2: Try TF-IDF with sklearn if available
+        # Attempt 3: Try TF-IDF with sklearn if available
         try:
             from sklearn.feature_extraction.text import TfidfVectorizer
             import numpy as np
             
             # Create a simple TF-IDF representation
-            vectorizer = TfidfVectorizer(max_features=384, stop_words='english')
+            vectorizer = TfidfVectorizer(max_features=1536, stop_words='english')
             # Need to fit on a corpus, so we'll use the text itself with some common words
             corpus = [cleaned_text, "the quick brown fox jumps over lazy dog"]
             tfidf_matrix = vectorizer.fit_transform(corpus)
             embedding = tfidf_matrix[0].toarray()[0].tolist()
             
-            # Pad or truncate to 384 dimensions
-            if len(embedding) < 384:
-                embedding.extend([0.0] * (384 - len(embedding)))
+            # Pad or truncate to 1536 dimensions
+            if len(embedding) < 1536:
+                embedding.extend([0.0] * (1536 - len(embedding)))
             else:
-                embedding = embedding[:384]
+                embedding = embedding[:1536]
             
             return embedding
         except Exception:
@@ -47,7 +64,7 @@ def generate_embedding(text):
         
         # Final fallback: Enhanced hash-based embedding
         embedding = []
-        for i in range(384):
+        for i in range(1536):
             # Create multiple hash values for better distribution
             hash_input = f"{cleaned_text}_{i}_embedding_salt"
             hash_value = hash(hash_input) % 10000
@@ -58,7 +75,7 @@ def generate_embedding(text):
         
     except Exception as e:
         logging.error(f"Failed to generate embedding: {str(e)}")
-        return [0.0] * 384
+        return [0.0] * 1536
 
 def clean_text(text):
     """Clean and normalize text for better embedding quality"""
