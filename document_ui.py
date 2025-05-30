@@ -193,15 +193,34 @@ def get_document_context_for_chat(user_id: str, query: str, memory_system) -> st
     
     try:
         doc_storage = DocumentStorage(memory_system.driver)
-        search_results = doc_storage.search_documents(user_id, query, limit=3)
         
-        if not search_results:
-            return ""
+        # For questions about document title/content, try broader searches
+        search_terms = [query]
+        if "title" in query.lower():
+            search_terms.extend(["document", "implementation", "plan", "processing"])
+        
+        all_results = []
+        for term in search_terms:
+            results = doc_storage.search_documents(user_id, term, limit=2)
+            all_results.extend(results)
+        
+        # Remove duplicates based on chunk_index and doc_id
+        seen = set()
+        unique_results = []
+        for result in all_results:
+            key = f"{result['doc_id']}_{result['chunk_index']}"
+            if key not in seen:
+                seen.add(key)
+                unique_results.append(result)
+        
+        if not unique_results:
+            # If no specific matches, get some recent document chunks
+            recent_results = doc_storage._get_recent_document_chunks(user_id, limit=2)
+            unique_results.extend(recent_results)
         
         context_parts = []
-        for result in search_results:
-            if result['similarity'] > 0.7:  # Only include highly relevant chunks
-                context_parts.append(f"From {result['filename']}: {result['chunk_content'][:300]}...")
+        for result in unique_results[:3]:  # Limit to 3 chunks
+            context_parts.append(f"From {result['filename']}: {result['chunk_content'][:400]}...")
         
         if context_parts:
             return "\n\nRelevant document knowledge:\n" + "\n".join(context_parts)
@@ -209,7 +228,6 @@ def get_document_context_for_chat(user_id: str, query: str, memory_system) -> st
         return ""
         
     except Exception as e:
-        # Silently fail if document search has issues
         return ""
 
 def display_document_stats_in_sidebar(user_id: str, memory_system):

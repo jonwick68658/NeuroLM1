@@ -155,27 +155,25 @@ class DocumentStorage:
             return result.single()['deleted_count'] > 0
     
     def search_documents(self, user_id: str, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Search through document content"""
-        try:
-            query_embedding = generate_embedding(query)
-        except Exception as e:
-            logging.warning(f"Failed to generate query embedding: {str(e)}")
-            # Fallback to text search
-            return self._text_search_documents(user_id, query, limit)
-        
+        """Search through document content using text matching"""
+        # Use text-based search for now - can enhance with embeddings later
+        return self._text_search_documents(user_id, query, limit)
+    
+    def _text_search_documents(self, user_id: str, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Enhanced text-based search with multiple strategies"""
         with self.driver.session() as session:
-            # Vector similarity search through chunks
+            # Try exact phrase search first
+            query_lower = query.lower()
+            
+            # Search for exact query matches
             result = session.run("""
             MATCH (c:DocumentChunk {user_id: $user_id})-[:BELONGS_TO]->(d:Document)
-            WHERE c.embedding IS NOT NULL
-            WITH c, d, gds.similarity.cosine(c.embedding, $query_embedding) AS similarity
-            WHERE similarity > 0.7
-            RETURN DISTINCT d.id AS doc_id, d.filename AS filename, 
-                   c.content AS chunk_content, c.chunk_index AS chunk_index,
-                   similarity
-            ORDER BY similarity DESC
+            WHERE toLower(c.content) CONTAINS $query_lower
+            RETURN DISTINCT d.id AS doc_id, d.filename AS filename,
+                   c.content AS chunk_content, c.chunk_index AS chunk_index, 1.0 as score
+            ORDER BY d.created_at DESC
             LIMIT $limit
-            """, user_id=user_id, query_embedding=query_embedding, limit=limit)
+            """, user_id=user_id, query_lower=query_lower, limit=limit)
             
             matches = []
             for record in result:
@@ -184,34 +182,61 @@ class DocumentStorage:
                     'filename': record['filename'],
                     'chunk_content': record['chunk_content'],
                     'chunk_index': record['chunk_index'],
-                    'similarity': record['similarity']
+                    'similarity': record['score']
                 })
+            
+            # If we don't have enough results, try keyword search
+            if len(matches) < limit:
+                keywords = [word.strip().lower() for word in query.split() if len(word.strip()) > 2]
+                
+                if keywords:
+                    keyword_result = session.run("""
+                    MATCH (c:DocumentChunk {user_id: $user_id})-[:BELONGS_TO]->(d:Document)
+                    WHERE ANY(keyword IN $keywords WHERE toLower(c.content) CONTAINS keyword)
+                    AND NOT (c.id IN $existing_ids)
+                    RETURN DISTINCT d.id AS doc_id, d.filename AS filename,
+                           c.content AS chunk_content, c.chunk_index AS chunk_index, 0.7 as score
+                    ORDER BY d.created_at DESC
+                    LIMIT $remaining_limit
+                    """, 
+                    user_id=user_id, 
+                    keywords=keywords, 
+                    existing_ids=[m['doc_id'] + '_' + str(m['chunk_index']) for m in matches],
+                    remaining_limit=limit - len(matches))
+                    
+                    for record in keyword_result:
+                        matches.append({
+                            'doc_id': record['doc_id'],
+                            'filename': record['filename'],
+                            'chunk_content': record['chunk_content'],
+                            'chunk_index': record['chunk_index'],
+                            'similarity': record['score']
+                        })
             
             return matches
     
-    def _text_search_documents(self, user_id: str, query: str, limit: int) -> List[Dict[str, Any]]:
-        """Fallback text-based search"""
+    def _get_recent_document_chunks(self, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """Get recent document chunks when no search results found"""
         with self.driver.session() as session:
             result = session.run("""
             MATCH (c:DocumentChunk {user_id: $user_id})-[:BELONGS_TO]->(d:Document)
-            WHERE toLower(c.content) CONTAINS toLower($query)
-            RETURN DISTINCT d.id AS doc_id, d.filename AS filename,
+            RETURN d.id AS doc_id, d.filename AS filename,
                    c.content AS chunk_content, c.chunk_index AS chunk_index
-            ORDER BY d.created_at DESC
+            ORDER BY d.created_at DESC, c.chunk_index ASC
             LIMIT $limit
-            """, user_id=user_id, query=query, limit=limit)
+            """, user_id=user_id, limit=limit)
             
-            matches = []
+            chunks = []
             for record in result:
-                matches.append({
+                chunks.append({
                     'doc_id': record['doc_id'],
                     'filename': record['filename'],
                     'chunk_content': record['chunk_content'],
                     'chunk_index': record['chunk_index'],
-                    'similarity': 0.8  # Default similarity for text matches
+                    'similarity': 0.5
                 })
             
-            return matches
+            return chunks
     
     def get_document_stats(self, user_id: str) -> Dict[str, Any]:
         """Get statistics about user's document collection"""
