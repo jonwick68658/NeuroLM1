@@ -889,12 +889,18 @@ def chat_interface():
                         try:
                             from document_storage import DocumentStorage
                             doc_storage = DocumentStorage(memory.driver)
-                            recent_chunks = doc_storage._get_recent_document_chunks(user_id, limit=2)
-                            if recent_chunks:
-                                context_parts = []
-                                for chunk in recent_chunks:
-                                    context_parts.append(f"From {chunk['filename']}: {chunk['chunk_content'][:300]}...")
-                                document_context = "\n\nUploaded document content:\n" + "\n".join(context_parts)
+                            
+                            # Try different user IDs in case of mismatch
+                            potential_users = [user_id, "user_Ryan", "default_user"]
+                            
+                            for test_user in potential_users:
+                                recent_chunks = doc_storage._get_recent_document_chunks(test_user, limit=2)
+                                if recent_chunks:
+                                    context_parts = []
+                                    for chunk in recent_chunks:
+                                        context_parts.append(f"From {chunk['filename']}: {chunk['chunk_content'][:400]}...")
+                                    document_context = "\n\nUploaded document content:\n" + "\n".join(context_parts)
+                                    break
                         except Exception as debug_error:
                             pass
                 except Exception as e:

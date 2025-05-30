@@ -169,9 +169,10 @@ class DocumentStorage:
             result = session.run("""
             MATCH (c:DocumentChunk {user_id: $user_id})-[:BELONGS_TO]->(d:Document)
             WHERE toLower(c.content) CONTAINS $query_lower
-            RETURN DISTINCT d.id AS doc_id, d.filename AS filename,
-                   c.content AS chunk_content, c.chunk_index AS chunk_index, 1.0 as score
-            ORDER BY d.created_at DESC
+            RETURN d.id AS doc_id, d.filename AS filename,
+                   c.content AS chunk_content, c.chunk_index AS chunk_index, 1.0 as score,
+                   d.created_at AS created_at
+            ORDER BY created_at DESC
             LIMIT $limit
             """, user_id=user_id, query_lower=query_lower, limit=limit)
             
@@ -194,9 +195,10 @@ class DocumentStorage:
                     MATCH (c:DocumentChunk {user_id: $user_id})-[:BELONGS_TO]->(d:Document)
                     WHERE ANY(keyword IN $keywords WHERE toLower(c.content) CONTAINS keyword)
                     AND NOT (c.id IN $existing_ids)
-                    RETURN DISTINCT d.id AS doc_id, d.filename AS filename,
-                           c.content AS chunk_content, c.chunk_index AS chunk_index, 0.7 as score
-                    ORDER BY d.created_at DESC
+                    RETURN d.id AS doc_id, d.filename AS filename,
+                           c.content AS chunk_content, c.chunk_index AS chunk_index, 0.7 as score,
+                           d.created_at AS created_at
+                    ORDER BY created_at DESC
                     LIMIT $remaining_limit
                     """, 
                     user_id=user_id, 
