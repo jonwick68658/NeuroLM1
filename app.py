@@ -22,7 +22,7 @@ model_selector = SimpleModelSelector()
 @st.cache_resource
 def init_memory():
     try:
-        return IntegratedMemorySystem()
+        return SimpleMemorySystem()
     except Exception as e:
         st.error(f"Memory initialization failed: {str(e)}")
         return None
