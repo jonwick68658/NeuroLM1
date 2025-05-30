@@ -27,102 +27,51 @@ class SimpleModelSelector:
     
     def render_selector(self, user_id: str) -> str:
         """Render simple model selector dropdown"""
-        st.sidebar.markdown("### 🤖 AI Model")
-        
         # Load models
-        with st.spinner("Loading models..."):
-            models = self.model_service.get_models()
+        models = self.model_service.get_models()
         
         if not models:
-            st.sidebar.error("Failed to load models")
-            return "openai/gpt-4o-mini"
-        
-        # Sort models alphabetically by provider then name
-        sorted_models = sorted(models, key=lambda x: (x.get('provider', ''), x.get('name', '')))
+            return "openai/gpt-3.5-turbo"
         
         # Create model options for dropdown
         model_options = {}
         model_display_names = []
         
-        for model in sorted_models:
-            provider = model.get('provider', 'Unknown')
+        for model in models:
             name = model.get('name', 'Unknown')
             model_id = model.get('id', '')
             
             if model_id and name:
-                display_name = f"{provider} - {name}"
-                model_options[display_name] = model_id
-                model_display_names.append(display_name)
+                model_options[name] = model_id
+                model_display_names.append(name)
         
         # Get current selection
         user_preference = self._get_user_preference(user_id)
-        current_model = st.session_state.get('selected_model', user_preference or 'openai/gpt-4o-mini')
+        current_model = st.session_state.get('selected_model', user_preference or 'openai/gpt-3.5-turbo')
         
-        # Find current display name
-        current_display = None
-        for display_name, model_id in model_options.items():
-            if model_id == current_model:
-                current_display = display_name
-                break
-        
-        if current_display is None and model_display_names:
-            current_display = model_display_names[0]
-            current_model = model_options[current_display]
-        
-        # Search functionality
-        search_query = st.sidebar.text_input(
-            "Search models",
-            placeholder="Type to search...",
-            key="model_search",
-            label_visibility="collapsed"
-        )
-        
-        # Filter models based on search
-        if search_query:
-            filtered_options = {
-                display: model_id for display, model_id in model_options.items()
-                if search_query.lower() in display.lower()
-            }
-            filtered_display_names = list(filtered_options.keys())
-        else:
-            filtered_options = model_options
-            filtered_display_names = model_display_names
-        
-        # Model selection dropdown
-        if filtered_display_names:
-            # Ensure current selection is in the filtered list
-            if current_display not in filtered_display_names and filtered_display_names:
-                current_display = filtered_display_names[0]
-                current_model = filtered_options[current_display]
+        # Simple dropdown
+        if model_display_names:
+            # Find current index
+            current_index = 0
+            for i, name in enumerate(model_display_names):
+                if model_options[name] == current_model:
+                    current_index = i
+                    break
             
-            selected_display = st.sidebar.selectbox(
-                "Model",
-                options=filtered_display_names,
-                index=filtered_display_names.index(current_display) if current_display in filtered_display_names else 0,
-                key="model_selectbox",
-                label_visibility="collapsed"
+            selected_name = st.selectbox(
+                "AI Model",
+                options=model_display_names,
+                index=current_index
             )
             
-            # Update selected model
-            if selected_display in filtered_options:
-                selected_model = filtered_options[selected_display]
-                if selected_model != current_model:
-                    st.session_state.selected_model = selected_model
-                    self._save_user_preference(user_id, selected_model)
-                    st.rerun()
-                current_model = selected_model
+            selected_model = model_options[selected_name]
+            if selected_model != current_model:
+                st.session_state.selected_model = selected_model
+                self._save_user_preference(user_id, selected_model)
+            
+            return selected_model
         
-        else:
-            st.sidebar.warning("No models match your search")
-        
-        # Show current model info in a compact way
-        current_model_info = self.model_service.get_model_by_id(current_model)
-        if current_model_info:
-            context = current_model_info.get('context_length', 0)
-            if context > 0:
-                st.sidebar.caption(f"Context: {context:,} tokens")
-        
-        return current_model
+        return "openai/gpt-3.5-turbo"
     
     def get_selected_model(self, user_id: str) -> str:
         """Get the currently selected model ID"""

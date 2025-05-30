@@ -217,8 +217,7 @@ def chat_interface():
         st.error("Please login to continue")
         return
     
-    # Neural activity widget
-    neural_activity_widget(current_user)
+
     
     # Model selector
     st.markdown("### AI Model")
