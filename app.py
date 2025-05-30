@@ -92,19 +92,20 @@ def authenticate_user(username, password):
         import hashlib
         password_hash = hashlib.sha256(password.encode()).hexdigest()
         
-        user = memory.driver.session().run(
-            """
-            MATCH (u:User {username: $username, password_hash: $password_hash})
-            RETURN u.id as user_id, u.username as username
-            """,
-            username=username,
-            password_hash=password_hash
-        ).single()
-        
-        if user:
-            return True, {"user_id": user["user_id"], "username": user["username"]}
-        else:
-            return False, "Invalid username or password"
+        with memory.driver.session() as session:
+            user = session.run(
+                """
+                MATCH (u:User {username: $username, password_hash: $password_hash})
+                RETURN u.id as user_id, u.username as username
+                """,
+                username=username,
+                password_hash=password_hash
+            ).single()
+            
+            if user:
+                return True, {"user_id": user["user_id"], "username": user["username"]}
+            else:
+                return False, "Invalid username or password"
             
     except Exception as e:
         return False, f"Authentication failed: {str(e)}"

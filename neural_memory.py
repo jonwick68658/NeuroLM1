@@ -254,6 +254,61 @@ class NeuralMemorySystem:
             print(f"Error getting topic overview: {e}")
             return {'topics': [], 'total_topics': 0}
     
+    def get_memory_stats(self, user_id: str) -> Dict[str, Any]:
+        """Get memory statistics for compatibility with app interface"""
+        overview = self.get_topic_overview(user_id)
+        return {
+            "total_memories": overview["total_memories"],
+            "top_topics": overview["topics"][:5],
+            "avg_confidence": 0.85,  # Default confidence level
+            "total_links": 0  # Cross-topic links count
+        }
+
+    def get_conversation_history(self, user_id: str, limit: int = 10) -> list:
+        """Get recent conversation history for compatibility"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                RETURN m.role as role, m.content as content, m.created_at as timestamp
+                ORDER BY m.created_at DESC
+                LIMIT $limit
+                """, user_id=user_id, limit=limit)
+                
+                return [{"role": record["role"], "content": record["content"], "timestamp": record["timestamp"]} 
+                       for record in result]
+        except Exception as e:
+            print(f"Error getting conversation history: {e}")
+            return []
+
+    def get_memory_count(self, user_id: str) -> int:
+        """Get total memory count"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                RETURN count(m) as count
+                """, user_id=user_id)
+                
+                record = result.single()
+                return record["count"] if record else 0
+        except Exception as e:
+            print(f"Error getting memory count: {e}")
+            return 0
+
+    def get_relevant_memories(self, user_id: str, query: str, limit: int = 5) -> list:
+        """Get relevant memories for a query"""
+        context = self.retrieve_context(user_id, query, limit)
+        if context:
+            return [{"content": context, "relevance": 0.8}]
+        return []
+
+    def store_chat(self, user_id: str, messages: list):
+        """Store chat messages in the neural memory system"""
+        for msg in messages:
+            if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                self.store_conversation(user_id, msg["role"], msg["content"])
+
     def close(self):
         """Close database connection"""
         if self.driver:
