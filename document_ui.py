@@ -220,12 +220,25 @@ def get_unified_context_for_chat(user_id: str, query: str, memory_system) -> str
         # Get memory context with detailed error handling
         memory_context = []
         try:
-            memory_results = memory_system.get_relevant_memories(query, user_id, limit=5)
-            if memory_results:
-                memory_context = memory_results
-                context_parts.append("From your conversation history:")
-                for i, memory in enumerate(memory_context[:3]):
-                    context_parts.append(f"- {memory[:250]}...")
+            # For name queries, get broader conversation history
+            if any(word in query.lower() for word in ['name', 'who', 'ryan']):
+                # Get recent conversation history that might contain the name
+                recent_memories = memory_system.get_conversation_history(user_id, limit=10)
+                if recent_memories:
+                    memory_context = [mem.get('content', '') for mem in recent_memories if mem.get('content')]
+                    context_parts.append("From your conversation history:")
+                    for memory in memory_context[:5]:
+                        # Don't truncate as much for name queries
+                        context_parts.append(f"- {memory[:400]}")
+            else:
+                # Use semantic search for other queries
+                memory_results = memory_system.get_relevant_memories(query, user_id, limit=5)
+                if memory_results:
+                    memory_context = memory_results
+                    context_parts.append("From your conversation history:")
+                    for memory in memory_context[:3]:
+                        context_parts.append(f"- {memory[:250]}...")
+                        
         except Exception as e:
             # Log memory retrieval failure but continue
             context_parts.append(f"Memory search failed: {str(e)[:100]}")
