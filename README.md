@@ -1,12 +1,19 @@
-# NeuroLM - Advanced AI Memory System
+# NeuroLM - Neural Language Model with Persistent Memory
 
-A next-generation AI chat application that eliminates the context loss problem plaguing traditional LLM interfaces. Built with intelligent memory management using graph database technology for true conversation continuity.
+An advanced AI chat application that solves the context loss problem of traditional chatbots through intelligent memory management and document processing. Built with Neo4j graph database technology for true conversation continuity and knowledge persistence.
 
-## Why NeuroLM?
+## The Problem with Traditional AI Chat
 
-**The Problem**: Traditional AI chatbots suffer from "goldfish memory" - every conversation starts from scratch, forcing users to constantly re-explain context, preferences, and background information.
+Traditional AI chatbots suffer from "goldfish memory" - every conversation starts from scratch, forcing users to constantly re-explain context, preferences, and background information. Uploaded documents are forgotten, previous insights are lost, and there's no learning continuity.
 
-**The Solution**: NeuroLM creates a persistent, evolving memory network that remembers your conversations, builds relationships between ideas, and grows more intelligent over time.
+## NeuroLM's Solution
+
+NeuroLM creates a persistent, evolving neural memory network that:
+- Remembers every conversation permanently
+- Processes and retains uploaded documents as active knowledge
+- Builds relationships between ideas across time
+- Grows more intelligent with each interaction
+- Provides true conversation continuity
 
 ## Core Features
 
@@ -22,11 +29,18 @@ A next-generation AI chat application that eliminates the context loss problem p
 - **Cost Optimization**: Select the right model for each task and budget
 - **Provider Independence**: Never locked into a single AI vendor
 
+### 📄 Document Processing & Knowledge Integration
+- **Multi-Format Support**: Process PDF, DOCX, Excel, CSV, and text files
+- **Intelligent Chunking**: Breaks documents into semantic chunks with overlap
+- **Persistent Knowledge**: Documents become permanent part of your AI's memory
+- **Contextual Retrieval**: AI references document content in conversations naturally
+- **Cross-Document Connections**: Links related information across multiple uploads
+
 ### 💬 Advanced Chat Experience
 - **Conversation Continuity**: Pick up where you left off, even weeks later
-- **Context-Aware Responses**: AI references previous discussions naturally
+- **Context-Aware Responses**: AI references previous discussions and documents naturally
 - **Session Management**: Organized conversation history with smart grouping
-- **Document Integration**: Upload and discuss PDF/DOCX files with persistent memory
+- **Dynamic Learning**: System builds connections between conversations and documents
 
 ### 🔧 Technical Capabilities
 - **Vector Embeddings**: Semantic similarity matching for intelligent retrieval
@@ -54,7 +68,7 @@ APP_PASSWORD=your-password
 ### Installation
 ```bash
 # Install dependencies
-pip install streamlit neo4j openai requests python-dotenv PyPDF2 docx2txt
+uv add streamlit neo4j openai requests python-dotenv PyPDF2 docx2txt openpyxl pandas
 
 # Run application
 streamlit run app.py --server.port 5000
@@ -80,24 +94,28 @@ streamlit run app.py --server.port 5000
 ## Use Cases
 
 **For Professionals**
-- Maintain context across long projects
-- Reference previous decisions and discussions
-- Build cumulative knowledge bases
+- Maintain context across long projects and meetings
+- Reference previous decisions, strategies, and discussions
+- Build cumulative knowledge bases from uploaded reports and documents
+- Track project evolution and decision rationale over time
 
 **For Researchers**
-- Connect insights across research sessions
-- Maintain literature review context
-- Track evolving hypotheses and findings
+- Connect insights across research sessions and uploaded papers
+- Maintain literature review context with document processing
+- Track evolving hypotheses and findings with persistent memory
+- Cross-reference uploaded research documents with conversations
 
-**For Creatives**
-- Develop characters and worlds with consistent memory
-- Reference previous creative decisions
-- Build upon iterative creative processes
+**For Students & Learners**
+- Accumulate knowledge from uploaded textbooks and course materials
+- Connect concepts across different subjects and documents
+- Track learning progress and build upon previous study sessions
+- Create persistent study companions that remember your learning journey
 
-**For Learning**
-- Accumulate knowledge across study sessions
-- Connect concepts from different subjects
-- Track learning progress and insights
+**For Content Creators**
+- Upload reference materials and maintain creative consistency
+- Build upon previous creative decisions and character development
+- Reference uploaded style guides, brand documents, and inspiration
+- Develop long-term creative projects with continuous context
 
 ## Architecture
 
@@ -156,17 +174,20 @@ Final Score = (Vector Similarity × 0.40) +
 ## File Structure
 
 ```
-├── app.py                   # Main Streamlit application
-├── memory.py               # Core Neo4j memory management
-├── retrieval.py            # Advanced weighted memory retrieval
-├── consolidation.py        # Background memory consolidation
-├── association.py          # Multi-hop association discovery
-├── model_service.py        # OpenRouter model fetching
-├── simple_model_selector.py # Clean model selection interface
-├── utils.py                # Utility functions
-├── config.py               # Central configuration
-├── .env.example            # Environment variable template
-└── README.md               # This documentation
+├── app.py                  # Main Streamlit application with chat interface
+├── memory.py              # Core Neo4j memory management and neural processing
+├── retrieval.py           # Advanced weighted memory retrieval algorithms
+├── consolidation.py       # Background memory consolidation and optimization
+├── association.py         # Multi-hop association discovery between memories
+├── document_storage.py    # Neo4j document storage and retrieval system
+├── document_ui.py         # Streamlit document upload and management interface
+├── file_processor.py      # Multi-format document processing engine
+├── model_service.py       # OpenRouter API model fetching and caching
+├── simple_model_selector.py # Clean model selection dropdown interface
+├── utils.py               # Utility functions for embeddings and text processing
+├── config.py              # Central configuration management
+├── .env.example           # Environment variable template
+└── README.md              # Complete system documentation
 ```
 
 ## Performance & Scalability
