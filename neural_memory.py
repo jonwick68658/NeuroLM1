@@ -58,7 +58,7 @@ class NeuralMemorySystem:
         """Extract topic from conversation content using LLM"""
         try:
             response = self.openai_client.chat.completions.create(
-                model="openai/gpt-3.5-turbo",
+                model="openai/gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "Extract a single, concise topic (1-3 words) from this conversation. Examples: 'Cooking', 'Travel Planning', 'Career Advice', 'Personal Health'. Respond with just the topic name."},
                     {"role": "user", "content": content}

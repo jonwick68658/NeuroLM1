@@ -20,11 +20,9 @@ class ModelService:
         
         try:
             if not self.api_key:
-                # Return basic models if no API key
+                # Return default model if no API key
                 return [
-                    {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo"},
-                    {"id": "gpt-4", "name": "GPT-4"},
-                    {"id": "claude-3-haiku", "name": "Claude 3 Haiku"}
+                    {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini"}
                 ]
             
             headers = {
@@ -48,20 +46,16 @@ class ModelService:
                 self._models_cache = models
                 return models
             else:
-                # Fallback models
+                # Default model if API call fails
                 return [
-                    {"id": "openai/gpt-3.5-turbo", "name": "GPT-3.5 Turbo"},
-                    {"id": "openai/gpt-4", "name": "GPT-4"},
-                    {"id": "anthropic/claude-3-haiku", "name": "Claude 3 Haiku"}
+                    {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini"}
                 ]
                 
         except Exception as e:
             print(f"Error fetching models: {e}")
-            # Return fallback models
+            # Return default model
             return [
-                {"id": "openai/gpt-3.5-turbo", "name": "GPT-3.5 Turbo"},
-                {"id": "openai/gpt-4", "name": "GPT-4"},
-                {"id": "anthropic/claude-3-haiku", "name": "Claude 3 Haiku"}
+                {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini"}
             ]
     
     def search_models(self, query: str) -> List[Dict]:

@@ -31,7 +31,7 @@ class SimpleModelSelector:
         models = self.model_service.get_models()
         
         if not models:
-            return "openai/gpt-3.5-turbo"
+            return "openai/gpt-4o-mini"
         
         # Create model options for dropdown
         model_options = {}
@@ -47,7 +47,7 @@ class SimpleModelSelector:
         
         # Get current selection
         user_preference = self._get_user_preference(user_id)
-        current_model = st.session_state.get('selected_model', user_preference or 'openai/gpt-3.5-turbo')
+        current_model = st.session_state.get('selected_model', user_preference or 'openai/gpt-4o-mini')
         
         # Simple dropdown
         if model_display_names:
@@ -71,7 +71,7 @@ class SimpleModelSelector:
             
             return selected_model
         
-        return "openai/gpt-3.5-turbo"
+        return "openai/gpt-4o-mini"
     
     def get_selected_model(self, user_id: str) -> str:
         """Get the currently selected model ID"""
