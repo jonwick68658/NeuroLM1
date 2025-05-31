@@ -24,6 +24,8 @@ class NeuralMemorySystem:
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1"
         )
+        # Simple cache for topic extraction results
+        self._topic_cache = {}
         self._init_schema()
     
     def _init_schema(self):
@@ -55,16 +57,22 @@ class NeuralMemorySystem:
             return False
     
     def extract_topics(self, content: str) -> list:
-        """Extract multiple topics from conversation content using LLM"""
+        """Extract multiple topics from conversation content using Gemini 2.0 Flash"""
+        # Check cache first (simple hash-based caching)
+        content_hash = str(hash(content[:200]))  # Use first 200 chars for cache key
+        if content_hash in self._topic_cache:
+            return self._topic_cache[content_hash]
+            
         try:
+            # Try Gemini 2.0 Flash first
             response = self.openai_client.chat.completions.create(
-                model="openai/gpt-4o-mini",
+                model="google/gemini-2.0-flash-001",
                 messages=[
-                    {"role": "system", "content": "Extract 1-3 main topics from this conversation. Format: 'Primary: TopicName, Secondary: TopicName, Tertiary: TopicName' (only include what's relevant). Examples: 'Primary: Sports, Secondary: Parenting' or just 'Primary: Cooking'. Use 1-3 words per topic."},
+                    {"role": "system", "content": "Extract 1-3 main topics from this conversation. Avoid creating separate topics for related concepts (e.g., 'Fitness' and 'Health' for workout discussions should be 'Health & Fitness'). Format: 'Primary: TopicName, Secondary: TopicName, Tertiary: TopicName' (only include what's relevant). Examples: 'Primary: Health & Fitness' or 'Primary: Cooking, Secondary: Nutrition'. Use 1-4 words per topic, consolidate related concepts."},
                     {"role": "user", "content": content}
                 ],
-                temperature=0.3,
-                max_tokens=30
+                temperature=0.2,
+                max_tokens=40
             )
             
             response_text = response.choices[0].message.content.strip()
@@ -79,32 +87,79 @@ class NeuralMemorySystem:
                         if topic and len(topics) < 3:
                             topics.append(topic)
             
-            return topics if topics else ["General Discussion"]
+            result = topics if topics else ["General Discussion"]
+            # Cache the result
+            self._topic_cache[content_hash] = result
+            # Keep cache size manageable 
+            if len(self._topic_cache) > 100:
+                # Remove oldest entries (simple FIFO)
+                oldest_key = next(iter(self._topic_cache))
+                del self._topic_cache[oldest_key]
+            return result
             
         except Exception as e:
-            print(f"Topic extraction failed: {e}")
-            return ["General Discussion"]
+            print(f"Gemini topic extraction failed, trying fallback: {e}")
+            # Fallback to GPT-4o Mini
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="openai/gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "Extract 1-3 main topics from this conversation. Avoid creating separate topics for related concepts (e.g., 'Fitness' and 'Health' for workout discussions should be 'Health & Fitness'). Format: 'Primary: TopicName, Secondary: TopicName, Tertiary: TopicName' (only include what's relevant). Use 1-4 words per topic, consolidate related concepts."},
+                        {"role": "user", "content": content}
+                    ],
+                    temperature=0.2,
+                    max_tokens=40
+                )
+                
+                response_text = response.choices[0].message.content.strip()
+                topics = []
+                
+                if response_text:
+                    parts = response_text.split(',')
+                    for part in parts:
+                        if ':' in part:
+                            topic = part.split(':', 1)[1].strip()
+                            if topic and len(topics) < 3:
+                                topics.append(topic)
+                
+                result = topics if topics else ["General Discussion"]
+                # Cache fallback result too
+                self._topic_cache[content_hash] = result
+                return result
+                
+            except Exception as fallback_error:
+                print(f"All topic extraction failed: {fallback_error}")
+                result = ["General Discussion"]
+                self._topic_cache[content_hash] = result
+                return result
     
     def find_or_create_topic(self, user_id: str, topic_name: str, content: str) -> str:
-        """Find existing topic or create new one"""
+        """Find existing topic or create new one with enhanced collision detection"""
         try:
             topic_embedding = generate_embedding(f"{topic_name} {content}")
             topic_id = str(uuid.uuid4())
             
             with self.driver.session() as session:
-                # Check for existing similar topic
+                # Enhanced similarity check with name matching
                 result = session.run("""
                 MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
                 WHERE t.embedding IS NOT NULL
-                WITH t, vector.similarity.cosine(t.embedding, $topic_embedding) AS similarity
-                WHERE similarity > 0.8
-                RETURN t.id as topic_id, t.name as name, similarity
-                ORDER BY similarity DESC
+                WITH t, 
+                     vector.similarity.cosine(t.embedding, $topic_embedding) AS similarity,
+                     CASE 
+                         WHEN toLower(t.name) CONTAINS toLower($topic_name) OR toLower($topic_name) CONTAINS toLower(t.name) 
+                         THEN 0.2 
+                         ELSE 0.0 
+                     END AS name_bonus
+                WHERE similarity + name_bonus > 0.75
+                RETURN t.id as topic_id, t.name as name, similarity + name_bonus as final_score
+                ORDER BY final_score DESC
                 LIMIT 1
-                """, user_id=user_id, topic_embedding=topic_embedding)
+                """, user_id=user_id, topic_embedding=topic_embedding, topic_name=topic_name)
                 
                 existing = result.single()
                 if existing:
+                    print(f"Found existing topic: {existing['name']} (score: {existing['final_score']:.3f})")
                     return existing['topic_id']
                 
                 # Create new topic
@@ -120,6 +175,7 @@ class NeuralMemorySystem:
                 CREATE (u)-[:HAS_TOPIC]->(t)
                 """, user_id=user_id, topic_id=topic_id, topic_name=topic_name, topic_embedding=topic_embedding)
                 
+                print(f"Created new topic: {topic_name}")
                 return topic_id
                 
         except Exception as e:
@@ -176,11 +232,32 @@ class NeuralMemorySystem:
         try:
             content_embedding = generate_embedding(content)
             
+            # Validate embedding format
+            if not content_embedding or not isinstance(content_embedding, list):
+                print("Invalid embedding format for cross-topic linking")
+                return
+                
             with self.driver.session() as session:
-                # Find semantically similar memories in other topics
+                # First check if any memories have valid embeddings
+                check_result = session.run("""
+                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                WHERE m.id <> $memory_id AND m.embedding IS NOT NULL 
+                AND size(m.embedding) = 1536
+                RETURN count(m) as valid_memories
+                """, user_id=user_id, memory_id=memory_id)
+                
+                valid_count = check_result.single()
+                if not valid_count or valid_count['valid_memories'] == 0:
+                    print("No valid memories found for cross-topic linking")
+                    return
+                
+                # Find semantically similar memories with embedding validation
                 result = session.run("""
                 MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
-                WHERE m.id <> $memory_id AND m.embedding IS NOT NULL
+                WHERE m.id <> $memory_id 
+                AND m.embedding IS NOT NULL 
+                AND size(m.embedding) = 1536
+                AND size($content_embedding) = 1536
                 WITH m, vector.similarity.cosine(m.embedding, $content_embedding) AS similarity
                 WHERE similarity > 0.75
                 RETURN m.id as related_memory_id, similarity
@@ -189,11 +266,16 @@ class NeuralMemorySystem:
                 """, user_id=user_id, memory_id=memory_id, content_embedding=content_embedding)
                 
                 # Create relationships to related memories
+                links_created = 0
                 for record in result:
                     session.run("""
                     MATCH (m1:Memory {id: $memory_id}), (m2:Memory {id: $related_memory_id})
                     CREATE (m1)-[:RELATES_TO {strength: $similarity}]->(m2)
                     """, memory_id=memory_id, related_memory_id=record['related_memory_id'], similarity=record['similarity'])
+                    links_created += 1
+                
+                if links_created > 0:
+                    print(f"Created {links_created} cross-topic links")
                     
         except Exception as e:
             print(f"Error creating cross-topic links: {e}")
