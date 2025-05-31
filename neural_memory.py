@@ -121,7 +121,35 @@ class NeuralMemorySystem:
             topic_id = str(uuid.uuid4())
             
             with self.driver.session() as session:
-                # Enhanced similarity check with name matching
+                # If no embedding available, use name-based matching only
+                if topic_embedding is None:
+                    result = session.run("""
+                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
+                    WHERE toLower(t.name) = toLower($topic_name)
+                    RETURN t.id as topic_id
+                    LIMIT 1
+                    """, user_id=user_id, topic_name=topic_name)
+                    
+                    existing = result.single()
+                    if existing:
+                        return existing['topic_id']
+                    
+                    # Create topic without embedding
+                    session.run("""
+                    MATCH (u:User {id: $user_id})
+                    CREATE (t:Topic {
+                        id: $topic_id,
+                        name: $topic_name,
+                        created_at: datetime(),
+                        memory_count: 0
+                    })
+                    CREATE (u)-[:HAS_TOPIC]->(t)
+                    """, user_id=user_id, topic_id=topic_id, topic_name=topic_name)
+                    
+                    print(f"Created new topic: {topic_name} (no embedding)")
+                    return topic_id
+                
+                # Use embedding-based similarity check
                 result = session.run("""
                 MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
                 WHERE t.embedding IS NOT NULL
@@ -143,7 +171,7 @@ class NeuralMemorySystem:
                     print(f"Found existing topic: {existing['name']} (score: {existing['final_score']:.3f})")
                     return existing['topic_id']
                 
-                # Create new topic
+                # Create new topic with embedding
                 session.run("""
                 MATCH (u:User {id: $user_id})
                 CREATE (t:Topic {
@@ -173,19 +201,31 @@ class NeuralMemorySystem:
             content_embedding = generate_embedding(content)
             memory_id = str(uuid.uuid4())
             
-            # Create memory node first
+            # Create memory node (with or without embedding)
             with self.driver.session() as session:
-                session.run("""
-                CREATE (m:Memory {
-                    id: $memory_id,
-                    role: $role,
-                    content: $content,
-                    embedding: $content_embedding,
-                    created_at: datetime(),
-                    access_count: 0,
-                    relevance_score: 1.0
-                })
-                """, memory_id=memory_id, role=role, content=content, content_embedding=content_embedding)
+                if content_embedding is not None:
+                    session.run("""
+                    CREATE (m:Memory {
+                        id: $memory_id,
+                        role: $role,
+                        content: $content,
+                        embedding: $content_embedding,
+                        created_at: datetime(),
+                        access_count: 0,
+                        relevance_score: 1.0
+                    })
+                    """, memory_id=memory_id, role=role, content=content, content_embedding=content_embedding)
+                else:
+                    session.run("""
+                    CREATE (m:Memory {
+                        id: $memory_id,
+                        role: $role,
+                        content: $content,
+                        created_at: datetime(),
+                        access_count: 0,
+                        relevance_score: 1.0
+                    })
+                    """, memory_id=memory_id, role=role, content=content)
             
             # Connect memory to all relevant topics
             for topic_name in topics:
@@ -212,6 +252,10 @@ class NeuralMemorySystem:
         """Create links between memories across different topics"""
         try:
             content_embedding = generate_embedding(content)
+            
+            # Skip cross-topic linking if no embedding available
+            if content_embedding is None:
+                return
             
             with self.driver.session() as session:
                 
@@ -243,26 +287,36 @@ class NeuralMemorySystem:
             context_parts = []
             
             with self.driver.session() as session:
-                # Find relevant topics first
-                result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
-                WHERE t.embedding IS NOT NULL
-                WITH t, vector.similarity.cosine(t.embedding, $query_embedding) AS topic_similarity
-                WHERE topic_similarity > 0.6
-                
-                // Get memories from relevant topics
-                MATCH (t)-[:CONTAINS_MEMORY]->(m:Memory)
-                WHERE m.embedding IS NOT NULL
-                WITH t, m, topic_similarity, vector.similarity.cosine(m.embedding, $query_embedding) AS memory_similarity
-                
-                // Combined scoring: topic relevance + memory relevance
-                WITH t, m, (topic_similarity * 0.3 + memory_similarity * 0.7) AS combined_score
-                WHERE combined_score > 0.6
-                
-                RETURN t.name as topic, m.role as role, m.content as content, combined_score
-                ORDER BY combined_score DESC
-                LIMIT $limit
-                """, user_id=user_id, query_embedding=query_embedding, limit=limit)
+                # If no query embedding available, use text-based search
+                if query_embedding is None:
+                    result = session.run("""
+                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                    WHERE m.content CONTAINS $query OR t.name CONTAINS $query
+                    RETURN t.name as topic, m.role as role, m.content as content, 1.0 as combined_score
+                    ORDER BY m.created_at DESC
+                    LIMIT $limit
+                    """, user_id=user_id, query=query, limit=limit)
+                else:
+                    # Find relevant topics first using embeddings
+                    result = session.run("""
+                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
+                    WHERE t.embedding IS NOT NULL
+                    WITH t, vector.similarity.cosine(t.embedding, $query_embedding) AS topic_similarity
+                    WHERE topic_similarity > 0.6
+                    
+                    // Get memories from relevant topics
+                    MATCH (t)-[:CONTAINS_MEMORY]->(m:Memory)
+                    WHERE m.embedding IS NOT NULL
+                    WITH t, m, topic_similarity, vector.similarity.cosine(m.embedding, $query_embedding) AS memory_similarity
+                    
+                    // Combined scoring: topic relevance + memory relevance
+                    WITH t, m, (topic_similarity * 0.3 + memory_similarity * 0.7) AS combined_score
+                    WHERE combined_score > 0.6
+                    
+                    RETURN t.name as topic, m.role as role, m.content as content, combined_score
+                    ORDER BY combined_score DESC
+                    LIMIT $limit
+                    """, user_id=user_id, query_embedding=query_embedding, limit=limit)
                 
                 # Group by topics
                 topics = {}

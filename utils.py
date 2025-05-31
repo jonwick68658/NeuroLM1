@@ -3,73 +3,33 @@ import os
 import re
 import hashlib
 
-# Enhanced embedding function with multiple fallback methods
 def generate_embedding(text):
-    """Generate embedding with multiple fallback methods"""
+    """Generate embedding using OpenAI API only"""
     if not text or not text.strip():
-        return [0.0] * 1536  # Return zero vector for empty text (OpenAI dimension)
+        return None
     
     try:
         # Clean and normalize text
         cleaned_text = clean_text(text)
         if not cleaned_text:
-            return [0.0] * 1536
+            return None
         
-        # Attempt 1: Try OpenAI embeddings with direct API
-        try:
-            import openai
-            import os
-            
-            client = openai.OpenAI(
-                api_key=os.getenv("OPENAI_API_KEY")
-            )
-            response = client.embeddings.create(
-                model="text-embedding-3-small",
-                input=cleaned_text
-            )
-            return response.data[0].embedding
-        except Exception as e:
-            logging.warning(f"OpenAI embedding failed: {e}")
-            pass
+        # Use OpenAI embeddings only
+        import openai
+        import os
         
-        # Skip sentence-transformers to avoid dependency issues
-        
-        # Attempt 3: Try TF-IDF with sklearn if available
-        try:
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            import numpy as np
-            
-            # Create a simple TF-IDF representation
-            vectorizer = TfidfVectorizer(max_features=1536, stop_words='english')
-            # Need to fit on a corpus, so we'll use the text itself with some common words
-            corpus = [cleaned_text, "the quick brown fox jumps over lazy dog"]
-            tfidf_matrix = vectorizer.fit_transform(corpus)
-            embedding = tfidf_matrix[0].toarray()[0].tolist()
-            
-            # Pad or truncate to 1536 dimensions
-            if len(embedding) < 1536:
-                embedding.extend([0.0] * (1536 - len(embedding)))
-            else:
-                embedding = embedding[:1536]
-            
-            return embedding
-        except Exception:
-            pass
-        
-        # Final fallback: Enhanced hash-based embedding
-        embedding = []
-        for i in range(1536):
-            # Create multiple hash values for better distribution
-            hash_input = f"{cleaned_text}_{i}_embedding_salt"
-            hash_value = hash(hash_input) % 10000
-            normalized_value = (hash_value / 10000.0) * 2 - 1  # Scale to -1 to 1
-            embedding.append(normalized_value)
-        
-        return embedding
+        client = openai.OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY")
+        )
+        response = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=cleaned_text
+        )
+        return response.data[0].embedding
         
     except Exception as e:
-        logging.error(f"Failed to generate embedding: {str(e)}")
-        return [0.0] * 1536
+        logging.error(f"OpenAI embedding failed: {e}")
+        return None
 
 def clean_text(text):
     """Clean and normalize text for better embedding quality"""
