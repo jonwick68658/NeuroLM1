@@ -1,244 +1,178 @@
-# NeuroLM - Neural Language Model with Persistent Memory
+# NeuroLM - Neural Language Model with Hierarchical Memory
 
-An advanced AI chat application that solves the context loss problem of traditional chatbots through intelligent memory management and document processing. Built with Neo4j graph database technology for true conversation continuity and knowledge persistence.
-
-## The Problem with Traditional AI Chat
-
-Traditional AI chatbots suffer from "goldfish memory" - every conversation starts from scratch, forcing users to constantly re-explain context, preferences, and background information. Uploaded documents are forgotten, previous insights are lost, and there's no learning continuity.
-
-## NeuroLM's Solution
-
-NeuroLM creates a persistent, evolving neural memory network that:
-- Remembers every conversation permanently
-- Processes and retains uploaded documents as active knowledge
-- Builds relationships between ideas across time
-- Grows more intelligent with each interaction
-- Provides true conversation continuity
+An advanced AI chat application featuring a sophisticated neural memory system that organizes conversations using hierarchical topic-based architecture, mimicking human cognitive memory organization.
 
 ## Core Features
 
-### 🧠 Intelligent Memory System
-- **Persistent Context**: Remembers conversations across sessions, weeks, or months
-- **Graph-Based Architecture**: Neo4j database maps relationships between memories
-- **Biomimetic Consolidation**: Strengthens important memories, weakens unused ones
-- **Multi-Hop Discovery**: Finds connections between seemingly unrelated topics
+### Neural Memory System
+- **Hierarchical Organization**: User → Topic → Memory structure that mirrors human memory
+- **Multi-Topic Support**: Complex conversations automatically connected to multiple relevant topics
+- **Semantic Retrieval**: Context-aware memory search using vector embeddings
+- **Cross-Topic Linking**: Related memories connected across different topic categories
 
-### 🤖 Universal Model Access
-- **Hundreds of AI Models**: Choose from OpenAI, Anthropic, Google, Meta, and more
-- **Smart Model Selection**: Search and filter by capabilities, cost, context length
-- **Cost Optimization**: Select the right model for each task and budget
-- **Provider Independence**: Never locked into a single AI vendor
+### AI Integration
+- **OpenRouter Models**: Access to multiple AI models with dynamic selection
+- **Default Model**: GPT-4o Mini for cost-effective conversations
+- **Context Enhancement**: Memory-augmented responses using stored conversation history
 
-### 📄 Document Processing & Knowledge Integration
-- **Multi-Format Support**: Process PDF, DOCX, Excel, CSV, and text files
-- **Intelligent Chunking**: Breaks documents into semantic chunks with overlap
-- **Persistent Knowledge**: Documents become permanent part of your AI's memory
-- **Contextual Retrieval**: AI references document content in conversations naturally
-- **Cross-Document Connections**: Links related information across multiple uploads
+### User Management
+- **Secure Authentication**: Account creation and login with encrypted passwords
+- **Individual Memory Spaces**: Each user maintains their own neural memory network
+- **Session Management**: Persistent login states and user preferences
 
-### 💬 Advanced Chat Experience
-- **Conversation Continuity**: Pick up where you left off, even weeks later
-- **Context-Aware Responses**: AI references previous discussions and documents naturally
-- **Session Management**: Organized conversation history with smart grouping
-- **Dynamic Learning**: System builds connections between conversations and documents
+## Technology Stack
 
-### 🔧 Technical Capabilities
-- **Vector Embeddings**: Semantic similarity matching for intelligent retrieval
-- **Association Networks**: Dynamic relationship discovery between concepts
-- **Temporal Intelligence**: Memory strength evolves based on usage patterns
-- **Background Optimization**: Automatic memory network enhancement
+- **Frontend**: Streamlit web interface
+- **Database**: Neo4j graph database for hierarchical memory storage
+- **AI Models**: OpenRouter integration with OpenAI models
+- **Embeddings**: OpenAI text-embedding-3-small for semantic search
+- **Memory Architecture**: Topic-based hierarchical organization
+
+## Neural Memory Architecture
+
+The system implements a biomimetic memory structure:
+
+```
+User Node
+├── Topic: "Sports"
+│   ├── Memory: "went to baseball game"
+│   └── Memory: "love watching football"
+├── Topic: "Family"
+│   ├── Memory: "my son enjoys sports"
+│   └── Memory: "planning family vacation"
+└── Topic: "Fitness"
+    ├── Memory: "morning workout routine"
+    └── Memory: "need to exercise more"
+```
+
+### Multi-Topic Conversations
+Complex messages are analyzed and connected to multiple relevant topics:
+- Input: "Went to baseball game with my son after my morning workout"
+- Topics Created: Sports, Family, Fitness
+- Result: Single memory connected to all three topic nodes
 
 ## Getting Started
 
 ### Prerequisites
-- Neo4j Aura database (free tier available)
-- OpenRouter API key (pay-per-use pricing)
+- Neo4j database instance
+- OpenRouter API key
+- OpenAI API key (for embeddings)
 
-### Environment Setup
-Create `.env` file:
-```env
-NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your-password
-OPENROUTER_API_KEY=your-openrouter-key
-APP_USERNAME=your-username
-APP_PASSWORD=your-password
+### Environment Variables
+```
+NEO4J_URI=your_neo4j_connection_string
+NEO4J_USER=your_neo4j_username
+NEO4J_PASSWORD=your_neo4j_password
+OPENROUTER_API_KEY=your_openrouter_api_key
+OPENAI_API_KEY=your_openai_api_key
 ```
 
-### Installation
+### Running the Application
 ```bash
-# Install dependencies
-uv add streamlit neo4j openai requests python-dotenv PyPDF2 docx2txt openpyxl pandas
-
-# Run application
 streamlit run app.py --server.port 5000
 ```
 
-## Competitive Advantages
+## Usage
 
-### vs. Standard Chatbots
-- **Memory Persistence**: Never lose conversation context
-- **Relationship Mapping**: Understands connections between topics
-- **Evolving Intelligence**: Gets smarter with each interaction
+### Basic Workflow
+1. **Create Account**: Register with username, email, and password
+2. **Start Conversation**: Begin chatting with the AI assistant
+3. **Memory Building**: System automatically organizes your conversations by topics
+4. **Context Retrieval**: AI accesses relevant memories to provide contextual responses
+5. **Explore Memory**: View analytics to see how your conversations are organized
 
-### vs. Enterprise Solutions
-- **Personal Focus**: Designed for individual users, not teams
-- **Accessible Pricing**: No enterprise licensing or setup costs
-- **Simple Deployment**: Run anywhere, including personal servers
+### Memory System Benefits
+- **No Context Loss**: Conversations build upon previous discussions
+- **Topic Organization**: Related conversations grouped intelligently
+- **Semantic Search**: Find relevant information using natural language queries
+- **Authentic Responses**: AI uses only actual conversation history, no fabricated details
 
-### vs. Memory-Enhanced AIs
-- **True Graph Memory**: Not just vector similarity matching
-- **Model Flexibility**: Choose optimal AI for each task
-- **Open Architecture**: Full control over your data and deployment
+## Neural Memory Features
 
-## Use Cases
+### Automatic Topic Extraction
+- Analyzes conversation content using GPT-4o Mini
+- Extracts 1-3 most relevant topics per message
+- Handles both simple and complex multi-topic conversations
 
-**For Professionals**
-- Maintain context across long projects and meetings
-- Reference previous decisions, strategies, and discussions
-- Build cumulative knowledge bases from uploaded reports and documents
-- Track project evolution and decision rationale over time
+### Hierarchical Storage
+- Creates topic nodes for conversation categories
+- Links individual memories to relevant topics
+- Maintains relationships between users, topics, and memories
 
-**For Researchers**
-- Connect insights across research sessions and uploaded papers
-- Maintain literature review context with document processing
-- Track evolving hypotheses and findings with persistent memory
-- Cross-reference uploaded research documents with conversations
+### Enhanced Retrieval
+- Searches across all connected topics for relevant context
+- Ranks memories by semantic similarity to current query
+- Provides organized context grouped by topic areas
 
-**For Students & Learners**
-- Accumulate knowledge from uploaded textbooks and course materials
-- Connect concepts across different subjects and documents
-- Track learning progress and build upon previous study sessions
-- Create persistent study companions that remember your learning journey
+## Project Structure
 
-**For Content Creators**
-- Upload reference materials and maintain creative consistency
-- Build upon previous creative decisions and character development
-- Reference uploaded style guides, brand documents, and inspiration
-- Develop long-term creative projects with continuous context
+```
+├── app.py                 # Main Streamlit application
+├── neural_memory.py       # Core hierarchical memory system
+├── simple_model_selector.py # AI model selection interface
+├── model_service.py       # OpenRouter integration
+├── utils.py              # Embedding and utility functions
+└── README.md             # Documentation
+```
 
-## Architecture
+## Key Components
 
-### Memory System
-- **Neo4j Graph Database**: Stores memories as connected nodes
-- **Vector Embeddings**: Semantic similarity for content matching
-- **Temporal Scoring**: Time-based relevance weighting
-- **Association Strength**: Relationship quality metrics
+### NeuralMemorySystem
+- Topic extraction and management
+- Multi-topic memory storage
+- Semantic context retrieval
+- Cross-topic relationship creation
 
 ### Model Integration
-- **OpenRouter API**: Access to 100+ AI models
-- **Dynamic Selection**: Choose optimal model per conversation
-- **Cost Transparency**: Clear pricing for each interaction
-- **Provider Diversity**: Avoid vendor lock-in
+- OpenRouter API connectivity
+- Dynamic model selection
+- Cost-optimized default selection (GPT-4o Mini)
 
-### Background Processing
-- **Memory Consolidation**: Strengthens frequently accessed information
-- **Association Discovery**: Creates new connections between related memories
-- **Pruning System**: Removes weak, outdated memories
-- **Performance Optimization**: Maintains fast retrieval speeds
+### Memory Analytics
+- Topic distribution analysis
+- Memory count tracking
+- Neural network visualization
+- Conversation pattern insights
 
-## Advanced Memory Features
+## Memory System Design Principles
 
-### Weighted Scoring Algorithm
-```
-Final Score = (Vector Similarity × 0.40) + 
-              (Temporal Relevance × 0.25) + 
-              (Access Frequency × 0.20) + 
-              (Association Strength × 0.15)
-```
+### Authenticity
+- Uses only actual conversation data
+- No synthetic or placeholder information
+- Preserves exact user statements and AI responses
+
+### Efficiency
+- Optimized vector similarity search
+- Targeted topic-based retrieval
+- Minimal API calls through better context management
+
+### Scalability
+- Graph database architecture supports complex relationships
+- Multi-topic connections enable rich semantic networks
+- Hierarchical organization maintains performance with growth
+
+## Development Notes
 
 ### Database Schema
-- **User Nodes**: Multi-user accounts with secure authentication
-- **Memory Nodes**: Conversations with embeddings, confidence scores, and access tracking
-- **Topic Nodes**: AI-extracted conversation subjects with usage statistics
-- **CREATED Relationships**: User-memory ownership links
-- **ASSOCIATED_WITH Relationships**: Memory-to-memory connections with strength values
-- **ABOUT Relationships**: Memory-topic associations with relevance weights
+The Neo4j database automatically creates:
+- User nodes with authentication data
+- Topic nodes with embeddings and metadata
+- Memory nodes with conversation content and embeddings
+- Relationships: HAS_TOPIC, CONTAINS_MEMORY, RELATES_TO
 
-### Intelligent Features
-- **Dynamic Confidence**: Memory reliability evolves based on usage patterns
-- **Associative Strengthening**: Co-accessed memories develop stronger connections
-- **Temporal Decay**: Unused associations naturally weaken over time
-- **Smart Pruning**: Automatic removal of weak, inactive memories
-- **Context Clustering**: Groups related memories for enhanced retrieval
-
-## Technical Stack
-
-- **Frontend**: Streamlit with custom neural-themed interface
-- **Database**: Neo4j graph database for memory storage
-- **AI Models**: OpenRouter API for multi-provider access
-- **Embeddings**: Sentence-transformers for semantic understanding
-- **Authentication**: Simple user management system
-- **File Processing**: PDF/DOCX document handling
-
-## File Structure
-
-```
-├── app.py                  # Main Streamlit application with chat interface
-├── memory.py              # Core Neo4j memory management and neural processing
-├── retrieval.py           # Advanced weighted memory retrieval algorithms
-├── consolidation.py       # Background memory consolidation and optimization
-├── association.py         # Multi-hop association discovery between memories
-├── document_storage.py    # Neo4j document storage and retrieval system
-├── document_ui.py         # Streamlit document upload and management interface
-├── file_processor.py      # Multi-format document processing engine
-├── model_service.py       # OpenRouter API model fetching and caching
-├── simple_model_selector.py # Clean model selection dropdown interface
-├── utils.py               # Utility functions for embeddings and text processing
-├── config.py              # Central configuration management
-├── .env.example           # Environment variable template
-└── README.md              # Complete system documentation
-```
-
-## Performance & Scalability
-
-### Memory System Performance
-- **Batch Processing**: Handles consolidation in configurable batch sizes
-- **Caching Layer**: Efficient model and memory caching
-- **Optimized Queries**: Efficient Neo4j queries with proper indexing
-- **Background Processing**: Non-blocking consolidation and maintenance
-- **Fallback Mechanisms**: Graceful degradation when advanced features fail
-
-### Configuration Options
-- **Retrieval Weights**: Adjustable scoring algorithm parameters
-- **Consolidation Settings**: Configurable pruning thresholds and schedules
-- **Association Parameters**: Tunable relationship strength and decay rates
-- **Model Selection**: Cached model lists with search functionality
-
-## User Experience
-
-### Interface Design
-- **Professional Dark Theme**: Deep black backgrounds with pure white text
-- **Clean Chat Layout**: Focus on natural conversation flow
-- **Smart Model Selection**: Searchable dropdown with hundreds of AI models
-- **Intuitive Navigation**: Simple sidebar with conversation history
-
-### Conversation Features
-- **New Chat Button**: Start fresh conversations anytime
-- **Chat History**: Quick access to previous conversation sessions
-- **Context Awareness**: AI remembers previous discussions for continuity
-- **Model Flexibility**: Switch between AI models mid-conversation
-
-## Future Roadmap
-
-- **Mobile Application**: Native iOS/Android apps
-- **Advanced Analytics**: Memory network visualization
-- **Collaborative Features**: Shared memory spaces
-- **API Access**: Programmatic memory interaction
-- **Plugin System**: Third-party integrations
+### Performance Considerations
+- Vector embeddings enable fast semantic search
+- Topic-based organization reduces search space
+- Graph structure provides efficient relationship traversal
 
 ## Contributing
 
-NeuroLM is designed to democratize advanced AI memory capabilities. Contributions welcome for:
-- Memory algorithm improvements
-- New model integrations
-- Interface enhancements
-- Performance optimizations
+The neural memory system is designed for extensibility:
+- Topic extraction can be enhanced with more sophisticated NLP
+- Memory consolidation algorithms can be improved
+- Additional relationship types can be added
+- Analytics and visualization can be expanded
 
 ## License
 
-Open source - designed to keep advanced AI memory accessible to everyone, not just enterprise users.
-
----
-
-*NeuroLM: Where every conversation builds upon the last, creating an AI companion that truly learns with you.*
+MIT License - See LICENSE file for details.
