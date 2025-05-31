@@ -24,8 +24,7 @@ class NeuralMemorySystem:
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1"
         )
-        # Simple cache for topic extraction results
-        self._topic_cache = {}
+
         self._init_schema()
     
     def _init_schema(self):
@@ -58,11 +57,6 @@ class NeuralMemorySystem:
     
     def extract_topics(self, content: str) -> list:
         """Extract multiple topics from conversation content using Gemini 2.0 Flash"""
-        # Check cache first (simple hash-based caching)
-        content_hash = str(hash(content[:200]))  # Use first 200 chars for cache key
-        if content_hash in self._topic_cache:
-            return self._topic_cache[content_hash]
-            
         try:
             # Try Gemini 2.0 Flash first
             response = self.openai_client.chat.completions.create(
@@ -87,15 +81,7 @@ class NeuralMemorySystem:
                         if topic and len(topics) < 3:
                             topics.append(topic)
             
-            result = topics if topics else ["General Discussion"]
-            # Cache the result
-            self._topic_cache[content_hash] = result
-            # Keep cache size manageable 
-            if len(self._topic_cache) > 100:
-                # Remove oldest entries (simple FIFO)
-                oldest_key = next(iter(self._topic_cache))
-                del self._topic_cache[oldest_key]
-            return result
+            return topics if topics else ["General Discussion"]
             
         except Exception as e:
             print(f"Gemini topic extraction failed, trying fallback: {e}")
@@ -122,16 +108,11 @@ class NeuralMemorySystem:
                             if topic and len(topics) < 3:
                                 topics.append(topic)
                 
-                result = topics if topics else ["General Discussion"]
-                # Cache fallback result too
-                self._topic_cache[content_hash] = result
-                return result
+                return topics if topics else ["General Discussion"]
                 
             except Exception as fallback_error:
                 print(f"All topic extraction failed: {fallback_error}")
-                result = ["General Discussion"]
-                self._topic_cache[content_hash] = result
-                return result
+                return ["General Discussion"]
     
     def find_or_create_topic(self, user_id: str, topic_name: str, content: str) -> str:
         """Find existing topic or create new one with enhanced collision detection"""
@@ -382,82 +363,6 @@ class NeuralMemorySystem:
             if isinstance(msg, dict) and "role" in msg and "content" in msg:
                 self.store_conversation(user_id, msg["role"], msg["content"])
 
-    def cleanup_invalid_embeddings(self):
-        """Clean up invalid embeddings that cause vector similarity errors"""
-        try:
-            with self.driver.session() as session:
-                # Find memories with invalid embeddings
-                result = session.run("""
-                MATCH (m:Memory)
-                WHERE m.embedding IS NOT NULL 
-                AND (size(m.embedding) <> 1536 OR NOT all(x IN m.embedding WHERE x IS NOT NULL))
-                RETURN m.id as memory_id, size(m.embedding) as embedding_size
-                """)
-                
-                invalid_memories = list(result)
-                print(f"Found {len(invalid_memories)} memories with invalid embeddings")
-                
-                # Fix invalid memory embeddings
-                for record in invalid_memories:
-                    memory_id = record['memory_id']
-                    # Get memory content to regenerate embedding
-                    content_result = session.run("""
-                    MATCH (m:Memory {id: $memory_id})
-                    RETURN m.content as content
-                    """, memory_id=memory_id)
-                    
-                    content_record = content_result.single()
-                    if content_record:
-                        content = content_record['content']
-                        new_embedding = generate_embedding(content)
-                        
-                        if new_embedding and isinstance(new_embedding, list) and len(new_embedding) == 1536:
-                            session.run("""
-                            MATCH (m:Memory {id: $memory_id})
-                            SET m.embedding = $new_embedding
-                            """, memory_id=memory_id, new_embedding=new_embedding)
-                            print(f"Fixed embedding for memory {memory_id}")
-                        else:
-                            # Remove invalid embedding
-                            session.run("""
-                            MATCH (m:Memory {id: $memory_id})
-                            REMOVE m.embedding
-                            """, memory_id=memory_id)
-                            print(f"Removed invalid embedding for memory {memory_id}")
-                
-                # Find and fix invalid topic embeddings
-                topic_result = session.run("""
-                MATCH (t:Topic)
-                WHERE t.embedding IS NOT NULL 
-                AND (size(t.embedding) <> 1536 OR NOT all(x IN t.embedding WHERE x IS NOT NULL))
-                RETURN t.id as topic_id, t.name as topic_name, size(t.embedding) as embedding_size
-                """)
-                
-                invalid_topics = list(topic_result)
-                print(f"Found {len(invalid_topics)} topics with invalid embeddings")
-                
-                for record in invalid_topics:
-                    topic_id = record['topic_id']
-                    topic_name = record['topic_name']
-                    new_embedding = generate_embedding(topic_name)
-                    
-                    if new_embedding and isinstance(new_embedding, list) and len(new_embedding) == 1536:
-                        session.run("""
-                        MATCH (t:Topic {id: $topic_id})
-                        SET t.embedding = $new_embedding
-                        """, topic_id=topic_id, new_embedding=new_embedding)
-                        print(f"Fixed embedding for topic {topic_name}")
-                    else:
-                        session.run("""
-                        MATCH (t:Topic {id: $topic_id})
-                        REMOVE t.embedding
-                        """, topic_id=topic_id)
-                        print(f"Removed invalid embedding for topic {topic_name}")
-                
-                print("Embedding cleanup completed")
-                
-        except Exception as e:
-            print(f"Error during embedding cleanup: {e}")
 
     def close(self):
         """Close database connection"""
