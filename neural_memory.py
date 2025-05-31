@@ -234,26 +234,28 @@ class NeuralMemorySystem:
             
             with self.driver.session() as session:
                 
-                # Debug embedding before vector similarity
-                print(f"Content embedding type: {type(content_embedding)}, length: {len(content_embedding) if content_embedding else 'None'}")
-                
-                # Find semantically similar memories in other topics
-                result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
-                WHERE m.id <> $memory_id AND m.embedding IS NOT NULL
-                WITH m, vector.similarity.cosine(m.embedding, $content_embedding) AS similarity
-                WHERE similarity > 0.75
-                RETURN m.id as related_memory_id, similarity
-                ORDER BY similarity DESC
-                LIMIT 3
-                """, user_id=user_id, memory_id=memory_id, content_embedding=content_embedding)
-                
-                # Create relationships to related memories
-                for record in result:
-                    session.run("""
-                    MATCH (m1:Memory {id: $memory_id}), (m2:Memory {id: $related_memory_id})
-                    CREATE (m1)-[:RELATES_TO {strength: $similarity}]->(m2)
-                    """, memory_id=memory_id, related_memory_id=record['related_memory_id'], similarity=record['similarity'])
+                # Find semantically similar memories in other topics - skip on vector errors
+                try:
+                    result = session.run("""
+                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                    WHERE m.id <> $memory_id AND m.embedding IS NOT NULL
+                    WITH m, vector.similarity.cosine(m.embedding, $content_embedding) AS similarity
+                    WHERE similarity > 0.75
+                    RETURN m.id as related_memory_id, similarity
+                    ORDER BY similarity DESC
+                    LIMIT 3
+                    """, user_id=user_id, memory_id=memory_id, content_embedding=content_embedding)
+                    
+                    # Create relationships to related memories
+                    for record in result:
+                        session.run("""
+                        MATCH (m1:Memory {id: $memory_id}), (m2:Memory {id: $related_memory_id})
+                        CREATE (m1)-[:RELATES_TO {strength: $similarity}]->(m2)
+                        """, memory_id=memory_id, related_memory_id=record['related_memory_id'], similarity=record['similarity'])
+                        
+                except Exception as vector_error:
+                    # Skip cross-topic linking if vector similarity fails
+                    pass
                     
         except Exception as e:
             print(f"Error creating cross-topic links: {e}")
@@ -261,30 +263,40 @@ class NeuralMemorySystem:
     def retrieve_context(self, user_id: str, query: str, limit: int = 5) -> str:
         """Retrieve contextual memories using topic hierarchy"""
         try:
-            query_embedding = generate_embedding(query)
             context_parts = []
             
             with self.driver.session() as session:
-                # Find relevant topics first
-                result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
-                WHERE t.embedding IS NOT NULL
-                WITH t, vector.similarity.cosine(t.embedding, $query_embedding) AS topic_similarity
-                WHERE topic_similarity > 0.6
-                
-                // Get memories from relevant topics
-                MATCH (t)-[:CONTAINS_MEMORY]->(m:Memory)
-                WHERE m.embedding IS NOT NULL
-                WITH t, m, topic_similarity, vector.similarity.cosine(m.embedding, $query_embedding) AS memory_similarity
-                
-                // Combined scoring: topic relevance + memory relevance
-                WITH t, m, (topic_similarity * 0.3 + memory_similarity * 0.7) AS combined_score
-                WHERE combined_score > 0.6
-                
-                RETURN t.name as topic, m.role as role, m.content as content, combined_score
-                ORDER BY combined_score DESC
-                LIMIT $limit
-                """, user_id=user_id, query_embedding=query_embedding, limit=limit)
+                # Try vector similarity first, fallback to recent memories if it fails
+                try:
+                    query_embedding = generate_embedding(query)
+                    result = session.run("""
+                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
+                    WHERE t.embedding IS NOT NULL
+                    WITH t, vector.similarity.cosine(t.embedding, $query_embedding) AS topic_similarity
+                    WHERE topic_similarity > 0.6
+                    
+                    // Get memories from relevant topics
+                    MATCH (t)-[:CONTAINS_MEMORY]->(m:Memory)
+                    WHERE m.embedding IS NOT NULL
+                    WITH t, m, topic_similarity, vector.similarity.cosine(m.embedding, $query_embedding) AS memory_similarity
+                    
+                    // Combined scoring: topic relevance + memory relevance
+                    WITH t, m, (topic_similarity * 0.3 + memory_similarity * 0.7) AS combined_score
+                    WHERE combined_score > 0.6
+                    
+                    RETURN t.name as topic, m.role as role, m.content as content, combined_score
+                    ORDER BY combined_score DESC
+                    LIMIT $limit
+                    """, user_id=user_id, query_embedding=query_embedding, limit=limit)
+                    
+                except:
+                    # Fallback: get recent memories from all topics
+                    result = session.run("""
+                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                    RETURN t.name as topic, m.role as role, m.content as content, m.created_at as created_at
+                    ORDER BY m.created_at DESC
+                    LIMIT $limit
+                    """, user_id=user_id, limit=limit)
                 
                 # Group by topics
                 topics = {}
