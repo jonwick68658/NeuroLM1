@@ -234,6 +234,9 @@ class NeuralMemorySystem:
             
             with self.driver.session() as session:
                 
+                # Debug embedding before vector similarity
+                print(f"Content embedding type: {type(content_embedding)}, length: {len(content_embedding) if content_embedding else 'None'}")
+                
                 # Find semantically similar memories in other topics
                 result = session.run("""
                 MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
