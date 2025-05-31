@@ -54,23 +54,36 @@ class NeuralMemorySystem:
             print(f"Error creating user: {e}")
             return False
     
-    def extract_topic(self, content: str) -> str:
-        """Extract topic from conversation content using LLM"""
+    def extract_topics(self, content: str) -> list:
+        """Extract multiple topics from conversation content using LLM"""
         try:
             response = self.openai_client.chat.completions.create(
                 model="openai/gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Extract a single, concise topic (1-3 words) from this conversation. Examples: 'Cooking', 'Travel Planning', 'Career Advice', 'Personal Health'. Respond with just the topic name."},
+                    {"role": "system", "content": "Extract 1-3 main topics from this conversation. Format: 'Primary: TopicName, Secondary: TopicName, Tertiary: TopicName' (only include what's relevant). Examples: 'Primary: Sports, Secondary: Parenting' or just 'Primary: Cooking'. Use 1-3 words per topic."},
                     {"role": "user", "content": content}
                 ],
                 temperature=0.3,
-                max_tokens=10
+                max_tokens=30
             )
-            topic = response.choices[0].message.content.strip()
-            return topic if topic else "General Discussion"
+            
+            response_text = response.choices[0].message.content.strip()
+            topics = []
+            
+            # Parse the response to extract topics
+            if response_text:
+                parts = response_text.split(',')
+                for part in parts:
+                    if ':' in part:
+                        topic = part.split(':', 1)[1].strip()
+                        if topic and len(topics) < 3:
+                            topics.append(topic)
+            
+            return topics if topics else ["General Discussion"]
+            
         except Exception as e:
             print(f"Topic extraction failed: {e}")
-            return "General Discussion"
+            return ["General Discussion"]
     
     def find_or_create_topic(self, user_id: str, topic_name: str, content: str) -> str:
         """Find existing topic or create new one"""
@@ -116,22 +129,16 @@ class NeuralMemorySystem:
     def store_conversation(self, user_id: str, role: str, content: str) -> Optional[str]:
         """Store conversation in hierarchical topic structure"""
         try:
-            # Extract topic from content
-            topic_name = self.extract_topic(content)
-            
-            # Find or create topic
-            topic_id = self.find_or_create_topic(user_id, topic_name, content)
-            if not topic_id:
-                return None
+            # Extract multiple topics from content
+            topics = self.extract_topics(content)
             
             # Generate embedding for content
             content_embedding = generate_embedding(content)
             memory_id = str(uuid.uuid4())
             
+            # Create memory node first
             with self.driver.session() as session:
-                # Store memory linked to topic
                 session.run("""
-                MATCH (t:Topic {id: $topic_id})
                 CREATE (m:Memory {
                     id: $memory_id,
                     role: $role,
@@ -141,15 +148,24 @@ class NeuralMemorySystem:
                     access_count: 0,
                     relevance_score: 1.0
                 })
-                CREATE (t)-[:CONTAINS_MEMORY]->(m)
-                SET t.memory_count = t.memory_count + 1,
-                    t.last_updated = datetime()
-                """, topic_id=topic_id, memory_id=memory_id, role=role, content=content, content_embedding=content_embedding)
+                """, memory_id=memory_id, role=role, content=content, content_embedding=content_embedding)
+            
+            # Connect memory to all relevant topics
+            for topic_name in topics:
+                topic_id = self.find_or_create_topic(user_id, topic_name, content)
+                if topic_id:
+                    with self.driver.session() as session:
+                        session.run("""
+                        MATCH (t:Topic {id: $topic_id}), (m:Memory {id: $memory_id})
+                        CREATE (t)-[:CONTAINS_MEMORY]->(m)
+                        SET t.memory_count = t.memory_count + 1,
+                            t.last_updated = datetime()
+                        """, topic_id=topic_id, memory_id=memory_id)
                 
-                # Create cross-topic links if content references other topics
-                self._create_cross_topic_links(memory_id, content, user_id)
-                
-                return memory_id
+            # Create cross-topic links if content references other topics  
+            self._create_cross_topic_links(memory_id, content, user_id)
+            
+            return memory_id
                 
         except Exception as e:
             print(f"Error storing conversation: {e}")
@@ -218,9 +234,9 @@ class NeuralMemorySystem:
                         topics[topic] = []
                     topics[topic].append(f"- {record['role']}: {record['content']}")
                 
-                # Format context
+                # Format context with better organization
                 for topic, memories in topics.items():
-                    context_parts.append(f"\nFrom {topic} discussions:")
+                    context_parts.append(f"From {topic}:")
                     context_parts.extend(memories)
                 
                 return "\n".join(context_parts) if context_parts else ""
