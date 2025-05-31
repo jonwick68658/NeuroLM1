@@ -7,13 +7,15 @@ An advanced AI chat application featuring a sophisticated neural memory system t
 ### Neural Memory System
 - **Hierarchical Organization**: User → Topic → Memory structure that mirrors human memory
 - **Multi-Topic Support**: Complex conversations automatically connected to multiple relevant topics
-- **Semantic Retrieval**: Context-aware memory search using vector embeddings
+- **Semantic Retrieval**: Context-aware memory search using authentic OpenAI embeddings
 - **Cross-Topic Linking**: Related memories connected across different topic categories
+- **Topic Extraction**: Powered by Google Gemini 2.0 Flash with GPT-4o Mini fallback
 
 ### AI Integration
 - **OpenRouter Models**: Access to multiple AI models with dynamic selection
 - **Default Model**: GPT-4o Mini for cost-effective conversations
 - **Context Enhancement**: Memory-augmented responses using stored conversation history
+- **Authentic Data Only**: System uses only real conversation data, no synthetic content
 
 ### User Management
 - **Secure Authentication**: Account creation and login with encrypted passwords
@@ -25,8 +27,9 @@ An advanced AI chat application featuring a sophisticated neural memory system t
 - **Frontend**: Streamlit web interface
 - **Database**: Neo4j graph database for hierarchical memory storage
 - **AI Models**: OpenRouter integration with OpenAI models
-- **Embeddings**: OpenAI text-embedding-3-small for semantic search
-- **Memory Architecture**: Topic-based hierarchical organization
+- **Embeddings**: OpenAI text-embedding-3-small for authentic semantic search
+- **Topic Extraction**: Google Gemini 2.0 Flash for enhanced topic identification
+- **Memory Architecture**: Topic-based hierarchical organization with collision detection
 
 ## Neural Memory Architecture
 
