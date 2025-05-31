@@ -281,30 +281,36 @@ class NeuralMemorySystem:
     def retrieve_context(self, user_id: str, query: str, limit: int = 5) -> str:
         """Retrieve contextual memories using topic hierarchy"""
         try:
-            query_embedding = generate_embedding(query)
             context_parts = []
             
             with self.driver.session() as session:
-                # Find relevant topics first
-                result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
-                WHERE t.embedding IS NOT NULL
-                WITH t, vector.similarity.cosine(t.embedding, $query_embedding) AS topic_similarity
-                WHERE topic_similarity > 0.6
+                # Enhanced search: keyword matching + recent memories + content search
+                query_lower = query.lower()
+                keywords = query_lower.split()
                 
-                // Get memories from relevant topics
-                MATCH (t)-[:CONTAINS_MEMORY]->(m:Memory)
-                WHERE m.embedding IS NOT NULL
-                WITH t, m, topic_similarity, vector.similarity.cosine(m.embedding, $query_embedding) AS memory_similarity
+                # Find by topic name OR content matching
+                topic_conditions = []
+                content_conditions = []
                 
-                // Combined scoring: topic relevance + memory relevance
-                WITH t, m, (topic_similarity * 0.3 + memory_similarity * 0.7) AS combined_score
-                WHERE combined_score > 0.6
+                for keyword in keywords:
+                    if len(keyword) > 2:  # Lower threshold for keywords
+                        topic_conditions.append(f"toLower(t.name) CONTAINS '{keyword}'")
+                        content_conditions.append(f"toLower(m.content) CONTAINS '{keyword}'")
                 
-                RETURN t.name as topic, m.role as role, m.content as content, combined_score
-                ORDER BY combined_score DESC
+                # Combine conditions with fallback to recent memories
+                if topic_conditions or content_conditions:
+                    all_conditions = topic_conditions + content_conditions
+                    search_filter = " OR ".join(all_conditions)
+                else:
+                    search_filter = "true"  # Fallback to recent memories
+                
+                result = session.run(f"""
+                MATCH (u:User {{id: $user_id}})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                WHERE ({search_filter})
+                RETURN t.name as topic, m.role as role, m.content as content, m.created_at as created_at
+                ORDER BY m.created_at DESC
                 LIMIT $limit
-                """, user_id=user_id, query_embedding=query_embedding, limit=limit)
+                """, user_id=user_id, limit=limit)
                 
                 # Group by topics
                 topics = {}
