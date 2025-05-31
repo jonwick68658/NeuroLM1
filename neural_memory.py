@@ -251,19 +251,17 @@ class NeuralMemorySystem:
                     print("No valid memories found for cross-topic linking")
                     return
                 
-                # Find semantically similar memories with embedding validation
+                # Temporarily disable vector similarity due to Neo4j compatibility issues
+                # Will use topic-based linking instead
                 result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
-                WHERE m.id <> $memory_id 
-                AND m.embedding IS NOT NULL 
-                AND size(m.embedding) = 1536
-                AND size($content_embedding) = 1536
-                WITH m, vector.similarity.cosine(m.embedding, $content_embedding) AS similarity
-                WHERE similarity > 0.75
-                RETURN m.id as related_memory_id, similarity
-                ORDER BY similarity DESC
-                LIMIT 3
-                """, user_id=user_id, memory_id=memory_id, content_embedding=content_embedding)
+                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t1:Topic)-[:CONTAINS_MEMORY]->(m1:Memory {id: $memory_id})
+                MATCH (u)-[:HAS_TOPIC]->(t2:Topic)-[:CONTAINS_MEMORY]->(m2:Memory)
+                WHERE m2.id <> $memory_id 
+                AND t1.id <> t2.id
+                AND m2.created_at > datetime() - duration('P7D')
+                RETURN m2.id as related_memory_id, 0.8 as similarity
+                LIMIT 2
+                """, user_id=user_id, memory_id=memory_id)
                 
                 # Create relationships to related memories
                 links_created = 0
@@ -406,6 +404,83 @@ class NeuralMemorySystem:
         for msg in messages:
             if isinstance(msg, dict) and "role" in msg and "content" in msg:
                 self.store_conversation(user_id, msg["role"], msg["content"])
+
+    def cleanup_invalid_embeddings(self):
+        """Clean up invalid embeddings that cause vector similarity errors"""
+        try:
+            with self.driver.session() as session:
+                # Find memories with invalid embeddings
+                result = session.run("""
+                MATCH (m:Memory)
+                WHERE m.embedding IS NOT NULL 
+                AND (size(m.embedding) <> 1536 OR NOT all(x IN m.embedding WHERE x IS NOT NULL))
+                RETURN m.id as memory_id, size(m.embedding) as embedding_size
+                """)
+                
+                invalid_memories = list(result)
+                print(f"Found {len(invalid_memories)} memories with invalid embeddings")
+                
+                # Fix invalid memory embeddings
+                for record in invalid_memories:
+                    memory_id = record['memory_id']
+                    # Get memory content to regenerate embedding
+                    content_result = session.run("""
+                    MATCH (m:Memory {id: $memory_id})
+                    RETURN m.content as content
+                    """, memory_id=memory_id)
+                    
+                    content_record = content_result.single()
+                    if content_record:
+                        content = content_record['content']
+                        new_embedding = generate_embedding(content)
+                        
+                        if new_embedding and isinstance(new_embedding, list) and len(new_embedding) == 1536:
+                            session.run("""
+                            MATCH (m:Memory {id: $memory_id})
+                            SET m.embedding = $new_embedding
+                            """, memory_id=memory_id, new_embedding=new_embedding)
+                            print(f"Fixed embedding for memory {memory_id}")
+                        else:
+                            # Remove invalid embedding
+                            session.run("""
+                            MATCH (m:Memory {id: $memory_id})
+                            REMOVE m.embedding
+                            """, memory_id=memory_id)
+                            print(f"Removed invalid embedding for memory {memory_id}")
+                
+                # Find and fix invalid topic embeddings
+                topic_result = session.run("""
+                MATCH (t:Topic)
+                WHERE t.embedding IS NOT NULL 
+                AND (size(t.embedding) <> 1536 OR NOT all(x IN t.embedding WHERE x IS NOT NULL))
+                RETURN t.id as topic_id, t.name as topic_name, size(t.embedding) as embedding_size
+                """)
+                
+                invalid_topics = list(topic_result)
+                print(f"Found {len(invalid_topics)} topics with invalid embeddings")
+                
+                for record in invalid_topics:
+                    topic_id = record['topic_id']
+                    topic_name = record['topic_name']
+                    new_embedding = generate_embedding(topic_name)
+                    
+                    if new_embedding and isinstance(new_embedding, list) and len(new_embedding) == 1536:
+                        session.run("""
+                        MATCH (t:Topic {id: $topic_id})
+                        SET t.embedding = $new_embedding
+                        """, topic_id=topic_id, new_embedding=new_embedding)
+                        print(f"Fixed embedding for topic {topic_name}")
+                    else:
+                        session.run("""
+                        MATCH (t:Topic {id: $topic_id})
+                        REMOVE t.embedding
+                        """, topic_id=topic_id)
+                        print(f"Removed invalid embedding for topic {topic_name}")
+                
+                print("Embedding cleanup completed")
+                
+        except Exception as e:
+            print(f"Error during embedding cleanup: {e}")
 
     def close(self):
         """Close database connection"""
