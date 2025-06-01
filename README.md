@@ -10,12 +10,16 @@ An advanced AI chat application featuring a sophisticated neural memory system t
 - **Semantic Retrieval**: Context-aware memory search using authentic OpenAI embeddings
 - **Cross-Topic Linking**: Related memories connected across different topic categories
 - **Topic Extraction**: Powered by Google Gemini 2.0 Flash with GPT-4o Mini fallback
+- **Quality Memory Assessment**: Intelligent evaluation of memory context to trigger strategic questioning
+- **Actionable Preference Focus**: Prioritizes specific, useful user patterns over general conversation
 
 ### AI Integration
 - **OpenRouter Models**: Access to multiple AI models with dynamic selection
 - **Default Model**: GPT-4o Mini for cost-effective conversations
 - **Context Enhancement**: Memory-augmented responses using stored conversation history
 - **Authentic Data Only**: System uses only real conversation data, no synthetic content
+- **Strategic Questioning**: Intelligent prompting to extract actionable user preferences and patterns
+- **Memory Density Assessment**: Evaluates context quality to trigger targeted memory building
 
 ### User Management
 - **Secure Authentication**: Account creation and login with encrypted passwords
@@ -93,7 +97,7 @@ streamlit run app.py --server.port 5000
 ## Neural Memory Features
 
 ### Automatic Topic Extraction
-- Analyzes conversation content using GPT-4o Mini
+- Analyzes conversation content using Google Gemini 2.0 Flash with GPT-4o Mini fallback
 - Extracts 1-3 most relevant topics per message
 - Handles both simple and complex multi-topic conversations
 
@@ -102,10 +106,18 @@ streamlit run app.py --server.port 5000
 - Links individual memories to relevant topics
 - Maintains relationships between users, topics, and memories
 
-### Enhanced Retrieval
+### Enhanced Retrieval with Quality Assessment
 - Searches across all connected topics for relevant context
 - Ranks memories by semantic similarity to current query
+- Evaluates memory density to trigger strategic questioning
 - Provides organized context grouped by topic areas
+- Prioritizes actionable user preferences over general conversation
+
+### Strategic Memory Building
+- Detects sparse memory contexts to trigger targeted questioning
+- Focuses on extracting specific, actionable user preferences
+- Learns concrete patterns in how users like to work and communicate
+- Builds understanding of user rules, constraints, and technology choices
 
 ## Project Structure
 
