@@ -406,9 +406,12 @@ def document_registry():
         st.error("User not authenticated")
         return
     
+    if not memory:
+        st.error("Memory system not available")
+        return
+    
     # Get user documents
-    memory_system = st.session_state.memory_system
-    documents = memory_system.get_user_documents(user_id)
+    documents = memory.get_user_documents(user_id)
     
     if not documents:
         st.info("No documents uploaded yet.")
@@ -433,7 +436,7 @@ def document_registry():
         
         with col4:
             if st.button("Delete", key=f"delete_{doc['id']}"):
-                if memory_system.delete_document(user_id, doc['id']):
+                if memory.delete_document(user_id, doc['id']):
                     st.success(f"Deleted {doc['filename']}")
                     st.rerun()
                 else:
