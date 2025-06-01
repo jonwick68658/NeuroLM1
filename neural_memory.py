@@ -418,29 +418,65 @@ class NeuralMemorySystem:
                 self.store_conversation(user_id, msg["role"], msg["content"])
 
 
-    def delete_memories_containing(self, user_id: str, search_term: str) -> int:
-        """Delete memories containing specific text/keywords"""
+    def store_document(self, user_id: str, filename: str, content: str, file_type: str = "text") -> bool:
+        """Store document as a separate entity from conversation memories"""
         try:
             with self.driver.session() as session:
-                # Find memories containing the search term
+                session.run("""
+                    MERGE (u:User {user_id: $user_id})
+                    CREATE (d:Document {
+                        filename: $filename,
+                        content: $content,
+                        file_type: $file_type,
+                        uploaded_at: datetime(),
+                        document_id: randomUUID()
+                    })
+                    CREATE (u)-[:UPLOADED]->(d)
+                """, user_id=user_id, filename=filename, content=content, file_type=file_type)
+                return True
+        except Exception as e:
+            print(f"Error storing document: {e}")
+            return False
+
+    def get_user_documents(self, user_id: str) -> list:
+        """Get all documents uploaded by user"""
+        try:
+            with self.driver.session() as session:
                 result = session.run("""
-                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
-                    WHERE toLower(m.content) CONTAINS toLower($search_term)
-                    WITH m, t
-                    DETACH DELETE m
-                    WITH t
-                    // Clean up empty topics
-                    MATCH (t) WHERE NOT (t)-[:CONTAINS]->()
-                    DETACH DELETE t
-                    RETURN count(*) as deleted_count
-                """, user_id=user_id, search_term=search_term)
+                    MATCH (u:User {user_id: $user_id})-[:UPLOADED]->(d:Document)
+                    RETURN d.document_id as id, d.filename as filename, 
+                           d.file_type as type, d.uploaded_at as uploaded_at
+                    ORDER BY d.uploaded_at DESC
+                """, user_id=user_id)
+                
+                documents = []
+                for record in result:
+                    documents.append({
+                        'id': record['id'],
+                        'filename': record['filename'],
+                        'type': record['type'],
+                        'uploaded_at': record['uploaded_at']
+                    })
+                return documents
+        except Exception as e:
+            print(f"Error getting documents: {e}")
+            return []
+
+    def delete_document(self, user_id: str, document_id: str) -> bool:
+        """Delete a specific document"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:UPLOADED]->(d:Document {document_id: $document_id})
+                    DETACH DELETE d
+                    RETURN count(d) as deleted_count
+                """, user_id=user_id, document_id=document_id)
                 
                 deleted_count = result.single()["deleted_count"]
-                return deleted_count
-                
+                return deleted_count > 0
         except Exception as e:
-            print(f"Error deleting memories: {e}")
-            return 0
+            print(f"Error deleting document: {e}")
+            return False
 
     def close(self):
         """Close database connection"""

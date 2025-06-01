@@ -397,6 +397,48 @@ def memory_explorer():
     except:
         st.info("No recent activity to display")
 
+def document_registry():
+    """Document registry page for managing uploaded files"""
+    st.title("📄 Document Registry")
+    
+    user_id = get_current_user()
+    if not user_id:
+        st.error("User not authenticated")
+        return
+    
+    # Get user documents
+    memory_system = st.session_state.memory_system
+    documents = memory_system.get_user_documents(user_id)
+    
+    if not documents:
+        st.info("No documents uploaded yet.")
+        return
+    
+    st.write(f"**{len(documents)} documents found**")
+    
+    # Display documents in a table format
+    for doc in documents:
+        col1, col2, col3, col4 = st.columns([3, 1, 2, 1])
+        
+        with col1:
+            st.write(f"**{doc['filename']}**")
+        
+        with col2:
+            st.write(doc['type'])
+        
+        with col3:
+            uploaded_time = doc['uploaded_at']
+            if uploaded_time:
+                st.write(uploaded_time.strftime("%Y-%m-%d %H:%M") if hasattr(uploaded_time, 'strftime') else str(uploaded_time))
+        
+        with col4:
+            if st.button("Delete", key=f"delete_{doc['id']}"):
+                if memory_system.delete_document(user_id, doc['id']):
+                    st.success(f"Deleted {doc['filename']}")
+                    st.rerun()
+                else:
+                    st.error("Failed to delete document")
+
 def main():
     # Dark neural theme
     st.markdown("""
@@ -439,7 +481,7 @@ def main():
         
         page = st.selectbox(
             "Navigate",
-            ["💬 Chat", "📊 Analytics", "🔍 Memory Explorer"]
+            ["💬 Chat", "📊 Analytics", "🔍 Memory Explorer", "📄 Documents"]
         )
         
         if st.button("Logout"):
@@ -454,6 +496,8 @@ def main():
         analytics_dashboard()
     elif page == "🔍 Memory Explorer":
         memory_explorer()
+    elif page == "📄 Documents":
+        document_registry()
 
 if __name__ == "__main__":
     main()
