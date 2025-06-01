@@ -418,6 +418,30 @@ class NeuralMemorySystem:
                 self.store_conversation(user_id, msg["role"], msg["content"])
 
 
+    def delete_memories_containing(self, user_id: str, search_term: str) -> int:
+        """Delete memories containing specific text/keywords"""
+        try:
+            with self.driver.session() as session:
+                # Find memories containing the search term
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    WHERE toLower(m.content) CONTAINS toLower($search_term)
+                    WITH m, t
+                    DETACH DELETE m
+                    WITH t
+                    // Clean up empty topics
+                    MATCH (t) WHERE NOT (t)-[:CONTAINS]->()
+                    DETACH DELETE t
+                    RETURN count(*) as deleted_count
+                """, user_id=user_id, search_term=search_term)
+                
+                deleted_count = result.single()["deleted_count"]
+                return deleted_count
+                
+        except Exception as e:
+            print(f"Error deleting memories: {e}")
+            return 0
+
     def close(self):
         """Close database connection"""
         if self.driver:
