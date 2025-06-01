@@ -1,0 +1,193 @@
+# Streamlit Document Upload Solution
+
+Based on your plan, here's a complete Streamlit implementation for document uploading functionality:
+
+```python
+import streamlit as st
+import os
+import tempfile
+import uuid
+import PyPDF2
+import docx2txt
+import textwrap
+from typing import IO, TextIO, Tuple
+
+# Page configuration
+st.set_page_config(page_title="Document Manager", page_icon="📄")
+st.header("📝 Document Manager")
+
+# File processing functions
+def extract_text_from_pdf(file: IO[bytes]) -> str:
+    """Extract text from PDF file"""
+    pdf_reader = PyPDF2.PdfReader(file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text() or ""
+    return text.strip()
+
+def extract_text_from_docx(file: IO[bytes]) -> str:
+    """Extract text from DOCX file"""
+    return docx2txt.process(file)
+
+def extract_text_from_txt(file: IO[bytes]) -> str:
+    """Extract text from TXT file"""
+    return file.read().decode("utf-8")
+
+def extract_text_from_md(file: IO[bytes]) -> str:
+    """Extract text from Markdown file"""
+    return file.read().decode("utf-8")
+
+def process_file(file: IO[bytes], filename: str) -> Tuple[str, str, str]:
+    """Process files based on extension"""
+    file_ext = os.path.splitext(filename)[1][1].lower()
+    
+    if file_ext == "pdf":
+        content = extract_text_from_pdf(file)
+        return (content, filename, file_ext)
+    elif file_ext == "docx":
+        content = extract_text_from_docx(file)
+        return (content, filename, file_ext)
+    elif file_ext in ["txt", "md"]:
+        content = extract_text_from_txt(file) if file_ext == "txt" else extract_text_from_md(file)
+        return (content, filename, file_ext)
+    else:
+        raise ValueError(f"Unsupported file type: {file_ext}")
+
+# Main upload interface
+try:
+    uploaded_file = st.file_uploader(
+        "Upload a document",
+        type=["txt", "pdf", "docx", "md"],
+        help="Supported formats: .txt, .pdf, .docx, .md"
+    )
+
+    if uploaded_file:
+        # Process file
+        with st.spinner("Processing document..."):
+            # Get document info
+            filename = uploaded_file.name
+            file_size = uploaded_file.size
+            
+            # Check size limit (e.g., 10MB)
+            if file_size > 10 * 1024 * 1024:
+                st.error("File too large. Maximum file size is 10MB.")
+                raise ValueError("File too large")
+
+            try:
+                # Process file content based on type
+                file_content, file_name, file_type = process_file(
+                    uploaded_file, 
+                    filename
+                )
+                
+                # Store document using memory system
+                # (Assuming memory.store_document() is defined elsewhere)
+                success = memory.store_document(
+                    user_id,  # This should be implemented in your memory system
+                    file_content,
+                    file_name,
+                    file_type
+                )
+                
+                if success:
+                    st.success(f"✅ Successfully uploaded '{file_name}'")
+                    st.info(f"Extracted content from {file_type.upper()} document")
+                    
+                    # Display the first few characters of content
+                    preview = textwrap.fill(file_content[:500], width=80)
+                    if preview:
+                        st.subheader("Preview")
+                        st.text_area("First page preview:", preview, height=100)
+                    
+
+            # Display existing documents
+            display_documents("user123")  # This should be implemented in your memory system
+        
+        # Delete functionality (using your existing implementation)
+        your_existing_delete_document_function()
+
+except Exception as e:
+    st.error(f"Error processing file: {str(e)}")
+```
+
+## Implementation Notes
+
+### 1. Key Components
+
+The implementation includes:
+
+1. **File Uploader**: Using `st.file_uploader()` to get user documents
+2. **File Processing**: Support for TXT, PDF, DOCX, and Markdown formats
+3. **Content Extraction**:
+   - PDF: Extract text from each page
+   - DOCX: Used `docx2txt` to convert to text
+   - TXT/MD: Simple read operations
+4. **Integration with Memory System**:
+   - Using a placeholder `memory.store_document()` function
+   - Replace this with your actual memory integration
+5. **Error Handling**:
+   - Size limits
+   - Format mismatches
+   - Processing errors
+
+### 2. Integration Points
+
+You'll need to:
+
+1. **Implement `memory.store_document()`**:
+   ```python
+   def store_document(user_id, content, filename, filetype):
+       # Save to Neo4j database as a separate document node
+       # Structure should include:
+       #   - content (text)
+       #   - filename
+       #   - filetype
+       #   - user_id
+       return True  # Return True on success, False on failure
+   ```
+
+2. **Implement `display_documents()`**:
+   ```python
+   def display_documents(user_id):
+       # Query Neo4j for the user's documents
+       # Display a list of existing documents
+       pass
+   ```
+
+### 3. User Experience Enhancements
+
+For better user experience, consider adding:
+
+1. **File Information**:
+   - Show file name, type, and size before upload
+   - Display processing progress with `st.spinner()`
+
+2. **Preview Functionality**:
+   - Show a truncated text preview
+   - Optional: First page/paragraph preview
+
+3. **Error Handling**:
+   - Better feedback on failed uploads
+   - Clear messages about file type restrictions
+
+### 4. Dependencies
+
+Add these dependencies to your `requirements.txt`:
+
+```
+streamlit
+PyPDF2
+docx2txt
+python-docx
+```
+
+## Conclusion
+
+This implementation follows your plan exactly and provides a clean, user-friendly interface for document uploads. Once connected to your existing memory system, it will:
+
+- Extract text content from various document types
+- Store the information in your Neo4j database
+- Display recent documents in the interface
+- Provide delete functionality for cleanup
+
+The code is modular and can be easily extended to support additional file formats or add further processing capabilities.

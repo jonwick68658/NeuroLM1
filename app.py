@@ -410,6 +410,45 @@ def document_registry():
         st.error("Memory system not available")
         return
     
+    # File upload section
+    uploaded_file = st.file_uploader(
+        "Upload Document",
+        type=['txt', 'pdf', 'docx', 'md'],
+        help="Supported formats: .txt, .pdf, .docx, .md"
+    )
+    
+    if uploaded_file:
+        try:
+            # Get file info
+            filename = uploaded_file.name
+            file_ext = filename.split('.')[-1].lower()
+            
+            # Extract content based on file type
+            if file_ext == 'txt' or file_ext == 'md':
+                content = uploaded_file.read().decode('utf-8')
+            elif file_ext == 'pdf':
+                import PyPDF2
+                pdf_reader = PyPDF2.PdfReader(uploaded_file)
+                content = ""
+                for page in pdf_reader.pages:
+                    content += page.extract_text() or ""
+            elif file_ext == 'docx':
+                import docx2txt
+                content = docx2txt.process(uploaded_file)
+            else:
+                st.error("Unsupported file type")
+                return
+            
+            # Store document
+            if memory.store_document(user_id, filename, content, file_ext):
+                st.success(f"Uploaded {filename}")
+                st.rerun()
+            else:
+                st.error("Failed to upload document")
+                
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
+    
     # Get user documents
     documents = memory.get_user_documents(user_id)
     
