@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Form, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
 from memory_api import *
 from pydantic import BaseModel
 import uvicorn
@@ -12,6 +13,9 @@ from typing import Optional
 
 # Create FastAPI application
 app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
+
+# Add session middleware
+app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 
 # Include memory API routes
 app.include_router(router, prefix="/api")

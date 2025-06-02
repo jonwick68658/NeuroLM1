@@ -707,6 +707,15 @@ wheels = [
 ]
 
 [[package]]
+name = "itsdangerous"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9c/cb/8ac0172223afbccb63986cc25049b154ecfb5e85932587206f42317be31d/itsdangerous-2.2.0.tar.gz", hash = "sha256:e0050c0b7da1eea53ffaf149c0cfbb5c6e2e2b69c4bef22c81fa6eb73e5f6173", size = 54410 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl", hash = "sha256:c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef", size = 16234 },
+]
+
+[[package]]
 name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
@@ -2162,6 +2171,7 @@ dependencies = [
     { name = "docx2txt" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "itsdangerous" },
     { name = "matplotlib" },
     { name = "neo4j" },
     { name = "networkx" },
@@ -2180,6 +2190,7 @@ dependencies = [
     { name = "schedule" },
     { name = "scikit-learn" },
     { name = "sentence-transformers" },
+    { name = "starlette" },
     { name = "streamlit" },
     { name = "uvicorn" },
 ]
@@ -2190,6 +2201,7 @@ requires-dist = [
     { name = "docx2txt", specifier = ">=0.8" },
     { name = "fastapi", specifier = ">=0.115.9" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "neo4j", specifier = ">=5.0.0" },
     { name = "networkx", specifier = ">=3.5" },
@@ -2208,6 +2220,7 @@ requires-dist = [
     { name = "schedule", specifier = ">=1.2.2" },
     { name = "scikit-learn", specifier = ">=1.6.1" },
     { name = "sentence-transformers", specifier = ">=4.1.0" },
+    { name = "starlette", specifier = ">=0.45.3" },
     { name = "streamlit", specifier = ">=1.45.1" },
     { name = "uvicorn", specifier = ">=0.34.3" },
 ]
