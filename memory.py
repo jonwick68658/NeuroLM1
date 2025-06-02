@@ -88,23 +88,10 @@ class MemorySystem:
     def _create_schema(self):
         """Create the database schema if it doesn't exist"""
         with self.driver.session() as session:
-            # Create the Cypher queries for schema creation
-            session.write_transaction(
-                self._cypher_query,
-                """
-                CREATE CONSTRAINT IF NOT EXISTS ON (m:MemoryNode) ASSERT m.id IS UNIQUE
-                CREATE CONSTRAINT IF NOT EXISTS ON (t:Topic) ASSERT t.id IS UNIQUE
-                CREATE CONSTRAINT IF NOT EXISTS ON (c:Connection) ASSERT c.id IS UNIQUE
-                
-                CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON m.similarity_embedding
-                
-                MATCH (m:MemoryNode) WHERE NOT (m)-[:FROM]-(o:Origin)
-                WITH m LIMIT 10
-                CREATE (m)-[:FROM]->(o:Origin {type: 'created', timestamp: datetime()})
-                
-                RETURN "Schema created/verified" AS status
-                """
-            )
+            # Create constraints and indexes
+            session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (m:MemoryNode) REQUIRE m.id IS UNIQUE")
+            session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (t:Topic) REQUIRE t.id IS UNIQUE")
+            session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Connection) REQUIRE c.id IS UNIQUE")
             
     def _initialize_vector_store(self) -> chromadb.Collection:
         """Initialize a vector store using ChromaDB for semantic similarity"""
@@ -140,8 +127,7 @@ class MemorySystem:
         
         # Save to Neo4j
         with self.driver.session() as session:
-            session.write_transaction(
-                self._cypher_query,
+            session.run(
                 """
                 MERGE (m:MemoryNode {id: $id})
                 ON CREATE SET
@@ -447,8 +433,7 @@ class MemorySystem:
     def get_memory_node(self, memory_id: str) -> Optional[MemoryNode]:
         """Retrieve a specific memory node from the database by ID"""
         with self.driver.session() as session:
-            result = session.read_transaction(
-                self._cypher_query,
+            result = session.run(
                 """
                 MATCH (m:MemoryNode {id: $memory_id})
                 RETURN m AS memory_node
@@ -482,8 +467,7 @@ class MemorySystem:
         try:
             # Remove from Neo4j
             with self.driver.session() as session:
-                session.write_transaction(
-                    self._cypher_query,
+                session.run(
                     """
                     MATCH (m:MemoryNode {id: $memory_id})
                     DETACH DELETE m
@@ -505,8 +489,7 @@ class MemorySystem:
     def get_all_memory_nodes(self) -> List[MemoryNode]:
         """Retrieve all memory nodes from the database"""
         with self.driver.session() as session:
-            result = session.read_transaction(
-                self._cypher_query,
+            result = session.run(
                 """
                 MATCH (m:MemoryNode)
                 RETURN m.id AS id
