@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Human-like Memory System</title>
-    <script src="https://unpkg.com/springy@2.8.1/springy.js"></script>
+
     <style>
         :root {
             --primary-color: #4a6fa5;
@@ -337,8 +337,8 @@
             const memoryDetailsContainer = document.getElementById('memoryDetails');
             
             // Memory system state
-            let memoryNodes = [];  // Will hold memory data for visualization
-            let springySimulation = null;
+            let memoryNodes = [];
+            let selectedNode = null;
             
             // Initialize the memory visualization
             initMemoryGraph();
@@ -571,74 +571,61 @@
             addMemoryBtn.addEventListener('click', () => {
                 const content = memoryContent.value.trim();
                 if (content) {
-                    // Add physics-based feedback for button press
-                    this.classList.add('node-animation');
-                    setTimeout(() => this.classList.remove('node-animation'), 2000);
-                    
                     addNewMemory(content)
                         .then(result => {
-                            // Clear input and update UI
                             memoryContent.value = '';
                             alert(`Memory added successfully with ID: ${result.id}`);
-                            // In a full implementation, request visualization update
-                            springySimulation.reload();
+                            loadMemoriesFromAPI(); // Refresh visualization
                         })
                         .catch(error => {
-                            alert('Error: ' + error.message);
+                            alert('Error adding memory: ' + error.message);
                         });
                 }
             });
             
             enhanceBtn.addEventListener('click', () => {
-                // In a full implementation, would require a selected node
-                alert("Need to select a memory to enhance");
+                if (selectedNode) {
+                    enhanceMemory(selectedNode)
+                        .then(() => {
+                            alert(`Enhanced memory: ${selectedNode}`);
+                        })
+                        .catch(error => {
+                            alert('Error enhancing memory: ' + error.message);
+                        });
+                } else {
+                    alert("Please select a memory from the graph first");
+                }
             });
             
             decayBtn.addEventListener('click', () => {
-                // Trigger physics effect
-                memoryGraphContainer.style.animation = 'circularBounce 0.5s ease forwards';
-                setTimeout(() => memoryGraphContainer.style.animation = '', 500);
-                
                 triggerMemoryDecay()
-                    .then(response => {
+                    .then(() => {
                         alert("Memory decay process initiated");
                     })
                     .catch(error => {
-                        alert('Error: ' + error.message);
+                        alert('Error triggering decay: ' + error.message);
                     });
             });
             
             forgetBtn.addEventListener('click', () => {
-                // In a full implementation, would require a selected node
-                alert("Need to select a memory to forget");
+                if (selectedNode) {
+                    forgetMemory(selectedNode)
+                        .then(() => {
+                            alert(`Forgot memory: ${selectedNode}`);
+                            selectedNode = null;
+                            loadMemoriesFromAPI(); // Refresh visualization
+                        })
+                        .catch(error => {
+                            alert('Error forgetting memory: ' + error.message);
+                        });
+                } else {
+                    alert("Please select a memory from the graph first");
+                }
             });
             
-            // Initial example functionality for demonstration purposes
-            window.demonstrateMemory = function() {
-                // Dope-inspired feedback effect
-                const memoryGraph = document.getElementById('memoryGraph');
-                memoryGraph.classList.add('dopamine-pulse');
-                setTimeout(() => memoryGraph.classList.remove('dopamine-pulse'), 800);
-                
-                // Add a new memory for demo purposes
-                addNewMemory("The human brain has approximately 86 billion neurons.")
-                    .then(result => {
-                        // Update graph with new node
-                        springySimulation.nodes.push({
-                            id: result.id,
-                            x: Math.random(),
-                            y: Math.random(),
-                            vx: 0,
-                            vy: 0,
-                            radius: 80,
-                            color: getColorForCategory("general_knowledge"),
-                            connections: []
-                        });
-                        
-                        // Trigger dynamic node creation in visualization
-                        springySimulation.reload();
-                    });
-            };
+            refreshBtn.addEventListener('click', () => {
+                loadMemoriesFromAPI();
+            });
         });
     </script>
 </body>
