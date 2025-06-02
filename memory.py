@@ -119,9 +119,9 @@ class MemorySystem:
         db = chromadb.PersistentClient(path="./chroma_db")
         return db.get_or_create_collection("memory_embeddings")
         
-    def _cypher_query(self, query: str, parameters: Optional[Dict] = None) -> str:
+    def _cypher_query(self, tx, query: str, parameters: Optional[Dict] = None):
         """Helper method for executing Cypher queries"""
-        return query, parameters
+        return tx.run(query, parameters or {})
         
     def add_memory(self, content: str, confidence: float = 0.8) -> str:
         """Add a new memory to the system and return its ID"""
@@ -132,7 +132,11 @@ class MemorySystem:
         embedding = memory_node.get_similarity_embedding()
         
         # Save to vector store
-        self.vector_store.add_items([memory_node.id], embedding)
+        self.vector_store.add(
+            ids=[memory_node.id],
+            embeddings=[embedding],
+            documents=[content]
+        )
         
         # Save to Neo4j
         with self.driver.session() as session:
@@ -164,7 +168,10 @@ class MemorySystem:
     def retrieve_memories(self, query: str, context: str = None, depth: int = 5) -> List[MemoryNode]:
         """Retrieve relevant memories based on query and context"""
         # First level: semantic similarity using vector store
-        results = self.vector_store.query(query, n_results=depth+2, include_embeddings=True)
+        results = self.vector_store.query(
+            query_texts=[query], 
+            n_results=depth+2
+        )
         
         # Convert to memory node objects
         memory_nodes = []
