@@ -18,6 +18,7 @@ memory_system = MemorySystem()
 class MemoryRequest(BaseModel):
     content: str
     confidence: Optional[float] = 0.8
+    user_id: Optional[str] = None
     
 class MemoryResponse(BaseModel):
     id: str

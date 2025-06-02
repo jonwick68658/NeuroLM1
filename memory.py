@@ -127,7 +127,7 @@ class MemorySystem:
         """Helper method for executing Cypher queries"""
         return tx.run(query, parameters or {})
         
-    def add_memory(self, content: str, confidence: float = 0.8) -> str:
+    def add_memory(self, content: str, confidence: float = 0.8, user_id: str = None) -> str:
         """Add a new memory to the system and return its ID"""
         # Create memory node
         memory_node = MemoryNode(content, confidence)
@@ -135,49 +135,91 @@ class MemorySystem:
         # Generate embedding for semantic search
         embedding = self._generate_embedding(content)
         
-        # Save to Neo4j with embedding
+        # Save to Neo4j with embedding and user relationship
         with self.driver.session() as session:
-            session.run(
-                """
-                CREATE (m:MemoryNode {
-                    id: $id,
-                    content: $content,
-                    confidence: $confidence,
-                    category: $category,
-                    timestamp: datetime($timestamp),
-                    embedding: $embedding
-                })
-                """,
-                {
-                    "id": memory_node.id,
-                    "content": memory_node.content,
-                    "confidence": memory_node.confidence,
-                    "category": memory_node.category,
-                    "timestamp": memory_node.timestamp.isoformat(),
-                    "embedding": embedding
-                }
-            )
+            if user_id:
+                # Create memory and link to user
+                session.run(
+                    """
+                    MATCH (u:User {id: $user_id})
+                    CREATE (m:MemoryNode {
+                        id: $id,
+                        content: $content,
+                        confidence: $confidence,
+                        category: $category,
+                        timestamp: datetime($timestamp),
+                        embedding: $embedding
+                    })
+                    CREATE (u)-[:HAS_MEMORY]->(m)
+                    """,
+                    {
+                        "user_id": user_id,
+                        "id": memory_node.id,
+                        "content": memory_node.content,
+                        "confidence": memory_node.confidence,
+                        "category": memory_node.category,
+                        "timestamp": memory_node.timestamp.isoformat(),
+                        "embedding": embedding
+                    }
+                )
+            else:
+                # Create memory without user link (backward compatibility)
+                session.run(
+                    """
+                    CREATE (m:MemoryNode {
+                        id: $id,
+                        content: $content,
+                        confidence: $confidence,
+                        category: $category,
+                        timestamp: datetime($timestamp),
+                        embedding: $embedding
+                    })
+                    """,
+                    {
+                        "id": memory_node.id,
+                        "content": memory_node.content,
+                        "confidence": memory_node.confidence,
+                        "category": memory_node.category,
+                        "timestamp": memory_node.timestamp.isoformat(),
+                        "embedding": embedding
+                    }
+                )
         
         return memory_node.id
         
-    def retrieve_memories(self, query: str, context: str = None, depth: int = 5) -> List[MemoryNode]:
+    def retrieve_memories(self, query: str, context: str = None, depth: int = 5, user_id: str = None) -> List[MemoryNode]:
         """Retrieve relevant memories based on query and context using Neo4j vector search"""
         # Generate embedding for the query
         query_embedding = self._generate_embedding(query)
         
         # Find similar memories using Neo4j vector similarity
         with self.driver.session() as session:
-            result = session.run(
-                """
-                MATCH (m:MemoryNode)
-                WHERE m.embedding IS NOT NULL
-                RETURN m.id AS id, m.embedding AS embedding,
-                       m.content AS content, m.confidence AS confidence
-                ORDER BY m.confidence DESC
-                LIMIT $limit
-                """,
-                {"limit": depth * 2}  # Get more candidates for filtering
-            )
+            if user_id:
+                # Filter memories by user
+                result = session.run(
+                    """
+                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                    WHERE m.embedding IS NOT NULL
+                    RETURN m.id AS id, m.embedding AS embedding,
+                           m.content AS content, m.confidence AS confidence
+                    ORDER BY m.confidence DESC
+                    LIMIT $limit
+                    """,
+                    {"user_id": user_id, "limit": depth * 2}  # Get more candidates for filtering
+                )
+            else:
+                # Get all memories (backward compatibility)
+                result = session.run(
+                    """
+                    MATCH (m:MemoryNode)
+                    WHERE m.embedding IS NOT NULL
+                    RETURN m.id AS id, m.embedding AS embedding,
+                           m.content AS content, m.confidence AS confidence
+                    ORDER BY m.confidence DESC
+                    LIMIT $limit
+                    """,
+                    {"limit": depth * 2}  # Get more candidates for filtering
+                )
             
             # Calculate similarity scores and sort
             candidates = []

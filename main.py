@@ -409,11 +409,14 @@ class ChatResponse(BaseModel):
 
 # Chat endpoint
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat_with_memory(chat_request: ChatMessage):
+async def chat_with_memory(chat_request: ChatMessage, request: Request):
     """
     Chat with LLM using memory system for context
     """
     try:
+        # Extract user_id from session
+        user_id = request.session.get("user_id")
+        
         # Retrieve relevant memories for context
         retrieve_request = RetrieveMemoryRequest(
             query=chat_request.message,
@@ -426,7 +429,8 @@ async def chat_with_memory(chat_request: ChatMessage):
         relevant_memories = memory_system.retrieve_memories(
             query=chat_request.message,
             context="",
-            depth=5
+            depth=5,
+            user_id=user_id
         )
         
         # Debug logging
@@ -450,7 +454,7 @@ Relevant memories:
 Respond naturally to the user's message, incorporating relevant memories when helpful."""
 
         # Store user message in memory
-        user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}")
+        user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}", user_id=user_id)
         
         # Create LLM messages with memory context
         system_message = {
@@ -487,7 +491,7 @@ Use these memories naturally in your responses when relevant. Be conversational,
             response_text += "I'm having trouble generating a full response right now."
         
         # Store assistant response in memory
-        assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}")
+        assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}", user_id=user_id)
         
         return ChatResponse(
             response=response_text,
