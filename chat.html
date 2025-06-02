@@ -184,6 +184,62 @@
             color: white;
             padding: 0.3rem;
         }
+
+        .model-search-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        #modelSearch {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 0.3rem;
+            border-radius: 4px;
+            min-width: 200px;
+        }
+
+        #modelSearch::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .model-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--primary-color);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .model-option {
+            padding: 0.5rem;
+            color: white;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .model-option:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .model-option.selected {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .model-name {
+            font-weight: bold;
+        }
+
+        .model-id {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -195,22 +251,11 @@
         <p>AI chat with integrated memory system</p>
         
         <div style="margin-top: 1rem;">
-            <label for="modelSelector" style="margin-right: 0.5rem; font-size: 0.9rem;">Model:</label>
-            <select id="modelSelector">
-                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
-                <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-                <option value="openai/gpt-4o">GPT-4o</option>
-                <option value="openai/gpt-4-turbo">GPT-4 Turbo</option>
-                <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-                <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
-                <option value="google/gemini-pro">Gemini Pro</option>
-                <option value="meta-llama/llama-3.2-3b-instruct">Llama 3.2 3B</option>
-                <option value="meta-llama/llama-3.2-11b-vision-instruct">Llama 3.2 11B Vision</option>
-                <option value="mistralai/mistral-7b-instruct">Mistral 7B</option>
-                <option value="mistralai/mixtral-8x7b-instruct">Mixtral 8x7B</option>
-                <option value="perplexity/llama-3.1-sonar-small-128k-online">Perplexity Sonar Small</option>
-                <option value="perplexity/llama-3.1-sonar-large-128k-online">Perplexity Sonar Large</option>
-            </select>
+            <label for="modelSearch" style="margin-right: 0.5rem; font-size: 0.9rem;">Model:</label>
+            <div class="model-search-container">
+                <input type="text" id="modelSearch" placeholder="Search models..." readonly>
+                <div class="model-dropdown" id="modelDropdown"></div>
+            </div>
         </div>
     </div>
 
@@ -237,6 +282,91 @@
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
         const memoryIndicator = document.getElementById('memoryIndicator');
+        
+        let selectedModel = 'openai/gpt-4o-mini';
+        let allModels = [];
+        let filteredModels = [];
+
+        // Load all models from OpenRouter
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                allModels = await response.json();
+                filteredModels = [...allModels];
+                
+                // Set initial model display
+                const defaultModel = allModels.find(m => m.id === selectedModel);
+                if (defaultModel) {
+                    document.getElementById('modelSearch').value = defaultModel.name;
+                }
+                
+                updateDropdown();
+            } catch (error) {
+                console.error('Error loading models:', error);
+                // Fallback to basic models
+                allModels = [
+                    {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "description": "Fast and efficient model"},
+                    {"id": "google/gemini-2.0-flash-001", "name": "Gemini 2.0 Flash", "description": "Google's latest model"}
+                ];
+                filteredModels = [...allModels];
+                document.getElementById('modelSearch').value = "GPT-4o Mini";
+            }
+        }
+
+        function updateDropdown() {
+            const dropdown = document.getElementById('modelDropdown');
+            dropdown.innerHTML = '';
+            
+            filteredModels.forEach(model => {
+                const option = document.createElement('div');
+                option.className = 'model-option';
+                option.innerHTML = `
+                    <div class="model-name">${model.name}</div>
+                    <div class="model-id">${model.id}</div>
+                `;
+                option.addEventListener('click', () => selectModel(model));
+                dropdown.appendChild(option);
+            });
+        }
+
+        function selectModel(model) {
+            selectedModel = model.id;
+            document.getElementById('modelSearch').value = model.name;
+            document.getElementById('modelDropdown').style.display = 'none';
+            console.log('Model selected:', model.id);
+        }
+
+        function filterModels(searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filteredModels = allModels.filter(model => 
+                model.name.toLowerCase().includes(term) || 
+                model.id.toLowerCase().includes(term)
+            );
+            updateDropdown();
+        }
+
+        // Model search functionality
+        document.getElementById('modelSearch').addEventListener('click', function() {
+            this.readOnly = false;
+            this.select();
+            document.getElementById('modelDropdown').style.display = 'block';
+        });
+
+        document.getElementById('modelSearch').addEventListener('input', function() {
+            filterModels(this.value);
+            document.getElementById('modelDropdown').style.display = 'block';
+        });
+
+        document.getElementById('modelSearch').addEventListener('blur', function() {
+            // Delay hiding dropdown to allow clicks
+            setTimeout(() => {
+                document.getElementById('modelDropdown').style.display = 'none';
+                this.readOnly = true;
+            }, 200);
+        });
+
+        // Load models on page load
+        document.addEventListener('DOMContentLoaded', loadModels);
 
         // Send message function
         async function sendMessage() {
@@ -253,8 +383,7 @@
             chatInput.value = '';
 
             try {
-                // Get selected model
-                const selectedModel = document.getElementById('modelSelector').value;
+                // Use the selected model from the search dropdown
                 
                 // Call chat API
                 const response = await fetch('/api/chat', {

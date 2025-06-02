@@ -512,6 +512,25 @@ async def clear_memory_database():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error clearing database: {str(e)}")
 
+# Get all available models from OpenRouter
+@app.get("/api/models")
+async def get_available_models():
+    """Get all available models from OpenRouter"""
+    try:
+        from model_service import ModelService
+        model_service = ModelService()
+        models = model_service.get_models()
+        # Sort alphabetically by name
+        models.sort(key=lambda x: x.get('name', '').lower())
+        return models
+    except Exception as e:
+        # Return basic models if OpenRouter is unavailable
+        default_models = [
+            {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "description": "Fast and efficient model for general chat"},
+            {"id": "google/gemini-2.0-flash-001", "name": "Gemini 2.0 Flash", "description": "Google's latest fast model"}
+        ]
+        return default_models
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
