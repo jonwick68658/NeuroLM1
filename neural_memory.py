@@ -124,7 +124,7 @@ class NeuralMemorySystem:
                 # If no embedding available, use name-based matching only
                 if topic_embedding is None:
                     result = session.run("""
-                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)
                     WHERE toLower(t.name) = toLower($topic_name)
                     RETURN t.id as topic_id
                     LIMIT 1
@@ -136,7 +136,7 @@ class NeuralMemorySystem:
                     
                     # Create topic without embedding
                     session.run("""
-                    MATCH (u:User {id: $user_id})
+                    MATCH (u:User {user_id: $user_id})
                     CREATE (t:Topic {
                         id: $topic_id,
                         name: $topic_name,
@@ -151,7 +151,7 @@ class NeuralMemorySystem:
                 
                 # Use embedding-based similarity check
                 result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
+                MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)
                 WHERE t.embedding IS NOT NULL
                 WITH t, 
                      vector.similarity.cosine(t.embedding, $topic_embedding) AS similarity,
@@ -173,7 +173,7 @@ class NeuralMemorySystem:
                 
                 # Create new topic with embedding
                 session.run("""
-                MATCH (u:User {id: $user_id})
+                MATCH (u:User {user_id: $user_id})
                 CREATE (t:Topic {
                     id: $topic_id,
                     name: $topic_name,
@@ -290,7 +290,7 @@ class NeuralMemorySystem:
                 # If no query embedding available, use text-based search
                 if query_embedding is None:
                     result = session.run("""
-                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
                     WHERE m.content CONTAINS $query OR t.name CONTAINS $query
                     RETURN t.name as topic, m.role as role, m.content as content, 1.0 as combined_score
                     ORDER BY m.created_at DESC
@@ -299,7 +299,7 @@ class NeuralMemorySystem:
                 else:
                     # Find relevant topics first using embeddings
                     result = session.run("""
-                    MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)
                     WHERE t.embedding IS NOT NULL
                     WITH t, vector.similarity.cosine(t.embedding, $query_embedding) AS topic_similarity
                     WHERE topic_similarity > 0.6
