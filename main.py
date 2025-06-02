@@ -58,6 +58,13 @@ async def chat_with_memory(chat_request: ChatMessage):
             depth=5
         )
         
+        # Debug logging
+        print(f"DEBUG: Query: {chat_request.message}")
+        print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
+        if relevant_memories:
+            for i, mem in enumerate(relevant_memories[:3]):
+                print(f"DEBUG: Memory {i+1}: {mem.content[:100]}...")
+        
         # Build context from memories
         context = ""
         if relevant_memories:
