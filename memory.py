@@ -79,32 +79,49 @@ class MemorySystem:
     def __init__(self):
         self.driver = GraphDatabase.driver(os.getenv("NEO4J_URI", "bolt://localhost:7687"),
                                            auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD")))
-        self.vector_store = self._initialize_vector_store()
         self.conversation_history = []
         self.past_queries = {}
         self.usefulness_history = []
         self._create_schema()
         
     def _create_schema(self):
-        """Create the database schema if it doesn't exist"""
+        """Create the database schema with vector support"""
         with self.driver.session() as session:
             # Create constraints and indexes
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (m:MemoryNode) REQUIRE m.id IS UNIQUE")
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (t:Topic) REQUIRE t.id IS UNIQUE")
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Connection) REQUIRE c.id IS UNIQUE")
             
-    def _initialize_vector_store(self) -> chromadb.Collection:
-        """Initialize a vector store using ChromaDB for semantic similarity"""
-        # In a production system, we'd either:
-        # 1. Use an in-memory store with persistence
-        # 2. Connect to a dedicated vector database
-        # 3. Or use Neo4j if it has vector support
-        #
-        # For this example, we'll use ChromaDB for demonstration
+            # Create index for vector similarity search
+            session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.category)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.confidence)")
+            
+    def _generate_embedding(self, text: str) -> List[float]:
+        """Generate embeddings using OpenAI API and store in Neo4j"""
+        try:
+            from utils import generate_embedding
+            return generate_embedding(text)
+        except Exception as e:
+            print(f"Warning: Could not generate embedding: {e}")
+            # Return a default zero vector if embedding generation fails
+            return [0.0] * 1536  # OpenAI text-embedding-3-small dimension
+    
+    def _calculate_cosine_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
+        """Calculate cosine similarity between two embeddings"""
+        import math
         
-        import chromadb
-        db = chromadb.PersistentClient(path="./chroma_db")
-        return db.get_or_create_collection("memory_embeddings")
+        # Calculate dot product
+        dot_product = sum(a * b for a, b in zip(embedding1, embedding2))
+        
+        # Calculate magnitudes
+        magnitude1 = math.sqrt(sum(a * a for a in embedding1))
+        magnitude2 = math.sqrt(sum(a * a for a in embedding2))
+        
+        # Avoid division by zero
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+            
+        return dot_product / (magnitude1 * magnitude2)
         
     def _cypher_query(self, tx, query: str, parameters: Optional[Dict] = None):
         """Helper method for executing Cypher queries"""
@@ -116,29 +133,32 @@ class MemorySystem:
         memory_node = MemoryNode(content, confidence)
         
         # Generate embedding for semantic search
-        embedding = memory_node.get_similarity_embedding()
+        embedding = self._generate_embedding(content)
         
-        # Save to vector store
-        self.vector_store.add(
-            ids=[memory_node.id],
-            embeddings=[embedding],
-            documents=[content]
-        )
-        
-        # Save to Neo4j
+        # Save to Neo4j with embedding
         with self.driver.session() as session:
             session.run(
                 """
-                MERGE (m:MemoryNode {id: $id})
-                ON CREATE SET
-                    m.content = $content,
-                    m.confidence = $confidence,
-                    m.category = $category,
-                    m.timestamp = datetime($timestamp)
-                ON MATCH SET
-                    m.confidence = m.confidence + $confidence,
-                    m.last_access = datetime()
-                RETURN m.id AS id
+                CREATE (m:MemoryNode {
+                    id: $id,
+                    content: $content,
+                    confidence: $confidence,
+                    category: $category,
+                    timestamp: datetime($timestamp),
+                    embedding: $embedding
+                })
+                """,
+                {
+                    "id": memory_node.id,
+                    "content": memory_node.content,
+                    "confidence": memory_node.confidence,
+                    "category": memory_node.category,
+                    "timestamp": memory_node.timestamp.isoformat(),
+                    "embedding": embedding
+                }
+            )
+        
+        return memory_node.id
                 """,
                 {
                     "id": memory_node.id,
