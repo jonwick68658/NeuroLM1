@@ -74,11 +74,39 @@ Respond naturally to the user's message, incorporating relevant memories when he
         # Store user message in memory
         user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}")
         
-        # For now, create a simple response (will integrate LLM next)
-        response_text = f"I understand you said: '{chat_request.message}'. "
-        if relevant_memories:
-            response_text += f"This reminds me of {len(relevant_memories)} related memories. "
-        response_text += "I'm processing this with my memory system."
+        # Create LLM messages with memory context
+        system_message = {
+            "role": "system",
+            "content": f"""You are NeuroLM, an AI with access to your memory system. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
+
+Relevant memories from previous conversations:
+{context}
+
+Use these memories naturally in your responses when relevant. Be conversational, warm, and helpful."""
+        }
+        
+        user_message = {
+            "role": "user", 
+            "content": chat_request.message
+        }
+        
+        messages = [system_message, user_message]
+        
+        # Generate LLM response
+        from model_service import ModelService
+        model_service = ModelService()
+        
+        try:
+            response_text = await model_service.chat_completion(
+                messages=messages,
+                model=chat_request.model or "openai/gpt-4o-mini"
+            )
+        except Exception as e:
+            # Fallback response if LLM fails
+            response_text = f"I understand your message about '{chat_request.message}'. "
+            if relevant_memories:
+                response_text += f"This connects to {len(relevant_memories)} memories I have. "
+            response_text += "I'm having trouble generating a full response right now."
         
         # Store assistant response in memory
         assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}")

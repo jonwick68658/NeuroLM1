@@ -179,6 +179,14 @@
         </div>
         <h1>NeuroLM Chat</h1>
         <p>AI chat with integrated memory system</p>
+        
+        <div style="margin-top: 1rem;">
+            <label for="modelSelector" style="margin-right: 0.5rem; font-size: 0.9rem;">Model:</label>
+            <select id="modelSelector" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 0.3rem; border-radius: 4px;">
+                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+                <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+            </select>
+        </div>
     </div>
 
     <div class="chat-container">
@@ -220,13 +228,19 @@
             chatInput.value = '';
 
             try {
+                // Get selected model
+                const selectedModel = document.getElementById('modelSelector').value;
+                
                 // Call chat API
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ message: message })
+                    body: JSON.stringify({ 
+                        message: message,
+                        model: selectedModel
+                    })
                 });
 
                 if (!response.ok) {
