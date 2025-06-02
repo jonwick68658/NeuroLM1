@@ -4,21 +4,23 @@ An advanced AI chat application with intelligent memory processing capabilities,
 
 ## Features
 
-- **Interactive Chat Interface**: Clean, professional web interface for natural AI conversations
+- **Interactive Chat Interface**: Clean, professional web interface with markdown rendering and copy functionality
 - **Advanced Memory System**: Neo4j graph database for persistent memory storage and retrieval
-- **Multiple AI Models**: Choose between GPT-4o Mini and Gemini 2.0 Flash via OpenRouter
+- **Complete Model Selection**: Searchable dropdown with all 323+ OpenRouter AI models
 - **Memory-Informed Responses**: AI responses use relevant memories from previous conversations
+- **Rich Text Formatting**: Full markdown support with syntax highlighting and copy buttons
 - **Real-time Learning**: Every conversation is stored and becomes part of the memory system
 - **Memory Management**: Visual memory graph interface for exploring stored knowledge
 
 ## Technology Stack
 
-- **Frontend**: Custom HTML/CSS with JavaScript for chat interface
+- **Frontend**: Custom HTML/CSS with JavaScript, Marked.js for markdown rendering
 - **Backend**: FastAPI for API endpoints and memory integration
 - **Database**: Neo4j graph database with integrated vector storage
-- **AI Models**: OpenRouter API (GPT-4o Mini, Gemini 2.0 Flash)
+- **AI Models**: OpenRouter API with 323+ models (GPT, Claude, Gemini, Llama, Mistral, etc.)
 - **Embeddings**: OpenAI text-embedding-3-small for semantic similarity
-- **Memory Architecture**: Unified Neo4j system (no ChromaDB dependency)
+- **Memory Architecture**: Unified Neo4j system with user authentication
+- **UI Features**: Multi-line input, searchable model selector, copy functionality
 
 ## Quick Start
 
@@ -44,7 +46,9 @@ An advanced AI chat application with intelligent memory processing capabilities,
 
 ### Chat Interface
 - Start conversations that build persistent memory over time
-- Choose between AI models using the dropdown selector
+- Search and select from 323+ AI models using the autocomplete dropdown
+- Multi-line text input with Shift+Enter support for complex messages
+- Rich markdown formatting in AI responses with copy functionality
 - View memory context information with each response
 
 ### Memory System
