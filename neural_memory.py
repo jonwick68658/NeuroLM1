@@ -694,12 +694,14 @@ class NeuralMemorySystem:
     def parse_command(self, user_id: str, message: str) -> dict:
         """Parse user message for memory commands"""
         message_lower = message.lower().strip()
+        print(f"DEBUG: Parsing message: '{message}' -> '{message_lower}'")
         
         # Slash commands
         if message_lower.startswith('/'):
             parts = message_lower[1:].split(' ', 1)
             command = parts[0]
             args = parts[1] if len(parts) > 1 else ""
+            print(f"DEBUG: Slash command detected - command: '{command}', args: '{args}'")
             
             if command == "delete":
                 return {"type": "delete", "target": args, "requires_confirmation": True}
@@ -707,6 +709,7 @@ class NeuralMemorySystem:
                 return {"type": "search", "query": args}
             elif command == "list":
                 if "topics" in args:
+                    print("DEBUG: Returning list_topics")
                     return {"type": "list_topics"}
                 else:
                     return {"type": "list_memories", "query": args}
