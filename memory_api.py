@@ -51,7 +51,8 @@ async def memorize_content(memory_request: MemoryRequest):
     try:
         memory_id = memory_system.add_memory(
             content=memory_request.content,
-            confidence=memory_request.confidence
+            confidence=memory_request.confidence or 0.8,
+            user_id=memory_request.user_id
         )
         
         memory_node = memory_system.get_memory_node(memory_id)

@@ -127,7 +127,7 @@ class MemorySystem:
         """Helper method for executing Cypher queries"""
         return tx.run(query, parameters or {})
         
-    def add_memory(self, content: str, confidence: float = 0.8, user_id: str = None) -> str:
+    def add_memory(self, content: str, confidence: float = 0.8, user_id: Optional[str] = None) -> str:
         """Add a new memory to the system and return its ID"""
         # Create memory node
         memory_node = MemoryNode(content, confidence)
@@ -187,7 +187,7 @@ class MemorySystem:
         
         return memory_node.id
         
-    def retrieve_memories(self, query: str, context: str = None, depth: int = 5, user_id: str = None) -> List[MemoryNode]:
+    def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None) -> List[MemoryNode]:
         """Retrieve relevant memories based on query and context using Neo4j vector search"""
         # Generate embedding for the query
         query_embedding = self._generate_embedding(query)
