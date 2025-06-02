@@ -78,7 +78,7 @@ class MemorySystem:
     
     def __init__(self):
         self.driver = GraphDatabase.driver(os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-                                           auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD")))
+                                           auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")))
         self.conversation_history = []
         self.past_queries = {}
         self.usefulness_history = []
@@ -88,6 +88,7 @@ class MemorySystem:
         """Create the database schema with vector support"""
         with self.driver.session() as session:
             # Create constraints and indexes
+            session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE")
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (m:MemoryNode) REQUIRE m.id IS UNIQUE")
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (t:Topic) REQUIRE t.id IS UNIQUE")
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Connection) REQUIRE c.id IS UNIQUE")
@@ -95,6 +96,7 @@ class MemorySystem:
             # Create index for vector similarity search
             session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.category)")
             session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.confidence)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (u:User) ON (u.username)")
             
     def _generate_embedding(self, text: str) -> List[float]:
         """Generate embeddings using OpenAI API and store in Neo4j"""
@@ -185,7 +187,47 @@ class MemorySystem:
                     }
                 )
         
+        # Create semantic relationships with existing memories for the same user
+        if user_id:
+            self._create_memory_relationships(memory_node.id, embedding, user_id)
+        
         return memory_node.id
+    
+    def _create_memory_relationships(self, new_memory_id: str, new_embedding: List[float], user_id: str):
+        """Create semantic relationships between the new memory and existing memories"""
+        similarity_threshold = 0.7  # Only create relationships for highly similar memories
+        
+        with self.driver.session() as session:
+            # Find similar memories for the same user
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                WHERE m.id <> $new_memory_id AND m.embedding IS NOT NULL
+                RETURN m.id AS id, m.embedding AS embedding
+                """,
+                {"user_id": user_id, "new_memory_id": new_memory_id}
+            )
+            
+            # Calculate similarities and create relationships
+            for record in result:
+                existing_embedding = record["embedding"]
+                similarity = self._calculate_cosine_similarity(new_embedding, existing_embedding)
+                
+                if similarity >= similarity_threshold:
+                    # Create bidirectional RELATES_TO relationship
+                    session.run(
+                        """
+                        MATCH (m1:MemoryNode {id: $memory1_id})
+                        MATCH (m2:MemoryNode {id: $memory2_id})
+                        MERGE (m1)-[:RELATES_TO {strength: $similarity, created_at: datetime()}]->(m2)
+                        MERGE (m2)-[:RELATES_TO {strength: $similarity, created_at: datetime()}]->(m1)
+                        """,
+                        {
+                            "memory1_id": new_memory_id,
+                            "memory2_id": record["id"],
+                            "similarity": similarity
+                        }
+                    )
         
     def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None) -> List[MemoryNode]:
         """Retrieve relevant memories based on query and context using Neo4j vector search"""
@@ -208,18 +250,8 @@ class MemorySystem:
                     {"user_id": user_id, "limit": depth * 2}  # Get more candidates for filtering
                 )
             else:
-                # Get all memories (backward compatibility)
-                result = session.run(
-                    """
-                    MATCH (m:MemoryNode)
-                    WHERE m.embedding IS NOT NULL
-                    RETURN m.id AS id, m.embedding AS embedding,
-                           m.content AS content, m.confidence AS confidence
-                    ORDER BY m.confidence DESC
-                    LIMIT $limit
-                    """,
-                    {"limit": depth * 2}  # Get more candidates for filtering
-                )
+                # Return empty list if no user_id provided to enforce user isolation
+                return []
             
             # Calculate similarity scores and sort
             candidates = []
