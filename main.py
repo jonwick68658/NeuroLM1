@@ -58,6 +58,23 @@ async def chat_with_memory(chat_request: ChatMessage):
             depth=5
         )
         
+        # Debug Neo4j connection and data
+        try:
+            # Test direct Neo4j query to see what's actually in the database
+            with memory_system.driver.session() as session:
+                result = session.run("MATCH (n:Memory) RETURN count(n) as total_memories")
+                total_count = result.single()["total_memories"]
+                print(f"DEBUG: Total memories in Neo4j: {total_count}")
+                
+                # Get sample of actual memories
+                sample_result = session.run("MATCH (n:Memory) RETURN n.content, n.timestamp LIMIT 5")
+                sample_memories = list(sample_result)
+                print(f"DEBUG: Sample memories from Neo4j:")
+                for i, record in enumerate(sample_memories):
+                    print(f"  {i+1}: {record['n.content'][:100]}...")
+        except Exception as e:
+            print(f"DEBUG: Neo4j connection error: {e}")
+        
         # Debug logging
         print(f"DEBUG: Query: {chat_request.message}")
         print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
