@@ -78,8 +78,8 @@ async def retrieve_memories(retrieve_request: RetrieveMemoryRequest):
     try:
         memories = memory_system.retrieve_memories(
             query=retrieve_request.query,
-            context=retrieve_request.context,
-            depth=retrieve_request.depth
+            context=retrieve_request.context or "",
+            depth=retrieve_request.depth or 5
         )
         
         # Convert to response format
@@ -128,7 +128,7 @@ async def decay_memories(decay_request: MemoryDecayRequest):
     Trigger memory decay process
     """
     try:
-        memory_system.decay_memories(force_decay=decay_request.force_decay)
+        memory_system.decay_memories(force_decay=decay_request.force_decay or False)
         return {
             "success": True,
             "message": "Memory decay process initiated",
