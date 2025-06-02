@@ -458,7 +458,7 @@ class MemorySystem:
                     content=memory_node_data["content"],
                     confidence=memory_node_data["confidence"],
                     category=memory_node_data["category"],
-                    timestamp=datetime.datetime.fromisoformat(memory_node_data["timestamp"]) if memory_node_data["timestamp"] else None
+                    timestamp=memory_node_data["timestamp"] if memory_node_data["timestamp"] else None
                 )
         return None
         
