@@ -261,7 +261,7 @@ class NeuralMemorySystem:
                 
                 # Find semantically similar memories in other topics
                 result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
                 WHERE m.id <> $memory_id AND m.embedding IS NOT NULL
                 WITH m, vector.similarity.cosine(m.embedding, $content_embedding) AS similarity
                 WHERE similarity > 0.75
@@ -342,7 +342,7 @@ class NeuralMemorySystem:
         try:
             with self.driver.session() as session:
                 result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)
+                MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)
                 OPTIONAL MATCH (t)-[:CONTAINS_MEMORY]->(m:Memory)
                 RETURN t.name as topic, t.created_at as created, count(m) as memory_count
                 ORDER BY memory_count DESC, created DESC
@@ -377,7 +377,7 @@ class NeuralMemorySystem:
         try:
             with self.driver.session() as session:
                 result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
                 RETURN m.role as role, m.content as content, m.created_at as timestamp
                 ORDER BY m.created_at DESC
                 LIMIT $limit
@@ -394,7 +394,7 @@ class NeuralMemorySystem:
         try:
             with self.driver.session() as session:
                 result = session.run("""
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
+                MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
                 RETURN count(m) as count
                 """, user_id=user_id)
                 
