@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import datetime
@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-app = FastAPI()
+# Create router for API endpoints
+router = APIRouter()
 
 # Create a global memory system instance
 memory_system = MemorySystem()
@@ -41,7 +42,7 @@ class MemoryOperationResponse(BaseModel):
 class MemoryDecayRequest(BaseModel):
     force_decay: Optional[bool] = False
     
-@app.post("/memorize/", response_model=MemoryResponse)
+@router.post("/memorize/", response_model=MemoryResponse)
 async def memorize_content(memory_request: MemoryRequest):
     """
     Add new content to memory
@@ -67,7 +68,7 @@ async def memorize_content(memory_request: MemoryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
-@app.post("/retrieve/", response_model=List[MemoryResponse])
+@router.post("/retrieve/", response_model=List[MemoryResponse])
 async def retrieve_memories(retrieve_request: RetrieveMemoryRequest):
     """
     Retrieve relevant memories based on query
@@ -95,7 +96,7 @@ async def retrieve_memories(retrieve_request: RetrieveMemoryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
-@app.put("/enhance/{memory_id}")
+@router.put("/enhance/{memory_id}")
 async def enhance_memory(memory_id: str):
     """
     Enhance a memory by reinforcing it
@@ -119,7 +120,7 @@ async def enhance_memory(memory_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
-@app.put("/decay/")
+@router.put("/decay/")
 async def decay_memories(decay_request: MemoryDecayRequest):
     """
     Trigger memory decay process
@@ -137,7 +138,7 @@ async def decay_memories(decay_request: MemoryDecayRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))        
       
-@app.post("/forget/{memory_id}")
+@router.post("/forget/{memory_id}")
 async def forget_memory(memory_id: str):
     """
     Permanently remove a memory from the system
