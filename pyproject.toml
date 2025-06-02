@@ -26,6 +26,8 @@ dependencies = [
     "matplotlib>=3.10.3",
     "chromadb>=1.0.12",
     "sentence-transformers>=4.1.0",
+    "python-multipart>=0.0.20",
+    "httpx>=0.28.1",
 ]
 
 [[tool.uv.index]]
