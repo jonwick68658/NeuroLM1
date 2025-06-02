@@ -219,8 +219,8 @@ class MemorySystem:
                         """
                         MATCH (m1:MemoryNode {id: $memory1_id})
                         MATCH (m2:MemoryNode {id: $memory2_id})
-                        MERGE (m1)-[:RELATES_TO {strength: $similarity, created_at: datetime()}]->(m2)
-                        MERGE (m2)-[:RELATES_TO {strength: $similarity, created_at: datetime()}]->(m1)
+                        MERGE (m1)-[:RELATES_TO {similarity: $similarity, created_at: datetime()}]->(m2)
+                        MERGE (m2)-[:RELATES_TO {similarity: $similarity, created_at: datetime()}]->(m1)
                         """,
                         {
                             "memory1_id": new_memory_id,
