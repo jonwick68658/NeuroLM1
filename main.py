@@ -419,8 +419,10 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
     """
     try:
         # Extract user_id from session
-        user_id = request.session.get("user_id")
-        print(f"DEBUG: user_id from session: {user_id}")
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         # Retrieve relevant memories for context
         retrieve_request = RetrieveMemoryRequest(
