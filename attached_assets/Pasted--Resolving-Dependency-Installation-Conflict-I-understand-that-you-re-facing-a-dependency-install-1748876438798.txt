@@ -1,0 +1,92 @@
+# Resolving Dependency Installation Conflict
+
+I understand that you're facing a dependency installation conflict with the `sentence-transformers` package. This is a common issue when multiple packages require different versions of dependencies. Let's resolve this step by step.
+
+## Step 1: Create a Virtual Environment
+
+First, create a new virtual environment to isolate dependencies:
+
+```bash
+python -m venv memory_system_env
+source memory_system_env/bin/activate  # Linux/Mac
+memory_system_env\Scripts\activate.bat # Windows
+```
+
+## Step 2: Install Required Dependencies
+
+Install all required packages:
+
+```bash
+pip install chromadb fastapi uvicorn networkx matplotlib
+```
+
+## Step 3: Verify Installation
+
+After installation, verify that the packages are correctly installed:
+
+```bash
+pip list | grep -E 'chromadb|fastapi|uvicorn|networkx|matplotlib|sentence-transformers'
+```
+
+## Alternative Solution: If Installation Fails
+
+If the installation still fails due to conflicts with `sentence-transformers`:
+
+1. First, uninstall `sentence-transformers` (it's not critical for the API functionality):
+
+```bash
+pip uninstall sentence-transformers
+```
+
+2. Then install the new packages:
+
+```bash
+pip install chromadb fastapi uvicorn networkx matplotlib
+```
+
+3. If ChromaDB needs it, install `python-dotenv` for .env file handling:
+
+```bash
+pip install python-dotenv
+```
+
+## Step 4: Update Memory System for Production
+
+Since `sentence-transformers` is just needed for development testing, we can leave it out of the production dependencies. The core functionality won't require it.
+
+Here's the final MemorySystem with the required dependencies removed:
+
+```python
+class MemorySystem:
+    """
+    The main memory system that interacts with Neo4j and manages memory operations.
+    """
+    
+    def __init__(self):
+        self.driver = GraphDatabase.driver(os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+                                           auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD")))
+        # Commented out vector store initialization since sentence-transformers is not available
+        # self.vector_store = self._initialize_vector_store()
+        self.conversation_history = []
+        self.past_queries = {}
+        self.usefulness_history = []
+        self._create_schema()
+```
+
+## Step 5: Install Missing Packages
+
+If you haven't already, install the required packages:
+
+```bash
+pip install chromadb fastapi uvicorn networkx matplotlib
+```
+
+## Step 6: Run the API Server
+
+After successful installation, run the API server:
+
+```bash
+uvicorn memory_api:app --reload --port 8000
+```
+
+This should resolve the dependency conflict and allow you to run the memory system. If you continue to face issues, please provide the specific error message, and I'll help you resolve it further.

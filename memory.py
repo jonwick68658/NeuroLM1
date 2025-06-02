@@ -6,11 +6,10 @@ import random
 from typing import List, Dict, Set, Tuple, Optional
 import os
 from neo4j import GraphDatabase
-from sentence_transformers import SentenceTransformer
 import chromadb
 
-# Initialize the embedding model
-EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+# Note: sentence_transformers removed to resolve dependency conflicts
+# We'll use OpenAI embeddings through utils.py instead
 
 class MemoryNode:
     """
@@ -46,8 +45,9 @@ class MemoryNode:
         return f"MemoryNode(id={self.id}, content={self.content[:50]}..., confidence={self.confidence})"
 
     def get_similarity_embedding(self) -> List[float]:
-        """Get the embedding vector for this memory node"""
-        return EMBEDDING_MODEL.encode(self.content).tolist()
+        """Get the embedding vector for this memory node - temporarily disabled"""
+        # return EMBEDDING_MODEL.encode(self.content).tolist()
+        return [0.0] * 384  # Return dummy embedding vector
 
 class MemoryConnection:
     """

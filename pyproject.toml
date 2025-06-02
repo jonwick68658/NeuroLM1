@@ -18,8 +18,14 @@ dependencies = [
     "python-docx>=1.1.2",
     "pandas>=2.2.3",
     "openpyxl>=3.1.5",
-    "sentence-transformers",
     "pyngrok",
+    "pydantic>=2.11.5",
+    "fastapi>=0.115.9",
+    "uvicorn>=0.34.3",
+    "networkx>=3.5",
+    "matplotlib>=3.10.3",
+    "chromadb>=1.0.12",
+    "sentence-transformers>=4.1.0",
 ]
 
 [[tool.uv.index]]
@@ -874,7 +880,6 @@ semantic-kernel = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'
 semantic-router = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 senselab = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 sent2vec = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
-sentence-transformers = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 sequence-model-train = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 serotiny = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
 sevenn = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
