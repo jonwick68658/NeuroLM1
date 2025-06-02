@@ -153,7 +153,7 @@ async def forget_memory(memory_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
-@app.get("/health")
+@router.get("/health")
 async def health_check():
     """
     Health check endpoint

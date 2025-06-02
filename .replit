@@ -22,7 +22,7 @@ args = "install_dependencies"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Main App"
+args = "FastAPI Server"
 
 [[workflows.workflow]]
 name = "install_dependencies"
@@ -33,12 +33,12 @@ task = "shell.exec"
 args = "uv add neo4j openai sentence-transformers PyPDF2 docx2txt python-dotenv pyngrok"
 
 [[workflows.workflow]]
-name = "Main App"
+name = "FastAPI Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run app.py --server.port 5000"
+args = "python main.py"
 waitForPort = 5000
 
 [[ports]]
