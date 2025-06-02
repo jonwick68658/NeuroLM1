@@ -114,6 +114,12 @@
             font-size: 1rem;
             outline: none;
             transition: border-color 0.3s ease;
+            resize: vertical;
+            min-height: 50px;
+            max-height: 200px;
+            font-family: inherit;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .chat-input:focus {
@@ -272,7 +278,7 @@
         </div>
 
         <div class="chat-input-container">
-            <input type="text" id="chatInput" class="chat-input" placeholder="Type your message here..." maxlength="1000">
+            <textarea id="chatInput" class="chat-input" placeholder="Type your message here... (Shift+Enter for new line)" maxlength="1000"></textarea>
             <button id="sendButton" class="send-button">Send</button>
         </div>
     </div>
