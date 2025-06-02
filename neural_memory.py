@@ -478,6 +478,71 @@ class NeuralMemorySystem:
             print(f"Error deleting document: {e}")
             return False
 
+    def search_documents(self, user_id: str, query: str, limit: int = 3) -> str:
+        """Search user's documents for relevant content"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:UPLOADED]->(d:Document)
+                    RETURN d.filename as filename, d.content as content, d.file_type as file_type
+                """, user_id=user_id)
+                
+                documents = []
+                for record in result:
+                    documents.append({
+                        'filename': record['filename'],
+                        'content': record['content'],
+                        'file_type': record['file_type']
+                    })
+                
+                if not documents:
+                    return ""
+                
+                # Search for relevant content using text similarity
+                from utils import generate_embedding
+                query_embedding = generate_embedding(query)
+                
+                relevant_docs = []
+                for doc in documents:
+                    if doc['content']:
+                        # Split document into chunks for better matching
+                        chunks = [doc['content'][i:i+500] for i in range(0, len(doc['content']), 400)]
+                        
+                        for chunk in chunks[:5]:  # Limit chunks per document
+                            chunk_embedding = generate_embedding(chunk)
+                            
+                            # Calculate similarity
+                            import numpy as np
+                            similarity = np.dot(query_embedding, chunk_embedding) / (
+                                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_embedding)
+                            )
+                            
+                            if similarity > 0.7:  # Threshold for relevance
+                                relevant_docs.append({
+                                    'filename': doc['filename'],
+                                    'content': chunk,
+                                    'similarity': similarity,
+                                    'file_type': doc['file_type']
+                                })
+                
+                # Sort by similarity and take top results
+                relevant_docs.sort(key=lambda x: x['similarity'], reverse=True)
+                relevant_docs = relevant_docs[:limit]
+                
+                if not relevant_docs:
+                    return ""
+                
+                # Format results for AI context
+                context = "\n\n=== RELEVANT DOCUMENTS ===\n"
+                for doc in relevant_docs:
+                    context += f"\nFrom {doc['filename']} ({doc['file_type']}):\n{doc['content']}\n"
+                
+                return context
+                
+        except Exception as e:
+            print(f"Error searching documents: {e}")
+            return ""
+
     def close(self):
         """Close database connection"""
         if self.driver:

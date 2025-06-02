@@ -248,26 +248,32 @@ def chat_interface():
         try:
             # Retrieve relevant context
             context = ""
+            document_context = ""
             context_quality = "sparse"
             if memory:
                 context = memory.retrieve_context(current_user, prompt, limit=3)
+                document_context = memory.search_documents(current_user, prompt, limit=3)
+                
+                # Combine contexts
+                full_context = context + document_context
+                
                 # Assess context quality for strategic questioning
-                if context and len(context.strip()) > 50:
-                    context_lines = [line for line in context.split('\n') if line.strip()]
+                if full_context and len(full_context.strip()) > 50:
+                    context_lines = [line for line in full_context.split('\n') if line.strip()]
                     if len(context_lines) >= 2:
                         context_quality = "sufficient"
             
             # Prepare messages for API
             api_messages = []
-            if context and context_quality == "sufficient":
+            if full_context and context_quality == "sufficient":
                 api_messages.append({
                     "role": "system", 
-                    "content": f"You are NeuroLM, an AI assistant with access to a neural memory system that stores and retrieval our conversation history. Your responses are enhanced by relevant memories from our past interactions. Relevant context: {context}"
+                    "content": f"You are NeuroLM, an AI assistant with access to a neural memory system that stores and retrieval our conversation history. Your responses are enhanced by relevant memories from our past interactions. Relevant context: {full_context}"
                 })
-            elif context and context_quality == "sparse":
+            elif full_context and context_quality == "sparse":
                 api_messages.append({
                     "role": "system", 
-                    "content": f"You are NeuroLM, an AI assistant with access to a neural memory system. I have limited relevant memories for this conversation, which presents a good opportunity to learn more about your specific preferences and patterns. Available context: {context}"
+                    "content": f"You are NeuroLM, an AI assistant with access to a neural memory system. I have limited relevant memories for this conversation, which presents a good opportunity to learn more about your specific preferences and patterns. Available context: {full_context}"
                 })
             else:
                 api_messages.append({
