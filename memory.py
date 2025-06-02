@@ -159,53 +159,46 @@ class MemorySystem:
             )
         
         return memory_node.id
-                """,
-                {
-                    "id": memory_node.id,
-                    "content": memory_node.content[:1000],  # Neo4j has a string limit
-                    "confidence": memory_node.confidence,
-                    "category": memory_node.category,
-                    "timestamp": memory_node.timestamp.isoformat()
-                }
-            )
-            
-        return memory_node.id
         
     def retrieve_memories(self, query: str, context: str = None, depth: int = 5) -> List[MemoryNode]:
-        """Retrieve relevant memories based on query and context"""
-        # First level: semantic similarity using vector store
-        results = self.vector_store.query(
-            query_texts=[query], 
-            n_results=depth+2
-        )
+        """Retrieve relevant memories based on query and context using Neo4j vector search"""
+        # Generate embedding for the query
+        query_embedding = self._generate_embedding(query)
         
-        # Convert to memory node objects
-        memory_nodes = []
-        for item in results["ids"][0]:
-            memory_id = item
-            embedding = results["embeddings"][0][item]
-            memory_node = memory_nodes.get_by_id(memory_id)
+        # Find similar memories using Neo4j vector similarity
+        with self.driver.session() as session:
+            result = session.run(
+                """
+                MATCH (m:MemoryNode)
+                WHERE m.embedding IS NOT NULL
+                RETURN m.id AS id, m.embedding AS embedding,
+                       m.content AS content, m.confidence AS confidence
+                ORDER BY m.confidence DESC
+                LIMIT $limit
+                """,
+                {"limit": depth * 2}  # Get more candidates for filtering
+            )
             
-            if not memory_node:
-                # If node isn't in memory cache, fetch from database
-                memory_node = MemoryNode(
-                    content=self._get_memory_content(memory_id),
-                    timestamp=datetime.datetime.now(),
-                    confidence=self._get_memory_confidence(memory_id)
-                )
-                memory_nodes.add(memory_node)
-                
-            memory_node.embedding = embedding
-            memory_nodes.append(memory_node)
+            # Calculate similarity scores and sort
+            candidates = []
+            for record in result:
+                stored_embedding = record["embedding"]
+                if stored_embedding:
+                    similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
+                    candidates.append((record["id"], similarity))
             
-        # Sort by relevance (we need to calculate relevance scores)
-        memory_nodes.sort(key=lambda x: self._calculate_relevance_score(x, query), reverse=True)
-        
-        # Apply contextual filtering if context is provided
-        if context:
-            memory_nodes = self._contextual_filter(context, memory_nodes)
+            # Sort by similarity and get top results
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            top_ids = [candidate[0] for candidate in candidates[:depth]]
             
-        return memory_nodes[:depth]
+            # Retrieve full memory nodes
+            memories = []
+            for memory_id in top_ids:
+                memory_node = self.get_memory_node(memory_id)
+                if memory_node:
+                    memories.append(memory_node)
+                    
+            return memories
         
     def _calculate_relevance_score(self, memory_node: MemoryNode, query: str) -> float:
         """Calculate a relevance score based on semantic similarity"""
@@ -498,8 +491,7 @@ class MemorySystem:
                     }
                 )
                 
-            # Remove from ChromaDB
-            self.vector_store.delete([memory_id])
+            # Neo4j deletion is complete (embedding stored in same node)
                 
             return True
         except Exception as e:
