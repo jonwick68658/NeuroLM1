@@ -543,6 +543,105 @@ class NeuralMemorySystem:
             print(f"Error searching documents: {e}")
             return ""
 
+    def delete_memories_containing(self, user_id: str, search_term: str) -> int:
+        """Delete memories containing specific text/keywords"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    WHERE toLower(m.content) CONTAINS toLower($search_term)
+                    WITH m, t
+                    DETACH DELETE m
+                    WITH t
+                    MATCH (t) WHERE NOT (t)-[:CONTAINS]->()
+                    DETACH DELETE t
+                    RETURN count(*) as deleted_count
+                """, user_id=user_id, search_term=search_term)
+                
+                deleted_count = result.single()["deleted_count"]
+                return deleted_count
+                
+        except Exception as e:
+            print(f"Error deleting memories: {e}")
+            return 0
+
+    def search_memories_by_keyword(self, user_id: str, keyword: str, limit: int = 10) -> list:
+        """Search memories by keyword - faster than semantic search"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    WHERE toLower(m.content) CONTAINS toLower($keyword)
+                    RETURN m.content as content, m.role as role, m.timestamp as timestamp, t.name as topic
+                    ORDER BY m.timestamp DESC
+                    LIMIT $limit
+                """, user_id=user_id, keyword=keyword, limit=limit)
+                
+                memories = []
+                for record in result:
+                    memories.append({
+                        'content': record['content'],
+                        'role': record['role'],
+                        'timestamp': record['timestamp'],
+                        'topic': record['topic']
+                    })
+                return memories
+        except Exception as e:
+            print(f"Error searching memories: {e}")
+            return []
+
+    def delete_memories_by_date_range(self, user_id: str, start_date: str, end_date: str) -> int:
+        """Delete memories within a date range (YYYY-MM-DD format)"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    WHERE date(m.timestamp) >= date($start_date) 
+                    AND date(m.timestamp) <= date($end_date)
+                    WITH m, t
+                    DETACH DELETE m
+                    WITH t
+                    MATCH (t) WHERE NOT (t)-[:CONTAINS]->()
+                    DETACH DELETE t
+                    RETURN count(*) as deleted_count
+                """, user_id=user_id, start_date=start_date, end_date=end_date)
+                
+                deleted_count = result.single()["deleted_count"]
+                return deleted_count
+                
+        except Exception as e:
+            print(f"Error deleting memories by date: {e}")
+            return 0
+
+    def set_user_name(self, user_id: str, name: str) -> bool:
+        """Set or update user's name in a dedicated node"""
+        try:
+            with self.driver.session() as session:
+                session.run("""
+                    MERGE (u:User {user_id: $user_id})
+                    MERGE (u)-[:HAS_NAME]->(n:UserName)
+                    SET n.name = $name, n.updated_at = datetime()
+                """, user_id=user_id, name=name)
+                return True
+        except Exception as e:
+            print(f"Error setting user name: {e}")
+            return False
+
+    def get_user_name(self, user_id: str) -> str:
+        """Get user's stored name"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:HAS_NAME]->(n:UserName)
+                    RETURN n.name as name
+                """, user_id=user_id)
+                
+                record = result.single()
+                return record['name'] if record else None
+        except Exception as e:
+            print(f"Error getting user name: {e}")
+            return None
+
     def close(self):
         """Close database connection"""
         if self.driver:
