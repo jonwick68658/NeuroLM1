@@ -1,26 +1,28 @@
 # NeuroLM
 
-An advanced AI chat application with intelligent memory processing capabilities, featuring a sophisticated Neo4j-based memory system that learns and remembers conversations over time.
+An advanced AI chat application with intelligent memory processing capabilities, featuring a sophisticated Neo4j-based memory system that learns and remembers conversations over time with complete user isolation and semantic relationship building.
 
 ## Features
 
-- **Interactive Chat Interface**: Clean, professional web interface with markdown rendering and copy functionality
-- **Advanced Memory System**: Neo4j graph database for persistent memory storage and retrieval
+- **Interactive Chat Interface**: Clean, professional web interface with markdown rendering and unlimited input capacity
+- **User-Isolated Memory System**: Neo4j graph database with complete user authentication and memory isolation
+- **Semantic Memory Relationships**: Automatic creation of RELATES_TO connections between similar memories
 - **Complete Model Selection**: Searchable dropdown with all 323+ OpenRouter AI models
-- **Memory-Informed Responses**: AI responses use relevant memories from previous conversations
+- **Memory-Informed Responses**: AI responses use relevant memories from previous conversations within user scope
 - **Rich Text Formatting**: Full markdown support with syntax highlighting and copy buttons
-- **Real-time Learning**: Every conversation is stored and becomes part of the memory system
-- **Memory Management**: Visual memory graph interface for exploring stored knowledge
+- **Real-time Learning**: Every conversation builds semantic memory networks and strengthens relationships
+- **User Authentication**: Secure registration and login system with session management
+- **Memory Management**: Visual memory graph interface for exploring stored knowledge networks
 
 ## Technology Stack
 
 - **Frontend**: Custom HTML/CSS with JavaScript, Marked.js for markdown rendering
-- **Backend**: FastAPI for API endpoints and memory integration
-- **Database**: Neo4j graph database with integrated vector storage
+- **Backend**: FastAPI with session middleware for secure user authentication
+- **Database**: Neo4j graph database with vector storage and relationship mapping
 - **AI Models**: OpenRouter API with 323+ models (GPT, Claude, Gemini, Llama, Mistral, etc.)
-- **Embeddings**: OpenAI text-embedding-3-small for semantic similarity
-- **Memory Architecture**: Unified Neo4j system with user authentication
-- **UI Features**: Multi-line input, searchable model selector, copy functionality
+- **Embeddings**: OpenAI text-embedding-3-small for semantic similarity and relationship detection
+- **Memory Architecture**: User-isolated Neo4j system with HAS_MEMORY and RELATES_TO relationships
+- **UI Features**: Unlimited input capacity, searchable model selector, markdown rendering with copy functionality
 
 ## Quick Start
 

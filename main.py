@@ -420,6 +420,7 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
     try:
         # Extract user_id from session
         user_id = request.session.get("user_id")
+        print(f"DEBUG: user_id from session: {user_id}")
         
         # Retrieve relevant memories for context
         retrieve_request = RetrieveMemoryRequest(
