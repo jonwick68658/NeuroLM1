@@ -548,12 +548,12 @@ class NeuralMemorySystem:
         try:
             with self.driver.session() as session:
                 result = session.run("""
-                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
                     WHERE toLower(m.content) CONTAINS toLower($search_term)
                     WITH m, t
                     DETACH DELETE m
                     WITH t
-                    MATCH (t) WHERE NOT (t)-[:CONTAINS]->()
+                    MATCH (t) WHERE NOT (t)-[:CONTAINS_MEMORY]->()
                     DETACH DELETE t
                     RETURN count(*) as deleted_count
                 """, user_id=user_id, search_term=search_term)
@@ -570,10 +570,10 @@ class NeuralMemorySystem:
         try:
             with self.driver.session() as session:
                 result = session.run("""
-                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
                     WHERE toLower(m.content) CONTAINS toLower($keyword)
-                    RETURN m.content as content, m.role as role, m.timestamp as timestamp, t.name as topic
-                    ORDER BY m.timestamp DESC
+                    RETURN m.content as content, m.role as role, m.created_at as timestamp, t.name as topic
+                    ORDER BY m.created_at DESC
                     LIMIT $limit
                 """, user_id=user_id, keyword=keyword, limit=limit)
                 
@@ -647,7 +647,7 @@ class NeuralMemorySystem:
         try:
             with self.driver.session() as session:
                 result = session.run("""
-                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
                     WITH t, count(m) as memory_count
                     RETURN t.name as topic, memory_count
                     ORDER BY memory_count DESC
@@ -670,11 +670,11 @@ class NeuralMemorySystem:
         try:
             with self.driver.session() as session:
                 result = session.run("""
-                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS_MEMORY]->(m:Memory)
                     WHERE toLower(t.name) CONTAINS toLower($topic_keyword) 
                     OR toLower(m.content) CONTAINS toLower($topic_keyword)
-                    RETURN m.content as content, m.role as role, m.timestamp as timestamp, t.name as topic
-                    ORDER BY m.timestamp DESC
+                    RETURN m.content as content, m.role as role, m.created_at as timestamp, t.name as topic
+                    ORDER BY m.created_at DESC
                     LIMIT $limit
                 """, user_id=user_id, topic_keyword=topic_keyword, limit=limit)
                 
