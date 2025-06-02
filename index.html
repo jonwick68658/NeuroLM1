@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Human-like Memory System</title>
-    <script src="https://cdn.jsdelivr.net/npm/springy@2.16.0/dist/springy.min.js"></script>
+    <script src="https://unpkg.com/springy@2.8.1/springy.js"></script>
     <style>
         :root {
             --primary-color: #4a6fa5;
@@ -343,148 +343,99 @@
             // Initialize the memory visualization
             initMemoryGraph();
             
-            // API base URL (adjust if necessary)
-            const apiUrl = 'http://localhost:8000';  // Change to your API address
+            // API base URL
+            const apiUrl = '/api';
             
-            // Function to initialize the spring physics simulation
-            function initSpringy() {
-                // Clear previous simulation
-                if (springySimulation) {
-                    springySimulation.destroy();
-                }
+            // Simple graph visualization without complex physics
+            function initSimpleGraph() {
+                memoryGraphContainer.innerHTML = '';
+                memoryNodes = [];
+                selectedNode = null;
                 
-                // Create a div to hold the sprites
-                const container = springyContainer = document.createElement('div');
-                container.style.position = 'absolute';
-                container.style.top = '0';
-                container.style.left = '0';
-                container.style.width = '100%';
-                container.style.height = '100%';
+                // Create SVG for graph visualization
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', '100%');
+                svg.setAttribute('height', '100%');
+                svg.style.position = 'absolute';
+                svg.style.top = '0';
+                svg.style.left = '0';
+                memoryGraphContainer.appendChild(svg);
                 
-                // Add the container to the graph container
-                memoryGraphContainer.appendChild(container);
-                
-                // Create the simulation with basic physics
-                springySimulation = new springy.Simulation(
-                    container,
-                    {
-                        friction: 0.1,
-                        bouncy: 0.3,
-                        aggresive: 0.02,
-                        zoomfallo: 1.0,
-                        zoomspring: 0.03
-                    }
-                );
-                
-                // Create initial nodes
-                springySimulation.nodes = [];
-                
-                // Store references to the physical bodies
-                const bodies = {};
-                
-                // Define node drag behavior
-                springy.Springs.drag = function(d) {
-                    // Custom drag behavior with physics
-                    if (bodies[d.id]) {
-                        // Apply constraint to keep node in view
-                        const bounds = springy.Springs.getBoundingClientRect(document.getElementById('memoryGraph'));
-                        const nodeRadius = 40;
-                        
-                        // Calculate normalized position (-1 to 1)
-                        const screenX = d.x * 100;
-                        const screenY = d.y * 100;
-                        
-                        // Apply spring force constraint when node gets too close to edge
-                        if (screenX < nodeRadius) {
-                            const offsetX = nodeRadius - screenX;
-                            d.vx += (offsetX * 0.05) * (100 - d.x) * 10;
-                        }
-                        if (screenY < nodeRadius) {
-                            const offsetY = nodeRadius - screenY;
-                            d.vy += (offsetY * 0.05) * (100 - d.y) * 10;
-                        }
-                        if (screenX > (800 - nodeRadius) * 100) {
-                            const offsetX = (screenX - (800 - nodeRadius)) * 100;
-                            d.vx -= (offsetX * 0.05) * (100 - d.x) * 10;
-                        }
-                        if (screenY > (600 - nodeRadius) * 100) {
-                            const offsetY = (screenY - (600 - nodeRadius)) * 100;
-                            d.vy -= (offsetY * 0.05) * (100 - d.y) * 10;
-                        }
-                    }
-                    return d;
-                };
+                return svg;
             }
             
             // Initialize the memory graph
             function initMemoryGraph() {
-                // Clear the graph container
-                memoryGraphContainer.innerHTML = '<div id="springy-simulator"></div>';
+                // Initialize simple graph
+                const svg = initSimpleGraph();
                 
-                // Initialize the spring simulation
-                initSpringy();
-                
-                // Create some default nodes
-                createDefaultMemoryNodes();
-                
-                // Start animation loop
-                requestAnimationFrame(updateMemoryVisualization);
+                // Load actual memories from API
+                loadMemoriesFromAPI();
             }
             
-            // Create sample memory nodes for visualization
-            function createDefaultMemoryNodes() {
-                // Create nodes data
-                const nodeData = [
-                    { id: 'node1', x: 0.2, y: 0.3, category: 'general_knowledge', content: 'The laws of physics are fundamental to understanding our universe.', title: 'Fundamental Laws' },
-                    { id: 'node2', x: 0.5, y: 0.3, category: 'scientific', content: 'Newton\'s second law states that F = ma, where F is force, m is mass, and a is acceleration.', title: 'Newton\'s Law' },
-                    { id: 'node3', x: 0.8, y: 0.3, category: 'scientific', content: 'Einstein\'s theory of relativity revolutionized our understanding of space and time.', title: 'Relativity' },
-                    { id: 'node4', x: 0.3, y: 0.6, category: 'historical', content: 'The Renaissance was a period of great cultural and intellectual revival in Europe.', title: 'Renaissance' },
-                    { id: 'node5', x: 0.7, y: 0.6, category: 'historical', content: 'World War II was a global conflict that lasted from 1939 to 1945.', title: 'World War II' },
-                    { id: 'node6', x: 0.4, y: 0.8, category: 'philosophical', content: 'Existentialism is a philosophical approach that emphasizes individual freedom and responsibility.', title: 'Existentialism' },
-                    { id: 'node7', x: 0.6, y: 0.8, category: 'philosophical', content: 'Plato\'s theory of forms suggests that reality is composed of ideal forms.', title: 'Plato\'s Forms' }
+            // Load memories from API and create visualization
+            function loadMemoriesFromAPI() {
+                fetch(`${apiUrl}/health`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'healthy') {
+                            // API is working, load actual memories
+                            createSimpleMemoryVisualization();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('API not available:', error);
+                        createSimpleMemoryVisualization();
+                    });
+            }
+
+            // Create a simple memory visualization
+            function createSimpleMemoryVisualization() {
+                const svg = memoryGraphContainer.querySelector('svg');
+                
+                // Create a simple network visualization
+                const nodes = [
+                    { id: 'memory1', x: 150, y: 100, category: 'general', content: 'Click "Add Memory" to store your thoughts' },
+                    { id: 'memory2', x: 300, y: 200, category: 'personal', content: 'Search memories using the query box' },
+                    { id: 'memory3', x: 450, y: 150, category: 'knowledge', content: 'Memory graph shows connections between ideas' }
                 ];
                 
-                // Add edges between nodes
-                const edges = [
-                    { source: 'node1', target: 'node2' },
-                    { source: 'node2', target: 'node3' },
-                    { source: 'node3', target: 'node6' },
-                    { source: 'node1', target: 'node4' },
-                    { source: 'node5', target: 'node4' },
-                    { source: 'node4', target: 'node7' }
-                ];
+                // Draw connections
+                nodes.forEach((node, i) => {
+                    if (i < nodes.length - 1) {
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', node.x);
+                        line.setAttribute('y1', node.y);
+                        line.setAttribute('x2', nodes[i + 1].x);
+                        line.setAttribute('y2', nodes[i + 1].y);
+                        line.setAttribute('stroke', '#ddd');
+                        line.setAttribute('stroke-width', '2');
+                        svg.appendChild(line);
+                    }
+                });
                 
-                // Add nodes to springy
-                springySimulation.nodes = nodeData.map(d => ({
-                    id: d.id,
-                    x: d.x,
-                    y: d.y,
-                    vx: 0,
-                    vy: 0,
-                    radius: 80,
-                    color: getColorForCategory(d.category),
-                    connections: []
-                }));
-                
-                // Add edges to springy
-                springySimulation.edges = edges.map(d => ({
-                    a: d.source,
-                    b: d.target
-                }));
-                
-                // Create sprites for nodes
-                springy.Springs.forEachSpring(function(edge) {
-                    const a = springySimulation.node(edge.a);
-                    const b = springySimulation.node(edge.b);
+                // Draw nodes
+                nodes.forEach(node => {
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', node.x);
+                    circle.setAttribute('cy', node.y);
+                    circle.setAttribute('r', '25');
+                    circle.setAttribute('fill', getColorForCategory(node.category));
+                    circle.setAttribute('stroke', '#fff');
+                    circle.setAttribute('stroke-width', '3');
+                    circle.style.cursor = 'pointer';
+                    circle.onclick = () => showMemoryDetails(node.id, node.content);
+                    svg.appendChild(circle);
                     
-                    createSphereSprite(edge.a + '_' + edge.a, a);
-                    createSphereSprite(edge.b + '_' + edge.b, b);
-                    
-                    // Color the edge
-                    edge.b.color = [0.7, 0.7, 0.7, 0.7]; // Gray
-                    
-                    // Add physics connector
-                    springy.Springs.springyConnector(edge, true, 120, 30, 0.001);
+                    // Add text label
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', node.x);
+                    text.setAttribute('y', node.y + 45);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('font-size', '12');
+                    text.setAttribute('fill', '#333');
+                    text.textContent = node.id;
+                    svg.appendChild(text);
                 });
             }
             
@@ -547,11 +498,12 @@
             
             // Retrieve memories
             function retrieveMemories(query) {
-                return fetch(`${apiUrl}/retrieve/?query=${encodeURIComponent(query)}`, {
-                    method: 'GET',
+                return fetch(`${apiUrl}/retrieve/`, {
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ query: query, context: null, depth: 5 })
                 }).then(response => response.json());
             }
             
@@ -577,36 +529,28 @@
             }
             
             // Show memory details
-            function showMemoryDetails(memoryId) {
-                // This would typically fetch details from the API
-                // For demonstration, let's simulate some memory data
-                const memoryData = {
-                    id: memoryId,
-                    content: "This is a demonstration of a memory detail view. In a full implementation, actual data would be fetched from our memory API.",
-                    timestamp: "2023-11-15",
-                    category: "general_knowledge",
-                    confidence: "High"
-                };
+            function showMemoryDetails(memoryId, content = null) {
+                selectedNode = memoryId;
                 
-                memoryDetailsContainer.innerHTML = `
-                    <h3>${memoryData.id}</h3>
-                    <div class="memory-content">${memoryData.content}</div>
-                    <div class="memory-metrics">
-                        <div class="metric-card">
-                            <div class="metric-value">${memoryData.timestamp}</div>
-                            <div class="metric-label">Date</div>
+                if (content) {
+                    // Display provided content
+                    memoryDetailsContainer.innerHTML = `
+                        <h3>Memory: ${memoryId}</h3>
+                        <div class="memory-content">${content}</div>
+                        <div class="memory-metrics">
+                            <div class="metric-card">
+                                <div class="metric-value">Active</div>
+                                <div class="metric-label">Status</div>
+                            </div>
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-value">${memoryData.confidence}</div>
-                            <div class="metric-label">Confidence</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value">${memoryData.category}</div>
-                            <div class="metric-label">Category</div>
-                        </div>
-                    </div>
-                    <button onclick="alert('Memory detail actions would be implemented here')">Learn More</button>
-                `;
+                    `;
+                } else {
+                    memoryDetailsContainer.innerHTML = `
+                        <h3>Memory Selected</h3>
+                        <p>Memory ID: ${memoryId}</p>
+                        <p>Use the buttons above to enhance, decay, or forget this memory.</p>
+                    `;
+                }
             }
             
             // Event handlers
