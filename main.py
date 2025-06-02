@@ -2,8 +2,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from memory_api import *
+from pydantic import BaseModel
 import uvicorn
 import os
+import httpx
+from typing import Optional
 
 # Create FastAPI application
 app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
@@ -11,11 +14,83 @@ app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
 # Include memory API routes
 app.include_router(router, prefix="/api")
 
-# Serve the custom HTML interface
+# Serve the chat interface as the main page
 @app.get("/")
-async def serve_index():
-    """Serve the custom HTML interface"""
+async def serve_chat():
+    """Serve the chat interface"""
+    return FileResponse("chat.html")
+
+# Serve the memory management interface
+@app.get("/memory")
+async def serve_memory():
+    """Serve the memory management interface"""
     return FileResponse("index.html")
+
+# Chat models
+class ChatMessage(BaseModel):
+    message: str
+    model: Optional[str] = "gpt-4o-mini"
+
+class ChatResponse(BaseModel):
+    response: str
+    memory_stored: bool
+    context_used: int
+
+# Chat endpoint
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_with_memory(chat_request: ChatMessage):
+    """
+    Chat with LLM using memory system for context
+    """
+    try:
+        # Retrieve relevant memories for context
+        retrieve_request = RetrieveMemoryRequest(
+            query=chat_request.message,
+            context=None,
+            depth=5
+        )
+        
+        # Get memory system instance
+        memory_system = MemorySystem()
+        relevant_memories = memory_system.retrieve_memories(
+            query=chat_request.message,
+            context="",
+            depth=5
+        )
+        
+        # Build context from memories
+        context = ""
+        if relevant_memories:
+            context = "\n".join([f"Memory: {mem.content}" for mem in relevant_memories[:3]])
+        
+        # Call LLM with context
+        system_prompt = f"""You are NeuroLM, an AI with access to your memory system. 
+        
+Relevant memories:
+{context}
+
+Respond naturally to the user's message, incorporating relevant memories when helpful."""
+
+        # Store user message in memory
+        user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}")
+        
+        # For now, create a simple response (will integrate LLM next)
+        response_text = f"I understand you said: '{chat_request.message}'. "
+        if relevant_memories:
+            response_text += f"This reminds me of {len(relevant_memories)} related memories. "
+        response_text += "I'm processing this with my memory system."
+        
+        # Store assistant response in memory
+        assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}")
+        
+        return ChatResponse(
+            response=response_text,
+            memory_stored=True,
+            context_used=len(relevant_memories) if relevant_memories else 0
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
 
 # Health check endpoint
 @app.get("/health")
