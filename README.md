@@ -17,7 +17,7 @@ An advanced AI chat application with intelligent memory processing capabilities,
 ## Technology Stack
 
 - **Frontend**: Custom HTML/CSS with JavaScript, Marked.js for markdown rendering
-- **Backend**: FastAPI with session middleware for secure user authentication
+- **Backend**: FastAPI with cookie-based authentication for secure user sessions
 - **Database**: Neo4j graph database with vector storage and relationship mapping
 - **AI Models**: OpenRouter API with 323+ models (GPT, Claude, Gemini, Llama, Mistral, etc.)
 - **Embeddings**: OpenAI text-embedding-3-small for semantic similarity and relationship detection
