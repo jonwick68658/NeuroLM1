@@ -642,6 +642,99 @@ class NeuralMemorySystem:
             print(f"Error getting user name: {e}")
             return None
 
+    def get_top_topics(self, user_id: str, limit: int = 5) -> list:
+        """Get most discussed topics by memory count"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    WITH t, count(m) as memory_count
+                    RETURN t.name as topic, memory_count
+                    ORDER BY memory_count DESC
+                    LIMIT $limit
+                """, user_id=user_id, limit=limit)
+                
+                topics = []
+                for record in result:
+                    topics.append({
+                        'topic': record['topic'],
+                        'memory_count': record['memory_count']
+                    })
+                return topics
+        except Exception as e:
+            print(f"Error getting top topics: {e}")
+            return []
+
+    def list_memories_about_topic(self, user_id: str, topic_keyword: str, limit: int = 10) -> list:
+        """List memories about a specific topic or containing keywords"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (u:User {user_id: $user_id})-[:HAS_TOPIC]->(t:Topic)-[:CONTAINS]->(m:Memory)
+                    WHERE toLower(t.name) CONTAINS toLower($topic_keyword) 
+                    OR toLower(m.content) CONTAINS toLower($topic_keyword)
+                    RETURN m.content as content, m.role as role, m.timestamp as timestamp, t.name as topic
+                    ORDER BY m.timestamp DESC
+                    LIMIT $limit
+                """, user_id=user_id, topic_keyword=topic_keyword, limit=limit)
+                
+                memories = []
+                for record in result:
+                    memories.append({
+                        'content': record['content'],
+                        'role': record['role'],
+                        'timestamp': record['timestamp'],
+                        'topic': record['topic']
+                    })
+                return memories
+        except Exception as e:
+            print(f"Error listing memories: {e}")
+            return []
+
+    def parse_command(self, user_id: str, message: str) -> dict:
+        """Parse user message for memory commands"""
+        message_lower = message.lower().strip()
+        
+        # Slash commands
+        if message_lower.startswith('/'):
+            parts = message_lower[1:].split(' ', 1)
+            command = parts[0]
+            args = parts[1] if len(parts) > 1 else ""
+            
+            if command == "delete":
+                return {"type": "delete", "target": args, "requires_confirmation": True}
+            elif command == "search":
+                return {"type": "search", "query": args}
+            elif command == "list":
+                if "topics" in args:
+                    return {"type": "list_topics"}
+                else:
+                    return {"type": "list_memories", "query": args}
+            
+        # Natural language patterns
+        elif any(phrase in message_lower for phrase in ["delete memories about", "delete all memories", "remove memories"]):
+            # Extract topic/keyword after the delete phrase
+            for phrase in ["delete memories about ", "delete all memories about ", "remove memories about "]:
+                if phrase in message_lower:
+                    target = message_lower.split(phrase, 1)[1].strip()
+                    return {"type": "delete", "target": target, "requires_confirmation": True}
+        
+        elif any(phrase in message_lower for phrase in ["search for memories", "find memories", "search memories"]):
+            # Extract search query
+            for phrase in ["search for memories about ", "find memories about ", "search memories for "]:
+                if phrase in message_lower:
+                    query = message_lower.split(phrase, 1)[1].strip()
+                    return {"type": "search", "query": query}
+        
+        elif any(phrase in message_lower for phrase in ["list top topics", "top discussed topics", "most discussed topics"]):
+            return {"type": "list_topics"}
+        
+        elif message_lower.startswith("list ") and ("memories" in message_lower or "about" in message_lower):
+            query = message_lower.replace("list memories about", "").replace("list", "").strip()
+            return {"type": "list_memories", "query": query}
+        
+        return {"type": "none"}
+
     def close(self):
         """Close database connection"""
         if self.driver:

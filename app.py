@@ -237,6 +237,80 @@ def chat_interface():
     
     # Chat input
     if prompt := st.chat_input("Ask me anything..."):
+        # Check for memory commands first
+        if memory:
+            command_result = memory.parse_command(current_user, prompt)
+            
+            if command_result["type"] != "none":
+                # Handle memory command
+                if command_result["type"] == "delete" and command_result["requires_confirmation"]:
+                    st.session_state.messages.append({"role": "user", "content": prompt})
+                    confirmation_msg = f"I found memories about '{command_result['target']}'. Type 'CONFIRM DELETE' to proceed with deletion, or continue the conversation normally."
+                    st.session_state.messages.append({"role": "assistant", "content": confirmation_msg})
+                    st.rerun()
+                    return
+                
+                elif command_result["type"] == "search":
+                    results = memory.search_memories_by_keyword(current_user, command_result["query"])
+                    if results:
+                        response = f"Found {len(results)} memories about '{command_result['query']}':\n\n"
+                        for result in results[:5]:
+                            response += f"• {result['content'][:100]}... (from {result['topic']})\n"
+                    else:
+                        response = f"No memories found containing '{command_result['query']}'"
+                    
+                    st.session_state.messages.append({"role": "user", "content": prompt})
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.rerun()
+                    return
+                
+                elif command_result["type"] == "list_topics":
+                    topics = memory.get_top_topics(current_user)
+                    if topics:
+                        response = "Your most discussed topics:\n\n"
+                        for i, topic in enumerate(topics, 1):
+                            response += f"{i}. {topic['topic']} ({topic['memory_count']} memories)\n"
+                    else:
+                        response = "No topics found in your memory."
+                    
+                    st.session_state.messages.append({"role": "user", "content": prompt})
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.rerun()
+                    return
+                
+                elif command_result["type"] == "list_memories":
+                    results = memory.list_memories_about_topic(current_user, command_result["query"])
+                    if results:
+                        response = f"Memories about '{command_result['query']}':\n\n"
+                        for result in results[:5]:
+                            response += f"• {result['content'][:150]}...\n"
+                    else:
+                        response = f"No memories found about '{command_result['query']}'"
+                    
+                    st.session_state.messages.append({"role": "user", "content": prompt})
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.rerun()
+                    return
+            
+            # Check for deletion confirmation
+            if prompt.strip().upper() == "CONFIRM DELETE":
+                # Get the last assistant message to find what to delete
+                if st.session_state.messages and "Type 'CONFIRM DELETE'" in st.session_state.messages[-1]["content"]:
+                    # Extract target from confirmation message
+                    last_msg = st.session_state.messages[-1]["content"]
+                    target = last_msg.split("'")[1] if "'" in last_msg else ""
+                    
+                    if target:
+                        deleted_count = memory.delete_memories_containing(current_user, target)
+                        response = f"Deleted {deleted_count} memories about '{target}'"
+                    else:
+                        response = "Could not identify what to delete."
+                    
+                    st.session_state.messages.append({"role": "user", "content": prompt})
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.rerun()
+                    return
+        
         # Add user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         
