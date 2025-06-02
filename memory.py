@@ -436,3 +436,80 @@ class MemorySystem:
         # In a complete implementation, this would retrain the embedding model
         # based on which memories were marked as useful
         pass
+        
+    def get_memory_node(self, memory_id: str) -> Optional[MemoryNode]:
+        """Retrieve a specific memory node from the database by ID"""
+        with self.driver.session() as session:
+            result = session.read_transaction(
+                self._cypher_query,
+                """
+                MATCH (m:MemoryNode {id: $memory_id})
+                RETURN m AS memory_node
+                """,
+                {
+                    "memory_id": memory_id
+                }
+            )
+            
+            record = result.single()
+            if record:
+                memory_node_data = {
+                    "id": record["memory_node"].get("id"),
+                    "content": record["memory_node"].get("content"),
+                    "confidence": record["memory_node"].get("confidence", 0.5),
+                    "category": record["memory_node"].get("category"),
+                    "timestamp": record["memory_node"].get("timestamp"),
+                    "connections": record["memory_node"].get("connections", [])
+                }
+                
+                return MemoryNode(
+                    content=memory_node_data["content"],
+                    confidence=memory_node_data["confidence"],
+                    category=memory_node_data["category"],
+                    timestamp=datetime.datetime.fromisoformat(memory_node_data["timestamp"]) if memory_node_data["timestamp"] else None
+                )
+        return None
+        
+    def forget_memory(self, memory_id: str) -> bool:
+        """Permanently remove a memory from both Neo4j and ChromaDB vector store"""
+        try:
+            # Remove from Neo4j
+            with self.driver.session() as session:
+                session.write_transaction(
+                    self._cypher_query,
+                    """
+                    MATCH (m:MemoryNode {id: $memory_id})
+                    DETACH DELETE m
+                    RETURN count(m) AS deleted
+                    """,
+                    {
+                        "memory_id": memory_id
+                    }
+                )
+                
+            # Remove from ChromaDB
+            self.vector_store.delete([memory_id])
+                
+            return True
+        except Exception as e:
+            print(f"Error forgetting memory {memory_id}: {str(e)}")
+            return False
+            
+    def get_all_memory_nodes(self) -> List[MemoryNode]:
+        """Retrieve all memory nodes from the database"""
+        with self.driver.session() as session:
+            result = session.read_transaction(
+                self._cypher_query,
+                """
+                MATCH (m:MemoryNode)
+                RETURN m.id AS id
+                """
+            )
+            
+            all_memory_nodes = []
+            for record in result:
+                memory_node = self.get_memory_node(record["id"])
+                if memory_node:
+                    all_memory_nodes.append(memory_node)
+                    
+            return all_memory_nodes
