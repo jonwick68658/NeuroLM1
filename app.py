@@ -248,32 +248,26 @@ def chat_interface():
         try:
             # Retrieve relevant context
             context = ""
-            document_context = ""
             context_quality = "sparse"
             if memory:
                 context = memory.retrieve_context(current_user, prompt, limit=3)
-                document_context = memory.search_documents(current_user, prompt, limit=3)
-                
-                # Combine contexts
-                full_context = context + document_context
-                
                 # Assess context quality for strategic questioning
-                if full_context and len(full_context.strip()) > 50:
-                    context_lines = [line for line in full_context.split('\n') if line.strip()]
+                if context and len(context.strip()) > 50:
+                    context_lines = [line for line in context.split('\n') if line.strip()]
                     if len(context_lines) >= 2:
                         context_quality = "sufficient"
             
             # Prepare messages for API
             api_messages = []
-            if full_context and context_quality == "sufficient":
+            if context and context_quality == "sufficient":
                 api_messages.append({
                     "role": "system", 
-                    "content": f"You are NeuroLM, an AI assistant with access to a neural memory system that stores and retrieval our conversation history. Your responses are enhanced by relevant memories from our past interactions. Relevant context: {full_context}"
+                    "content": f"You are NeuroLM, an AI assistant with access to a neural memory system that stores and retrieval our conversation history. Your responses are enhanced by relevant memories from our past interactions. Relevant context: {context}"
                 })
-            elif full_context and context_quality == "sparse":
+            elif context and context_quality == "sparse":
                 api_messages.append({
                     "role": "system", 
-                    "content": f"You are NeuroLM, an AI assistant with access to a neural memory system. I have limited relevant memories for this conversation, which presents a good opportunity to learn more about your specific preferences and patterns. Available context: {full_context}"
+                    "content": f"You are NeuroLM, an AI assistant with access to a neural memory system. I have limited relevant memories for this conversation, which presents a good opportunity to learn more about your specific preferences and patterns. Available context: {context}"
                 })
             else:
                 api_messages.append({
@@ -529,7 +523,7 @@ def main():
         
         page = st.selectbox(
             "Navigate",
-            ["💬 Chat", "📊 Analytics", "🔍 Memory Explorer", "📄 Documents"]
+            ["💬 Chat", "📊 Analytics", "🔍 Memory Explorer"]
         )
         
         if st.button("Logout"):
@@ -544,8 +538,6 @@ def main():
         analytics_dashboard()
     elif page == "🔍 Memory Explorer":
         memory_explorer()
-    elif page == "📄 Documents":
-        document_registry()
 
 if __name__ == "__main__":
     main()
