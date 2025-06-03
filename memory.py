@@ -6,7 +6,7 @@ import random
 from typing import List, Dict, Set, Tuple, Optional
 import os
 from neo4j import GraphDatabase
-import chromadb
+
 
 # Note: sentence_transformers removed to resolve dependency conflicts
 # We'll use OpenAI embeddings through utils.py instead
