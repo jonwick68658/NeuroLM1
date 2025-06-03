@@ -339,7 +339,7 @@
             color: rgba(255,255,255,0.7);
         }
 
-        .model-dropdown {
+        .model-dropdown, .file-dropdown {
             position: absolute;
             top: 100%;
             left: 0;
@@ -351,6 +351,11 @@
             overflow-y: auto;
             z-index: 1000;
             display: none;
+        }
+
+        .file-search-container {
+            position: relative;
+            display: inline-block;
         }
 
         .model-option {
@@ -485,6 +490,14 @@
                 <div class="model-dropdown" id="modelDropdown"></div>
             </div>
         </div>
+        
+        <div style="margin-left: 1rem; display: inline-block;">
+            <label for="fileSearch" style="margin-right: 0.3rem; font-size: 0.7rem;">Files:</label>
+            <div class="file-search-container" style="display: inline-block;">
+                <input type="text" id="fileSearch" placeholder="Search files..." readonly style="min-width: 150px; font-size: 0.8rem; padding: 0.2rem;">
+                <div class="file-dropdown" id="fileDropdown"></div>
+            </div>
+        </div>
     </div>
 
     <div class="main-container">
@@ -526,12 +539,16 @@
         const memoryIndicator = document.getElementById('memoryIndicator');
         const newChatBtn = document.getElementById('newChatBtn');
         const conversationsList = document.getElementById('conversationsList');
+        const fileSearch = document.getElementById('fileSearch');
+        const fileDropdown = document.getElementById('fileDropdown');
         
         let selectedModel = 'openai/gpt-4o-mini';
         let allModels = [];
         let filteredModels = [];
         let currentConversationId = null;
         let conversations = [];
+        let userFiles = [];
+        let filteredFiles = [];
 
         // Load all models from OpenRouter
         async function loadModels() {
@@ -890,10 +907,75 @@
         // Event listeners
         newChatBtn.addEventListener('click', startNewChat);
 
+        // File management functions
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/user-files');
+                if (response.ok) {
+                    userFiles = await response.json();
+                    filteredFiles = [...userFiles];
+                    updateFileDropdown();
+                    updateFileSearchDisplay();
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        function updateFileDropdown() {
+            fileDropdown.innerHTML = '';
+            
+            if (filteredFiles.length === 0) {
+                const emptyOption = document.createElement('div');
+                emptyOption.className = 'model-option';
+                emptyOption.innerHTML = '<div style="opacity: 0.7;">No files uploaded</div>';
+                fileDropdown.appendChild(emptyOption);
+                return;
+            }
+            
+            filteredFiles.forEach(file => {
+                const option = document.createElement('div');
+                option.className = 'model-option';
+                const date = new Date(file.uploaded_at).toLocaleDateString();
+                option.innerHTML = `
+                    <div class="model-name">${file.filename}</div>
+                    <div class="model-id">${file.file_type} • ${date}</div>
+                `;
+                option.addEventListener('click', () => selectFile(file));
+                fileDropdown.appendChild(option);
+            });
+        }
+
+        function updateFileSearchDisplay() {
+            if (userFiles.length === 0) {
+                fileSearch.value = 'No files';
+            } else {
+                fileSearch.value = `${userFiles.length} files available`;
+            }
+        }
+
+        function selectFile(file) {
+            chatInput.value = `/view ${file.filename}`;
+            fileDropdown.style.display = 'none';
+            chatInput.focus();
+        }
+
+        // File search event listeners
+        fileSearch.addEventListener('click', () => {
+            fileDropdown.style.display = fileDropdown.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.file-search-container')) {
+                fileDropdown.style.display = 'none';
+            }
+        });
+
         // Initialize app
         async function initializeApp() {
             await loadModels();
             await loadConversations();
+            await loadFiles();
             
             // If no current conversation, start a new one
             if (!currentConversationId) {

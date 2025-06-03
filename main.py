@@ -168,6 +168,120 @@ def get_conversation_messages(conversation_id: str) -> List[Dict]:
         print(f"Error getting messages: {e}")
         return []
 
+# Chat models - define before usage
+class ChatMessage(BaseModel):
+    message: str
+    model: Optional[str] = "gpt-4o-mini"
+    conversation_id: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    response: str
+    memory_stored: bool
+    context_used: int
+    conversation_id: str
+
+# Slash command handler
+async def handle_slash_command(command: str, user_id: str, conversation_id: str) -> ChatResponse:
+    """Handle slash commands for file management"""
+    parts = command.strip().split()
+    cmd = parts[0].lower()
+    
+    try:
+        if cmd == '/files':
+            # List all files
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT filename, file_type, uploaded_at FROM user_files WHERE user_id = %s ORDER BY uploaded_at DESC", (user_id,))
+            files = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            
+            if not files:
+                response = "No files uploaded yet. Use the + button to upload files."
+            else:
+                response = "**Your uploaded files:**\n\n"
+                for filename, file_type, uploaded_at in files:
+                    date = uploaded_at.strftime("%Y-%m-%d %H:%M")
+                    response += f"• `{filename}` ({file_type}) - {date}\n"
+                response += f"\nUse `/view [filename]` to display file content."
+            
+        elif cmd == '/view':
+            if len(parts) < 2:
+                response = "Usage: `/view [filename]`\nExample: `/view main.py`"
+            else:
+                filename = ' '.join(parts[1:])
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT content FROM user_files WHERE user_id = %s AND filename = %s", (user_id, filename))
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if result:
+                    response = f"**File: {filename}**\n\n```\n{result[0]}\n```"
+                else:
+                    response = f"File '{filename}' not found. Use `/files` to see available files."
+        
+        elif cmd == '/delete':
+            if len(parts) < 2:
+                response = "Usage: `/delete [filename]`\nExample: `/delete main.py`"
+            else:
+                filename = ' '.join(parts[1:])
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM user_files WHERE user_id = %s AND filename = %s", (user_id, filename))
+                deleted = cursor.rowcount
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
+                if deleted > 0:
+                    response = f"File '{filename}' deleted successfully."
+                else:
+                    response = f"File '{filename}' not found."
+        
+        elif cmd == '/search':
+            if len(parts) < 2:
+                response = "Usage: `/search [term]`\nExample: `/search main`"
+            else:
+                search_term = ' '.join(parts[1:])
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT filename, file_type, uploaded_at FROM user_files WHERE user_id = %s AND filename ILIKE %s ORDER BY uploaded_at DESC", (user_id, f"%{search_term}%"))
+                files = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                if not files:
+                    response = f"No files found matching '{search_term}'."
+                else:
+                    response = f"**Files matching '{search_term}':**\n\n"
+                    for filename, file_type, uploaded_at in files:
+                        date = uploaded_at.strftime("%Y-%m-%d %H:%M")
+                        response += f"• `{filename}` ({file_type}) - {date}\n"
+        
+        else:
+            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name"
+        
+        # Save command and response to conversation
+        save_conversation_message(conversation_id, 'user', command)
+        save_conversation_message(conversation_id, 'assistant', response)
+        
+        return ChatResponse(
+            response=response,
+            memory_stored=False,
+            context_used=0,
+            conversation_id=conversation_id
+        )
+        
+    except Exception as e:
+        return ChatResponse(
+            response=f"Error processing command: {str(e)}",
+            memory_stored=False,
+            context_used=0,
+            conversation_id=conversation_id
+        )
+
 def hash_password(password: str) -> str:
     """Hash password using SHA256"""
     return hashlib.sha256(password.encode()).hexdigest()
@@ -541,17 +655,7 @@ async def serve_chat(request: Request):
 
 
 
-# Chat models
-class ChatMessage(BaseModel):
-    message: str
-    model: Optional[str] = "gpt-4o-mini"
-    conversation_id: Optional[str] = None
 
-class ChatResponse(BaseModel):
-    response: str
-    memory_stored: bool
-    context_used: int
-    conversation_id: str
 
 # Conversation models
 class ConversationCreate(BaseModel):
@@ -582,6 +686,10 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
+        
+        # Check for slash commands
+        if chat_request.message.startswith('/'):
+            return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
         
         # Retrieve relevant memories for context
         retrieve_request = RetrieveMemoryRequest(
@@ -799,6 +907,52 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         return {"message": f"File {file.filename} uploaded successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Get user files endpoint
+@app.get("/api/user-files")
+async def get_user_files(request: Request, search: str = None):
+    """Get all files for the current user with optional search"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if search:
+            cursor.execute("""
+                SELECT id, filename, file_type, uploaded_at, 
+                       LEFT(content, 100) as content_preview
+                FROM user_files 
+                WHERE user_id = %s AND filename ILIKE %s
+                ORDER BY uploaded_at DESC
+            """, (user_id, f"%{search}%"))
+        else:
+            cursor.execute("""
+                SELECT id, filename, file_type, uploaded_at,
+                       LEFT(content, 100) as content_preview
+                FROM user_files 
+                WHERE user_id = %s
+                ORDER BY uploaded_at DESC
+            """, (user_id,))
+        
+        files = []
+        for row in cursor.fetchall():
+            files.append({
+                'id': row[0],
+                'filename': row[1],
+                'file_type': row[2],
+                'uploaded_at': row[3].isoformat(),
+                'content_preview': row[4] + "..." if len(row[4]) == 100 else row[4]
+            })
+        
+        cursor.close()
+        conn.close()
+        return files
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting files: {str(e)}")
 
 # Get all available models from OpenRouter
 @app.get("/api/models")
