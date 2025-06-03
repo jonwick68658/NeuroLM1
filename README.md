@@ -13,15 +13,17 @@ An advanced AI chat application with intelligent memory processing capabilities,
 - **Real-time Learning**: Every conversation builds semantic memory networks and strengthens relationships
 - **User Authentication**: Secure registration and login system with session management
 - **Memory Management**: Visual memory graph interface for exploring stored knowledge networks
+- **File Upload System**: Direct file upload with paperclip button, PostgreSQL storage, and AI file access integration
 
 ## Technology Stack
 
 - **Frontend**: Custom HTML/CSS with JavaScript, Marked.js for markdown rendering
 - **Backend**: FastAPI with cookie-based authentication for secure user sessions
-- **Database**: Neo4j graph database with vector storage and relationship mapping
+- **Database**: Neo4j graph database with vector storage and relationship mapping + PostgreSQL for file storage
 - **AI Models**: OpenRouter API with 323+ models (GPT, Claude, Gemini, Llama, Mistral, etc.)
 - **Embeddings**: OpenAI text-embedding-3-small for semantic similarity and relationship detection
 - **Memory Architecture**: User-isolated Neo4j system with HAS_MEMORY and RELATES_TO relationships
+- **File System**: PostgreSQL storage with direct AI access for uploaded documents
 - **UI Features**: Unlimited input capacity, searchable model selector, markdown rendering with copy functionality
 
 ## Quick Start
@@ -52,6 +54,7 @@ An advanced AI chat application with intelligent memory processing capabilities,
 - Multi-line text input with Shift+Enter support for complex messages
 - Rich markdown formatting in AI responses with copy functionality
 - View memory context information with each response
+- Upload files using the paperclip button for AI analysis and discussion
 
 ### Memory System
 - Automatically stores all conversations in Neo4j
@@ -62,6 +65,7 @@ An advanced AI chat application with intelligent memory processing capabilities,
 ## API Endpoints
 
 - `POST /api/chat` - Send messages and receive AI responses
+- `POST /api/upload-file` - Upload files for AI analysis and storage
 - `POST /api/memorize/` - Store new memories
 - `POST /api/retrieve/` - Retrieve relevant memories
 - `PUT /api/enhance/{memory_id}` - Enhance memory importance
