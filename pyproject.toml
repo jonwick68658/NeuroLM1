@@ -16,8 +16,4 @@ dependencies = [
     "itsdangerous>=2.2.0",
     "starlette>=0.45.3",
     "psycopg2-binary>=2.9.10",
-    "sentence-transformers>=4.1.0",
-    "pypdf2>=3.0.1",
-    "docx2txt>=0.9",
-    "pyngrok>=7.2.9",
 ]

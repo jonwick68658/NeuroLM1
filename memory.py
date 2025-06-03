@@ -77,8 +77,10 @@ class MemorySystem:
     """
     
     def __init__(self):
-        self.driver = GraphDatabase.driver(os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-                                           auth=(os.getenv("NEO4J_USERNAME"), os.getenv("NEO4J_PASSWORD")))
+        neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
+        neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
+        self.driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_username, neo4j_password))
         self.conversation_history = []
         self.past_queries = {}
         self.usefulness_history = []
