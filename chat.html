@@ -651,7 +651,7 @@
         let conversations = [];
         let userFiles = [];
         let filteredFiles = [];
-        let sidebarOpen = window.innerWidth > 768; // Default open on desktop
+        let sidebarOpen = false; // Default closed on all devices
 
         // Load all models from OpenRouter
         async function loadModels() {
