@@ -449,6 +449,63 @@
             display: inline-block;
         }
 
+        .slash-suggestions {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin-bottom: 4px;
+        }
+
+        .slash-suggestions.active {
+            display: block;
+        }
+
+        .slash-command-item {
+            padding: 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.2s;
+        }
+
+        .slash-command-item:last-child {
+            border-bottom: none;
+        }
+
+        .slash-command-item:hover,
+        .slash-command-item.highlighted {
+            background: var(--light-bg);
+        }
+
+        .slash-command-name {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .slash-command-desc {
+            font-size: 0.85rem;
+            color: var(--dark-text);
+            margin-bottom: 0.25rem;
+        }
+
+        .slash-command-usage {
+            font-size: 0.8rem;
+            color: #666;
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+        }
+
         .model-option {
             padding: 0.5rem;
             color: white;
@@ -621,7 +678,10 @@
         </div>
 
         <div class="chat-input-container">
-            <textarea id="chatInput" class="chat-input" placeholder="Type your message here... (Shift+Enter for new line)"></textarea>
+            <div style="position: relative; flex: 1;">
+                <textarea id="chatInput" class="chat-input" placeholder="Type your message here... (Shift+Enter for new line)"></textarea>
+                <div class="slash-suggestions" id="slashSuggestions"></div>
+            </div>
             <input type="file" id="fileInput" style="display: none;" accept=".txt,.py,.js,.html,.css,.md,.json,.xml,.csv">
             <button id="uploadButton" class="upload-button" title="Upload file">+</button>
             <button id="sendButton" class="send-button">Send</button>
@@ -643,6 +703,7 @@
         const sidebar = document.getElementById('sidebar');
         const sidebarOverlay = document.getElementById('sidebarOverlay');
         const chatContainer = document.querySelector('.chat-container');
+        const slashSuggestions = document.getElementById('slashSuggestions');
         
         let selectedModel = 'openai/gpt-4o-mini';
         let allModels = [];
@@ -652,6 +713,31 @@
         let userFiles = [];
         let filteredFiles = [];
         let sidebarOpen = false; // Default closed on all devices
+        let highlightedSuggestion = -1;
+        
+        // Slash command definitions
+        const slashCommands = [
+            {
+                cmd: '/files',
+                desc: 'List all uploaded files',
+                usage: '/files'
+            },
+            {
+                cmd: '/view',
+                desc: 'Display file content',
+                usage: '/view filename.txt'
+            },
+            {
+                cmd: '/delete',
+                desc: 'Delete a file',
+                usage: '/delete filename.txt'
+            },
+            {
+                cmd: '/search',
+                desc: 'Search files by name',
+                usage: '/search term'
+            }
+        ];
 
         // Load all models from OpenRouter
         async function loadModels() {
@@ -1100,6 +1186,83 @@
             updateSidebarState();
         });
 
+        // Slash command suggestion functions
+        function showSlashSuggestions(inputText) {
+            const query = inputText.slice(1).toLowerCase(); // Remove the '/' and lowercase
+            const filteredCommands = slashCommands.filter(cmd => 
+                cmd.cmd.slice(1).toLowerCase().startsWith(query)
+            );
+            
+            if (filteredCommands.length === 0) {
+                hideSlashSuggestions();
+                return;
+            }
+            
+            slashSuggestions.innerHTML = '';
+            filteredCommands.forEach((command, index) => {
+                const item = document.createElement('div');
+                item.className = 'slash-command-item';
+                item.innerHTML = `
+                    <div class="slash-command-name">${command.cmd}</div>
+                    <div class="slash-command-desc">${command.desc}</div>
+                    <div class="slash-command-usage">${command.usage}</div>
+                `;
+                
+                item.addEventListener('click', () => selectSlashCommand(command));
+                slashSuggestions.appendChild(item);
+            });
+            
+            slashSuggestions.classList.add('active');
+            highlightedSuggestion = -1;
+        }
+        
+        function hideSlashSuggestions() {
+            slashSuggestions.classList.remove('active');
+            highlightedSuggestion = -1;
+        }
+        
+        function selectSlashCommand(command) {
+            chatInput.value = command.usage;
+            hideSlashSuggestions();
+            chatInput.focus();
+            // Position cursor at end if it's a template command
+            if (command.usage.includes(' ')) {
+                const cursorPos = command.usage.length;
+                chatInput.setSelectionRange(cursorPos, cursorPos);
+            }
+        }
+        
+        function navigateSuggestions(direction) {
+            const items = slashSuggestions.querySelectorAll('.slash-command-item');
+            if (items.length === 0) return;
+            
+            // Remove previous highlight
+            if (highlightedSuggestion >= 0 && highlightedSuggestion < items.length) {
+                items[highlightedSuggestion].classList.remove('highlighted');
+            }
+            
+            // Update highlight index
+            if (direction === 'down') {
+                highlightedSuggestion = (highlightedSuggestion + 1) % items.length;
+            } else {
+                highlightedSuggestion = highlightedSuggestion <= 0 ? items.length - 1 : highlightedSuggestion - 1;
+            }
+            
+            // Add new highlight
+            items[highlightedSuggestion].classList.add('highlighted');
+        }
+        
+        function selectHighlightedSuggestion() {
+            const items = slashSuggestions.querySelectorAll('.slash-command-item');
+            if (highlightedSuggestion >= 0 && highlightedSuggestion < items.length) {
+                const commandName = items[highlightedSuggestion].querySelector('.slash-command-name').textContent;
+                const command = slashCommands.find(cmd => cmd.cmd === commandName);
+                if (command) {
+                    selectSlashCommand(command);
+                }
+            }
+        }
+
         // File search event listeners
         fileSearch.addEventListener('click', () => {
             fileDropdown.style.display = fileDropdown.style.display === 'block' ? 'none' : 'block';
@@ -1108,6 +1271,9 @@
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.file-search-container')) {
                 fileDropdown.style.display = 'none';
+            }
+            if (!e.target.closest('.chat-input-container')) {
+                hideSlashSuggestions();
             }
         });
 
