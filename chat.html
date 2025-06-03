@@ -153,13 +153,18 @@
         }
 
         @media (min-width: 769px) {
+            .sidebar {
+                position: fixed;
+                top: 40px;
+                left: 0;
+                height: calc(100vh - 40px);
+                z-index: 999;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            }
+            
             .chat-container {
                 margin-left: 0;
-                transition: margin-left 0.3s ease, width 0.3s ease;
-            }
-
-            .chat-container.sidebar-open {
-                margin-left: 300px;
+                width: 100%;
             }
         }
 
@@ -1067,41 +1072,26 @@
         function updateSidebarState() {
             const isMobile = window.innerWidth <= 768;
             
-            if (isMobile) {
-                // Mobile behavior - use transform and overlay
-                if (sidebarOpen) {
-                    sidebar.classList.add('open');
-                    sidebar.classList.remove('collapsed');
-                    sidebarOverlay.classList.add('active');
-                } else {
-                    sidebar.classList.remove('open');
-                    sidebar.classList.add('collapsed');
-                    sidebarOverlay.classList.remove('active');
-                }
-                // Reset desktop styles on mobile
-                chatContainer.style.marginLeft = '0';
+            // Unified overlay behavior for all screen sizes
+            if (sidebarOpen) {
+                sidebar.classList.add('open');
+                sidebar.classList.remove('collapsed');
+                sidebarOverlay.classList.add('active');
             } else {
-                // Desktop behavior - use direct style manipulation
-                if (sidebarOpen) {
-                    sidebar.classList.remove('collapsed');
-                    chatContainer.style.marginLeft = '300px';
-                } else {
-                    sidebar.classList.add('collapsed');
-                    chatContainer.style.marginLeft = '0';
-                }
-                // Remove mobile classes on desktop
                 sidebar.classList.remove('open');
+                sidebar.classList.add('collapsed');
                 sidebarOverlay.classList.remove('active');
             }
+            
+            // Chat container always stays at full width
+            chatContainer.style.marginLeft = '0';
         }
 
         // Event listeners for sidebar
         sidebarToggle.addEventListener('click', toggleSidebar);
         sidebarOverlay.addEventListener('click', () => {
-            if (window.innerWidth <= 768) {
-                sidebarOpen = false;
-                updateSidebarState();
-            }
+            sidebarOpen = false;
+            updateSidebarState();
         });
 
         // Handle window resize
