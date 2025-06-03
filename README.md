@@ -44,7 +44,6 @@ An advanced AI chat application with intelligent memory processing capabilities,
 
 3. **Access the Interface**:
    - Chat Interface: `http://localhost:5000`
-   - Memory Management: `http://localhost:5000/memory`
 
 ## Usage
 

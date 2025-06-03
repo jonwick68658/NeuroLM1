@@ -425,11 +425,7 @@ async def serve_chat(request: Request):
     
     return FileResponse("chat.html")
 
-# Serve the memory management interface
-@app.get("/memory")
-async def serve_memory():
-    """Serve the memory management interface"""
-    return FileResponse("index.html")
+
 
 # Chat models
 class ChatMessage(BaseModel):
