@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Form, Request
+from fastapi import FastAPI, HTTPException, Form, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -9,6 +9,7 @@ import os
 import httpx
 import hashlib
 import uuid
+import psycopg2
 from typing import Optional
 
 # Create FastAPI application
@@ -23,6 +24,35 @@ app.include_router(router, prefix="/api")
 # Global session storage (in production, use Redis or database)
 user_sessions = {}
 memory_system = MemorySystem()
+
+# Database connection for file storage
+def get_db_connection():
+    """Get PostgreSQL database connection"""
+    return psycopg2.connect(os.getenv("DATABASE_URL"))
+
+def init_file_storage():
+    """Initialize file storage table"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_files (
+                id SERIAL PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                filename VARCHAR(255) NOT NULL,
+                content TEXT NOT NULL,
+                file_type VARCHAR(50),
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error initializing file storage: {e}")
+
+# Initialize file storage on startup
+init_file_storage()
 
 def hash_password(password: str) -> str:
     """Hash password using SHA256"""
@@ -452,6 +482,29 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if relevant_memories:
             context = "\n".join([f"Memory: {mem.content}" for mem in relevant_memories[:3]])
         
+        # Check if user is asking about files and add file content to context
+        file_query_keywords = ["file", "main.py", "analyze", "code", "script", "upload"]
+        is_file_query = any(keyword in chat_request.message.lower() for keyword in file_query_keywords)
+        
+        if is_file_query:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT filename, content FROM user_files WHERE user_id = %s ORDER BY uploaded_at DESC LIMIT 5",
+                    (user_id,)
+                )
+                user_files = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                if user_files:
+                    context += "\n\nAvailable files:\n"
+                    for filename, content in user_files:
+                        context += f"\n--- {filename} ---\n{content}\n"
+            except Exception as e:
+                print(f"Error fetching user files: {e}")
+        
         # Call LLM with context
         system_prompt = f"""You are NeuroLM, an AI with access to your memory system. 
         
@@ -522,6 +575,36 @@ async def clear_memory_database():
         return {"status": "success", "message": "All memory data cleared from database"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error clearing database: {str(e)}")
+
+# File upload endpoint
+@app.post("/api/upload-file")
+async def upload_file(request: Request, file: UploadFile = File(...)):
+    """Upload and store file content in PostgreSQL"""
+    try:
+        # Get user from session
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        # Read file content
+        content = await file.read()
+        file_content = content.decode('utf-8')
+        
+        # Store in database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO user_files (user_id, filename, content, file_type) VALUES (%s, %s, %s, %s)",
+            (user_id, file.filename, file_content, file.content_type)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {"message": f"File {file.filename} uploaded successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Get all available models from OpenRouter
 @app.get("/api/models")

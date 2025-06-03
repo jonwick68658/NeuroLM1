@@ -30,6 +30,7 @@ dependencies = [
     "httpx>=0.28.1",
     "itsdangerous>=2.2.0",
     "starlette>=0.45.3",
+    "psycopg2-binary>=2.9.10",
 ]
 
 [[tool.uv.index]]

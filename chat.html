@@ -131,6 +131,23 @@
             border-color: var(--primary-color);
         }
 
+        .upload-button {
+            background: var(--secondary-color);
+            color: var(--light-text);
+            border: none;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 50px;
+        }
+
+        .upload-button:hover {
+            background: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
         .send-button {
             background: var(--primary-color);
             color: var(--light-text);
@@ -379,6 +396,8 @@
 
         <div class="chat-input-container">
             <textarea id="chatInput" class="chat-input" placeholder="Type your message here... (Shift+Enter for new line)"></textarea>
+            <input type="file" id="fileInput" style="display: none;" accept=".txt,.py,.js,.html,.css,.md,.json,.xml,.csv">
+            <button id="uploadButton" class="upload-button" title="Upload file">📎</button>
             <button id="sendButton" class="send-button">Send</button>
         </div>
     </div>
@@ -387,6 +406,8 @@
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
+        const uploadButton = document.getElementById('uploadButton');
+        const fileInput = document.getElementById('fileInput');
         const memoryIndicator = document.getElementById('memoryIndicator');
         
         let selectedModel = 'openai/gpt-4o-mini';
