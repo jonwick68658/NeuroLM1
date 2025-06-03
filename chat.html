@@ -1068,6 +1068,7 @@
             const isMobile = window.innerWidth <= 768;
             
             if (isMobile) {
+                // Mobile behavior - use transform and overlay
                 if (sidebarOpen) {
                     sidebar.classList.add('open');
                     sidebar.classList.remove('collapsed');
@@ -1077,14 +1078,19 @@
                     sidebar.classList.add('collapsed');
                     sidebarOverlay.classList.remove('active');
                 }
+                // Reset desktop styles on mobile
+                chatContainer.style.marginLeft = '0';
             } else {
+                // Desktop behavior - use direct style manipulation
                 if (sidebarOpen) {
                     sidebar.classList.remove('collapsed');
-                    chatContainer.classList.add('sidebar-open');
+                    chatContainer.style.marginLeft = '300px';
                 } else {
                     sidebar.classList.add('collapsed');
-                    chatContainer.classList.remove('sidebar-open');
+                    chatContainer.style.marginLeft = '0';
                 }
+                // Remove mobile classes on desktop
+                sidebar.classList.remove('open');
                 sidebarOverlay.classList.remove('active');
             }
         }
