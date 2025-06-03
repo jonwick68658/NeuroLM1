@@ -237,28 +237,43 @@ class MemorySystem:
         # Find similar memories using Neo4j vector similarity
         with self.driver.session() as session:
             if user_id:
-                # Filter memories by user
+                # Get ALL user memories for similarity calculation
                 result = session.run(
                     """
                     MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
                     WHERE m.embedding IS NOT NULL
                     RETURN m.id AS id, m.embedding AS embedding,
-                           m.content AS content, m.confidence AS confidence
-                    ORDER BY m.confidence DESC
-                    LIMIT $limit
+                           m.content AS content, m.confidence AS confidence,
+                           m.timestamp AS timestamp
+                    ORDER BY m.timestamp DESC
                     """,
-                    {"user_id": user_id, "limit": depth * 2}  # Get more candidates for filtering
+                    {"user_id": user_id}
                 )
             else:
                 # Return empty list if no user_id provided to enforce user isolation
                 return []
             
-            # Calculate similarity scores and sort
+            # Calculate similarity scores with recency boost
             candidates = []
             for record in result:
                 stored_embedding = record["embedding"]
                 if stored_embedding:
                     similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
+                    
+                    # Add recency boost - more recent memories get higher scores
+                    timestamp = record["timestamp"]
+                    if timestamp:
+                        from datetime import datetime
+                        try:
+                            # Convert Neo4j datetime to Python datetime for comparison
+                            memory_time = timestamp.to_native() if hasattr(timestamp, 'to_native') else timestamp
+                            time_diff_hours = (datetime.now() - memory_time).total_seconds() / 3600
+                            # Boost recent memories: 10% boost for memories less than 1 hour old
+                            recency_boost = max(0, 0.1 * (1 - min(time_diff_hours / 24, 1)))
+                            similarity = min(1.0, similarity + recency_boost)
+                        except:
+                            pass  # If timestamp parsing fails, use original similarity
+                    
                     candidates.append((record["id"], similarity))
             
             # Sort by similarity and get top results
