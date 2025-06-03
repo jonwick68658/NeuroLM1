@@ -818,6 +818,9 @@ async def get_conversations(request: Request):
     """Get all conversations for the current user"""
     try:
         session_id = request.cookies.get("session_id")
+        print(f"DEBUG: Session ID: {session_id}")
+        print(f"DEBUG: Available sessions: {list(user_sessions.keys())}")
+        
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
@@ -825,6 +828,7 @@ async def get_conversations(request: Request):
         conversations = get_user_conversations(user_id)
         return conversations
     except Exception as e:
+        print(f"DEBUG: Conversations error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting conversations: {str(e)}")
 
 @app.post("/api/conversations/new", response_model=ConversationResponse)
