@@ -682,14 +682,79 @@ Use these memories naturally in your responses when relevant. Be conversational,
         # Store assistant response in memory
         assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}", user_id=user_id)
         
+        # Handle conversation management
+        conversation_id = chat_request.conversation_id
+        if not conversation_id:
+            # Create new conversation if none specified
+            conversation_id = create_conversation(user_id)
+        
+        # Save user message to conversation
+        save_conversation_message(conversation_id, 'user', chat_request.message)
+        
+        # Save assistant response to conversation
+        save_conversation_message(conversation_id, 'assistant', response_text)
+        
         return ChatResponse(
             response=response_text,
             memory_stored=True,
-            context_used=len(relevant_memories) if relevant_memories else 0
+            context_used=len(relevant_memories) if relevant_memories else 0,
+            conversation_id=conversation_id
         )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+
+# Conversation management endpoints
+@app.get("/api/conversations", response_model=List[ConversationResponse])
+async def get_conversations(request: Request):
+    """Get all conversations for the current user"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        conversations = get_user_conversations(user_id)
+        return conversations
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting conversations: {str(e)}")
+
+@app.post("/api/conversations/new", response_model=ConversationResponse)
+async def create_new_conversation(request: Request, conversation_data: ConversationCreate):
+    """Create a new conversation"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        conversation_id = create_conversation(user_id, conversation_data.title)
+        if not conversation_id:
+            raise HTTPException(status_code=500, detail="Failed to create conversation")
+        
+        # Get the created conversation details
+        conversations = get_user_conversations(user_id)
+        new_conversation = next((c for c in conversations if c['id'] == conversation_id), None)
+        
+        if not new_conversation:
+            raise HTTPException(status_code=500, detail="Created conversation not found")
+        
+        return new_conversation
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating conversation: {str(e)}")
+
+@app.get("/api/conversations/{conversation_id}/messages", response_model=List[ConversationMessage])
+async def get_conversation_messages_endpoint(conversation_id: str, request: Request):
+    """Get all messages for a specific conversation"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        messages = get_conversation_messages(conversation_id)
+        return messages
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting conversation messages: {str(e)}")
 
 # Clear database endpoint
 @app.post("/api/clear-memory")
