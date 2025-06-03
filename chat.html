@@ -802,11 +802,110 @@
             }
         });
 
-        // Add welcome message on load
-        addMessage('Welcome to NeuroLM! I\'m your AI assistant with an integrated memory system. I can remember our conversations and learn from them. How can I help you today?', 'assistant', 'System message');
-        
-        // Focus input on load
-        chatInput.focus();
+        // Conversation management functions
+        async function loadConversations() {
+            try {
+                const response = await fetch('/api/conversations');
+                if (response.ok) {
+                    conversations = await response.json();
+                    renderConversations();
+                }
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+            }
+        }
+
+        function renderConversations() {
+            conversationsList.innerHTML = '';
+            
+            conversations.forEach(conversation => {
+                const conversationDiv = document.createElement('div');
+                conversationDiv.className = 'conversation-item';
+                if (conversation.id === currentConversationId) {
+                    conversationDiv.classList.add('active');
+                }
+                
+                const date = new Date(conversation.updated_at).toLocaleDateString();
+                conversationDiv.innerHTML = `
+                    <div class="conversation-title">${conversation.title}</div>
+                    <div class="conversation-meta">${date} • ${conversation.message_count} messages</div>
+                `;
+                
+                conversationDiv.addEventListener('click', () => loadConversation(conversation.id));
+                conversationsList.appendChild(conversationDiv);
+            });
+        }
+
+        async function loadConversation(conversationId) {
+            try {
+                // Clear current chat
+                chatMessages.innerHTML = '';
+                
+                // Load messages
+                const response = await fetch(`/api/conversations/${conversationId}/messages`);
+                if (response.ok) {
+                    const messages = await response.json();
+                    messages.forEach(message => {
+                        addMessage(message.content, message.message_type, 
+                                 message.message_type === 'assistant' ? 'Loaded from conversation' : null);
+                    });
+                    
+                    currentConversationId = conversationId;
+                    renderConversations(); // Update active state
+                }
+            } catch (error) {
+                console.error('Error loading conversation:', error);
+            }
+        }
+
+        async function startNewChat() {
+            try {
+                const response = await fetch('/api/conversations/new', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                if (response.ok) {
+                    const newConversation = await response.json();
+                    currentConversationId = newConversation.id;
+                    
+                    // Clear chat messages
+                    chatMessages.innerHTML = '';
+                    
+                    // Add welcome message
+                    addMessage('Hello! I\'m NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?', 'assistant', 'Memory system active • Ready to learn');
+                    
+                    // Reload conversations list
+                    loadConversations();
+                }
+            } catch (error) {
+                console.error('Error creating new conversation:', error);
+            }
+        }
+
+        // Event listeners
+        newChatBtn.addEventListener('click', startNewChat);
+
+        // Initialize app
+        async function initializeApp() {
+            await loadModels();
+            await loadConversations();
+            
+            // If no current conversation, start a new one
+            if (!currentConversationId) {
+                // Add initial welcome message without creating conversation yet
+                addMessage('Hello! I\'m NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?', 'assistant', 'Memory system active • Ready to learn');
+            }
+            
+            // Focus input
+            chatInput.focus();
+        }
+
+        // Start the app
+        initializeApp();
     </script>
 </body>
 </html>
