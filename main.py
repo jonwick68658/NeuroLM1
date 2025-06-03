@@ -64,6 +64,34 @@ def async_memory_storage(func, *args, **kwargs):
     thread = threading.Thread(target=run_in_thread, daemon=True)
     thread.start()
 
+def should_skip_memory(message: str) -> bool:
+    """Determine if message is simple enough to skip memory processing"""
+    message_lower = message.lower().strip()
+    
+    # Skip memory for very short messages
+    if len(message) < 10:
+        return True
+    
+    # Skip memory for common greetings and acknowledgments
+    simple_patterns = [
+        "hi", "hello", "hey", "thanks", "thank you", "ok", "okay", "yes", "no",
+        "good", "great", "awesome", "cool", "nice", "sure", "alright",
+        "got it", "understood", "makes sense", "i see", "sounds good"
+    ]
+    
+    # Check if message is just a simple pattern
+    for pattern in simple_patterns:
+        if message_lower == pattern or message_lower.startswith(pattern + " ") or message_lower.endswith(" " + pattern):
+            return True
+    
+    # Skip memory for very basic questions
+    basic_questions = ["how are you", "what's up", "how's it going", "what are you"]
+    for question in basic_questions:
+        if question in message_lower:
+            return True
+    
+    return False
+
 # Database connection pool for better performance
 import psycopg2.pool
 
@@ -763,24 +791,22 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if chat_request.message.startswith('/'):
             return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
         
-        # Retrieve relevant memories for context
-        retrieve_request = RetrieveMemoryRequest(
-            query=chat_request.message,
-            context=None,
-            depth=5
-        )
+        # OPTION B: Smart memory bypass for simple interactions
+        skip_memory = should_skip_memory(chat_request.message)
+        relevant_memories = []
+        memory_system = MemorySystem()  # Always initialize for potential use
         
-        # Get memory system instance
-        memory_system = MemorySystem()
-        relevant_memories = memory_system.retrieve_memories(
-            query=chat_request.message,
-            context="",
-            depth=5,
-            user_id=user_id
-        )
+        if not skip_memory:
+            relevant_memories = memory_system.retrieve_memories(
+                query=chat_request.message,
+                context="",
+                depth=3,  # Reduced from 5 to 3 for faster processing
+                user_id=user_id
+            )
         
         # Debug logging
         print(f"DEBUG: Query: {chat_request.message}")
+        print(f"DEBUG: Skip memory: {skip_memory}")
         print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
         if relevant_memories:
             for i, mem in enumerate(relevant_memories[:3]):
@@ -868,9 +894,11 @@ Use these memories naturally in your responses when relevant. Be conversational,
         # Save assistant response to conversation
         save_conversation_message(conversation_id, 'assistant', response_text)
         
-        # Store memories asynchronously in background after response is sent
-        async_memory_storage(memory_system.add_memory, f"User said: {chat_request.message}", user_id=user_id)
-        async_memory_storage(memory_system.add_memory, f"Assistant responded: {response_text}", user_id=user_id)
+        # OPTION A: Only store user messages with embeddings, skip assistant responses
+        if not skip_memory:
+            # Store only user message to avoid redundant embedding generation
+            async_memory_storage(memory_system.add_memory, f"User said: {chat_request.message}", user_id=user_id)
+            # Skip storing assistant response to eliminate embedding API call
         
         return ChatResponse(
             response=response_text,
