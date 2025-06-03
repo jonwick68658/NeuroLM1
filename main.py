@@ -10,7 +10,8 @@ import httpx
 import hashlib
 import uuid
 import psycopg2
-from typing import Optional
+from typing import Optional, List, Dict
+from datetime import datetime
 
 # Create FastAPI application
 app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
@@ -53,6 +54,119 @@ def init_file_storage():
 
 # Initialize file storage on startup
 init_file_storage()
+
+# Conversation database helper functions
+def create_conversation(user_id: str, title: str = None) -> str:
+    """Create a new conversation and return its ID"""
+    try:
+        conversation_id = str(uuid.uuid4())
+        if not title:
+            title = "New Conversation"
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO conversations (id, user_id, title, created_at, updated_at, message_count)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (conversation_id, user_id, title, datetime.now(), datetime.now(), 0))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return conversation_id
+    except Exception as e:
+        print(f"Error creating conversation: {e}")
+        return None
+
+def get_user_conversations(user_id: str) -> List[Dict]:
+    """Get all conversations for a user"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, title, created_at, updated_at, message_count
+            FROM conversations
+            WHERE user_id = %s
+            ORDER BY updated_at DESC
+            LIMIT 10
+        ''', (user_id,))
+        
+        conversations = []
+        for row in cursor.fetchall():
+            conversations.append({
+                'id': row[0],
+                'title': row[1],
+                'created_at': row[2].isoformat(),
+                'updated_at': row[3].isoformat(),
+                'message_count': row[4]
+            })
+        
+        cursor.close()
+        conn.close()
+        return conversations
+    except Exception as e:
+        print(f"Error getting conversations: {e}")
+        return []
+
+def save_conversation_message(conversation_id: str, message_type: str, content: str):
+    """Save a message to a conversation"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Insert message
+        cursor.execute('''
+            INSERT INTO conversation_messages (conversation_id, message_type, content, created_at)
+            VALUES (%s, %s, %s, %s)
+        ''', (conversation_id, message_type, content, datetime.now()))
+        
+        # Update conversation message count and timestamp
+        cursor.execute('''
+            UPDATE conversations 
+            SET message_count = message_count + 1, updated_at = %s
+            WHERE id = %s
+        ''', (datetime.now(), conversation_id))
+        
+        # Update conversation title if it's the first user message
+        if message_type == 'user':
+            cursor.execute('SELECT message_count FROM conversations WHERE id = %s', (conversation_id,))
+            count = cursor.fetchone()[0]
+            if count == 1:  # First message, update title
+                title = content[:50] + "..." if len(content) > 50 else content
+                cursor.execute('UPDATE conversations SET title = %s WHERE id = %s', (title, conversation_id))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error saving message: {e}")
+
+def get_conversation_messages(conversation_id: str) -> List[Dict]:
+    """Get all messages for a conversation"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, message_type, content, created_at
+            FROM conversation_messages
+            WHERE conversation_id = %s
+            ORDER BY created_at ASC
+        ''', (conversation_id,))
+        
+        messages = []
+        for row in cursor.fetchall():
+            messages.append({
+                'id': row[0],
+                'message_type': row[1],
+                'content': row[2],
+                'created_at': row[3].isoformat()
+            })
+        
+        cursor.close()
+        conn.close()
+        return messages
+    except Exception as e:
+        print(f"Error getting messages: {e}")
+        return []
 
 def hash_password(password: str) -> str:
     """Hash password using SHA256"""
@@ -431,11 +545,30 @@ async def serve_chat(request: Request):
 class ChatMessage(BaseModel):
     message: str
     model: Optional[str] = "gpt-4o-mini"
+    conversation_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
     memory_stored: bool
     context_used: int
+    conversation_id: str
+
+# Conversation models
+class ConversationCreate(BaseModel):
+    title: Optional[str] = None
+
+class ConversationResponse(BaseModel):
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int
+
+class ConversationMessage(BaseModel):
+    id: str
+    message_type: str
+    content: str
+    created_at: str
 
 # Chat endpoint
 @app.post("/api/chat", response_model=ChatResponse)
