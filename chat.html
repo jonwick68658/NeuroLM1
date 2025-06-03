@@ -1002,10 +1002,48 @@
         
         sendButton.addEventListener('click', sendMessage);
         
-        chatInput.addEventListener('keypress', (e) => {
+        // Chat input handling for slash commands
+        chatInput.addEventListener('input', (e) => {
+            const inputText = e.target.value;
+            
+            // Show slash suggestions when user types '/'
+            if (inputText.startsWith('/') && inputText.length > 1) {
+                showSlashSuggestions(inputText);
+            } else if (inputText.startsWith('/') && inputText.length === 1) {
+                // Show all commands when just '/' is typed
+                showSlashSuggestions('/');
+            } else {
+                hideSlashSuggestions();
+            }
+        });
+
+        chatInput.addEventListener('keydown', async (e) => {
+            const isSlashSuggestionsVisible = slashSuggestions.classList.contains('active');
+            
+            if (isSlashSuggestionsVisible) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    navigateSuggestions('down');
+                    return;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    navigateSuggestions('up');
+                    return;
+                } else if (e.key === 'Enter' && highlightedSuggestion >= 0) {
+                    e.preventDefault();
+                    selectHighlightedSuggestion();
+                    return;
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    hideSlashSuggestions();
+                    return;
+                }
+            }
+            
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage();
+                hideSlashSuggestions();
+                await sendMessage();
             }
         });
 
