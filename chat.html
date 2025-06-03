@@ -200,6 +200,22 @@
                 position: static !important;
                 margin: 0 !important;
             }
+
+            /* Enhanced scrolling for mobile */
+            .chat-messages {
+                padding-bottom: 150px !important;
+                scroll-behavior: smooth;
+            }
+
+            /* Ensure chat container uses full available height */
+            .chat-container {
+                height: calc(100vh - 50px) !important;
+            }
+
+            .chat-messages {
+                height: calc(100% - 120px) !important;
+                overflow-y: auto;
+            }
         }
 
         @media (min-width: 769px) {
