@@ -177,6 +177,29 @@
             .header p {
                 font-size: 0.65rem;
             }
+
+            /* Mobile input layout optimization */
+            .chat-input-container {
+                flex-direction: column !important;
+                gap: 0.5rem;
+            }
+
+            .chat-input {
+                width: 100% !important;
+                min-height: 80px !important;
+                margin-bottom: 0.5rem;
+            }
+
+            .input-buttons {
+                display: flex;
+                justify-content: flex-end;
+                gap: 0.5rem;
+            }
+
+            .upload-button, .send-button {
+                position: static !important;
+                margin: 0 !important;
+            }
         }
 
         @media (min-width: 769px) {
@@ -700,16 +723,16 @@
             </div>
         </div>
 
-        <div class="memory-indicator" id="memoryIndicator">
-            Memory system ready
-        </div>
+
 
         <div class="chat-input-container">
             <textarea id="chatInput" class="chat-input" placeholder="Type your message here... (Shift+Enter for new line)"></textarea>
             <div class="slash-suggestions" id="slashSuggestions"></div>
-            <input type="file" id="fileInput" style="display: none;" accept=".txt,.py,.js,.html,.css,.md,.json,.xml,.csv">
-            <button id="uploadButton" class="upload-button" title="Upload file">+</button>
-            <button id="sendButton" class="send-button">Send</button>
+            <div class="input-buttons">
+                <input type="file" id="fileInput" style="display: none;" accept=".txt,.py,.js,.html,.css,.md,.json,.xml,.csv">
+                <button id="uploadButton" class="upload-button" title="Upload file">+</button>
+                <button id="sendButton" class="send-button">Send</button>
+            </div>
         </div>
     </div>
 
@@ -719,7 +742,7 @@
         const sendButton = document.getElementById('sendButton');
         const uploadButton = document.getElementById('uploadButton');
         const fileInput = document.getElementById('fileInput');
-        const memoryIndicator = document.getElementById('memoryIndicator');
+
         const newChatBtn = document.getElementById('newChatBtn');
         const conversationsList = document.getElementById('conversationsList');
         const fileSearch = document.getElementById('fileSearch');
@@ -889,11 +912,7 @@
                 }
                 
                 // Add assistant response to chat
-                const memoryInfo = `Memory stored: ${data.memory_stored} • Context used: ${data.context_used} memories`;
-                addMessage(data.response, 'assistant', memoryInfo);
-
-                // Update memory indicator
-                memoryIndicator.textContent = `Last interaction: ${data.context_used} memories retrieved`;
+                addMessage(data.response, 'assistant');
 
             } catch (error) {
                 console.error('Chat error:', error);
