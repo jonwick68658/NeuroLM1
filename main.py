@@ -26,6 +26,44 @@ app.include_router(router, prefix="/api")
 user_sessions = {}
 memory_system = MemorySystem()
 
+# Embedding cache for performance optimization
+embedding_cache = {}
+from datetime import datetime, timedelta
+import asyncio
+import threading
+
+def get_cached_embedding(text: str):
+    """Get embedding from cache if available and not expired"""
+    cache_key = hash(text)
+    if cache_key in embedding_cache:
+        cached_data = embedding_cache[cache_key]
+        # Check if cache entry is still valid (30 minutes TTL)
+        if datetime.now() - cached_data['timestamp'] < timedelta(minutes=30):
+            return cached_data['embedding']
+        else:
+            # Remove expired entry
+            del embedding_cache[cache_key]
+    return None
+
+def cache_embedding(text: str, embedding: list):
+    """Cache embedding with timestamp"""
+    cache_key = hash(text)
+    embedding_cache[cache_key] = {
+        'embedding': embedding,
+        'timestamp': datetime.now()
+    }
+
+def async_memory_storage(func, *args, **kwargs):
+    """Execute memory storage function asynchronously in background"""
+    def run_in_thread():
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            print(f"Background memory storage error: {e}")
+    
+    thread = threading.Thread(target=run_in_thread, daemon=True)
+    thread.start()
+
 # Database connection for file storage
 def get_db_connection():
     """Get PostgreSQL database connection"""
@@ -750,10 +788,7 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful."""
 
-        # Store user message in memory
-        user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}", user_id=user_id)
-        
-        # Create LLM messages with memory context
+        # Create LLM messages with memory context (store memories async after response)
         system_message = {
             "role": "system",
             "content": f"""You are NeuroLM, an AI with access to your memory system. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
@@ -787,9 +822,6 @@ Use these memories naturally in your responses when relevant. Be conversational,
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Store assistant response in memory
-        assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}", user_id=user_id)
-        
         # Handle conversation management
         conversation_id = chat_request.conversation_id
         if not conversation_id:
@@ -801,6 +833,10 @@ Use these memories naturally in your responses when relevant. Be conversational,
         
         # Save assistant response to conversation
         save_conversation_message(conversation_id, 'assistant', response_text)
+        
+        # Store memories asynchronously in background after response is sent
+        async_memory_storage(memory_system.add_memory, f"User said: {chat_request.message}", user_id=user_id)
+        async_memory_storage(memory_system.add_memory, f"Assistant responded: {response_text}", user_id=user_id)
         
         return ChatResponse(
             response=response_text,

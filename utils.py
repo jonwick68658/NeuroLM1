@@ -4,16 +4,25 @@ import re
 import hashlib
 
 def generate_embedding(text):
-    """Generate embedding using OpenAI API only"""
+    """Generate embedding using OpenAI API with caching support"""
     if not text or not text.strip():
         return None
     
+    # Clean and normalize text first
+    cleaned_text = clean_text(text)
+    if not cleaned_text:
+        return None
+    
+    # Check cache first (import here to avoid circular imports)
     try:
-        # Clean and normalize text
-        cleaned_text = clean_text(text)
-        if not cleaned_text:
-            return None
-        
+        from main import get_cached_embedding, cache_embedding
+        cached_embedding = get_cached_embedding(cleaned_text)
+        if cached_embedding:
+            return cached_embedding
+    except ImportError:
+        pass  # Cache not available, proceed with API call
+    
+    try:
         # Use OpenAI embeddings only
         import openai
         import os
@@ -25,7 +34,16 @@ def generate_embedding(text):
             model="text-embedding-3-small",
             input=cleaned_text
         )
-        return response.data[0].embedding
+        embedding = response.data[0].embedding
+        
+        # Cache the result
+        try:
+            from main import cache_embedding
+            cache_embedding(cleaned_text, embedding)
+        except ImportError:
+            pass  # Cache not available
+        
+        return embedding
         
     except Exception as e:
         logging.error(f"OpenAI embedding failed: {e}")
