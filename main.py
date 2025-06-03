@@ -26,110 +26,10 @@ app.include_router(router, prefix="/api")
 user_sessions = {}
 memory_system = MemorySystem()
 
-# Embedding cache for performance optimization
-embedding_cache = {}
-from datetime import datetime, timedelta
-import asyncio
-import threading
-
-def get_cached_embedding(text: str):
-    """Get embedding from cache if available and not expired"""
-    cache_key = hash(text)
-    if cache_key in embedding_cache:
-        cached_data = embedding_cache[cache_key]
-        # Check if cache entry is still valid (30 minutes TTL)
-        if datetime.now() - cached_data['timestamp'] < timedelta(minutes=30):
-            return cached_data['embedding']
-        else:
-            # Remove expired entry
-            del embedding_cache[cache_key]
-    return None
-
-def cache_embedding(text: str, embedding: list):
-    """Cache embedding with timestamp"""
-    cache_key = hash(text)
-    embedding_cache[cache_key] = {
-        'embedding': embedding,
-        'timestamp': datetime.now()
-    }
-
-def async_memory_storage(func, *args, **kwargs):
-    """Execute memory storage function asynchronously in background"""
-    def run_in_thread():
-        try:
-            func(*args, **kwargs)
-        except Exception as e:
-            print(f"Background memory storage error: {e}")
-    
-    thread = threading.Thread(target=run_in_thread, daemon=True)
-    thread.start()
-
-def should_skip_memory(message: str) -> bool:
-    """Determine if message is simple enough to skip memory processing"""
-    message_lower = message.lower().strip()
-    
-    # Skip memory for very short messages
-    if len(message) < 10:
-        return True
-    
-    # Skip memory for common greetings and acknowledgments
-    simple_patterns = [
-        "hi", "hello", "hey", "thanks", "thank you", "ok", "okay", "yes", "no",
-        "good", "great", "awesome", "cool", "nice", "sure", "alright",
-        "got it", "understood", "makes sense", "i see", "sounds good"
-    ]
-    
-    # Check if message is just a simple pattern
-    for pattern in simple_patterns:
-        if message_lower == pattern or message_lower.startswith(pattern + " ") or message_lower.endswith(" " + pattern):
-            return True
-    
-    # Skip memory for very basic questions
-    basic_questions = ["how are you", "what's up", "how's it going", "what are you"]
-    for question in basic_questions:
-        if question in message_lower:
-            return True
-    
-    return False
-
-# Database connection pool for better performance
-import psycopg2.pool
-
-# Initialize connection pool
-db_pool = None
-
-def init_db_pool():
-    """Initialize PostgreSQL connection pool"""
-    global db_pool
-    try:
-        db_pool = psycopg2.pool.SimpleConnectionPool(
-            1, 20,  # min and max connections
-            os.getenv("DATABASE_URL")
-        )
-        print("Database connection pool initialized")
-    except Exception as e:
-        print(f"Failed to initialize DB pool: {e}")
-
+# Database connection for file storage
 def get_db_connection():
-    """Get PostgreSQL database connection from pool"""
-    global db_pool
-    if db_pool is None:
-        init_db_pool()
-    
-    try:
-        return db_pool.getconn()
-    except:
-        # Fallback to direct connection if pool fails
-        return psycopg2.connect(os.getenv("DATABASE_URL"))
-
-def return_db_connection(conn):
-    """Return connection to pool"""
-    global db_pool
-    if db_pool and conn:
-        try:
-            db_pool.putconn(conn)
-        except:
-            conn.close()
+    """Get PostgreSQL database connection"""
+    return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 def init_file_storage():
     """Initialize file storage table"""
@@ -148,7 +48,7 @@ def init_file_storage():
         ''')
         conn.commit()
         cursor.close()
-        return_db_connection(conn)
+        conn.close()
     except Exception as e:
         print(f"Error initializing file storage: {e}")
 
@@ -791,22 +691,24 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if chat_request.message.startswith('/'):
             return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
         
-        # OPTION B: Smart memory bypass for simple interactions
-        skip_memory = should_skip_memory(chat_request.message)
-        relevant_memories = []
-        memory_system = MemorySystem()  # Always initialize for potential use
+        # Retrieve relevant memories for context
+        retrieve_request = RetrieveMemoryRequest(
+            query=chat_request.message,
+            context=None,
+            depth=5
+        )
         
-        if not skip_memory:
-            relevant_memories = memory_system.retrieve_memories(
-                query=chat_request.message,
-                context="",
-                depth=3,  # Reduced from 5 to 3 for faster processing
-                user_id=user_id
-            )
+        # Get memory system instance
+        memory_system = MemorySystem()
+        relevant_memories = memory_system.retrieve_memories(
+            query=chat_request.message,
+            context="",
+            depth=5,
+            user_id=user_id
+        )
         
         # Debug logging
         print(f"DEBUG: Query: {chat_request.message}")
-        print(f"DEBUG: Skip memory: {skip_memory}")
         print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
         if relevant_memories:
             for i, mem in enumerate(relevant_memories[:3]):
@@ -848,7 +750,10 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful."""
 
-        # Create LLM messages with memory context (store memories async after response)
+        # Store user message in memory
+        user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}", user_id=user_id)
+        
+        # Create LLM messages with memory context
         system_message = {
             "role": "system",
             "content": f"""You are NeuroLM, an AI with access to your memory system. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
@@ -882,6 +787,9 @@ Use these memories naturally in your responses when relevant. Be conversational,
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
+        # Store assistant response in memory
+        assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}", user_id=user_id)
+        
         # Handle conversation management
         conversation_id = chat_request.conversation_id
         if not conversation_id:
@@ -893,12 +801,6 @@ Use these memories naturally in your responses when relevant. Be conversational,
         
         # Save assistant response to conversation
         save_conversation_message(conversation_id, 'assistant', response_text)
-        
-        # OPTION A: Only store user messages with embeddings, skip assistant responses
-        if not skip_memory:
-            # Store only user message to avoid redundant embedding generation
-            async_memory_storage(memory_system.add_memory, f"User said: {chat_request.message}", user_id=user_id)
-            # Skip storing assistant response to eliminate embedding API call
         
         return ChatResponse(
             response=response_text,
