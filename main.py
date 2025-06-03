@@ -10,6 +10,7 @@ import httpx
 import hashlib
 import uuid
 import psycopg2
+from psycopg2 import pool
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -26,13 +27,37 @@ app.include_router(router, prefix="/api")
 user_sessions = {}
 memory_system = MemorySystem()
 
-# Database connection for file storage
+# Database connection pool
+db_pool = None
+
+def init_db_pool():
+    """Initialize database connection pool"""
+    global db_pool
+    try:
+        db_pool = psycopg2.pool.SimpleConnectionPool(
+            1, 20,  # min=1, max=20 connections
+            os.getenv("DATABASE_URL")
+        )
+        print("Database connection pool initialized")
+    except Exception as e:
+        print(f"Error initializing database pool: {e}")
+
 def get_db_connection():
-    """Get PostgreSQL database connection"""
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
+    """Get PostgreSQL database connection from pool"""
+    if db_pool:
+        return db_pool.getconn()
+    else:
+        # Fallback to direct connection
+        return psycopg2.connect(os.getenv("DATABASE_URL"))
+
+def return_db_connection(conn):
+    """Return connection to pool"""
+    if db_pool and conn:
+        db_pool.putconn(conn)
 
 def init_file_storage():
     """Initialize file storage table"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -48,11 +73,14 @@ def init_file_storage():
         ''')
         conn.commit()
         cursor.close()
-        conn.close()
     except Exception as e:
         print(f"Error initializing file storage: {e}")
+    finally:
+        if conn:
+            return_db_connection(conn)
 
-# Initialize file storage on startup
+# Initialize database pool and file storage on startup
+init_db_pool()
 init_file_storage()
 
 # Conversation database helper functions
@@ -79,6 +107,7 @@ def create_conversation(user_id: str, title: str = None) -> str:
 
 def get_user_conversations(user_id: str) -> List[Dict]:
     """Get all conversations for a user"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -101,14 +130,17 @@ def get_user_conversations(user_id: str) -> List[Dict]:
             })
         
         cursor.close()
-        conn.close()
         return conversations
     except Exception as e:
         print(f"Error getting conversations: {e}")
         return []
+    finally:
+        if conn:
+            return_db_connection(conn)
 
 def save_conversation_message(conversation_id: str, message_type: str, content: str):
     """Save a message to a conversation"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -136,9 +168,11 @@ def save_conversation_message(conversation_id: str, message_type: str, content: 
         
         conn.commit()
         cursor.close()
-        conn.close()
     except Exception as e:
         print(f"Error saving message: {e}")
+    finally:
+        if conn:
+            return_db_connection(conn)
 
 def get_conversation_messages(conversation_id: str) -> List[Dict]:
     """Get all messages for a conversation"""
@@ -953,7 +987,7 @@ async def get_user_files(request: Request, search: str = None):
             })
         
         cursor.close()
-        conn.close()
+        return_db_connection(conn)
         return files
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting files: {str(e)}")
