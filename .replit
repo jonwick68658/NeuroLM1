@@ -18,19 +18,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "install_dependencies"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "FastAPI Server"
-
-[[workflows.workflow]]
-name = "install_dependencies"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "uv add neo4j openai sentence-transformers PyPDF2 docx2txt python-dotenv pyngrok"
 
 [[workflows.workflow]]
 name = "FastAPI Server"
