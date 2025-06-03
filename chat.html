@@ -625,7 +625,48 @@
             }
         }
 
+        // File upload functionality
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                uploadButton.textContent = 'Uploading...';
+                uploadButton.disabled = true;
+                
+                const response = await fetch('/api/upload-file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+                
+                const data = await response.json();
+                addMessage(`File uploaded successfully: ${file.name}`, 'system', 'File upload');
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                addMessage(`Failed to upload file: ${file.name}`, 'system', 'Upload error');
+            } finally {
+                uploadButton.textContent = '📎';
+                uploadButton.disabled = false;
+            }
+        }
+
         // Event listeners
+        uploadButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                uploadFile(file);
+            }
+        });
+        
         sendButton.addEventListener('click', sendMessage);
         
         chatInput.addEventListener('keypress', (e) => {
