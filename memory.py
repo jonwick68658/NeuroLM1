@@ -239,15 +239,16 @@ class MemorySystem:
         # Find similar memories using Neo4j vector similarity
         with self.driver.session() as session:
             if user_id:
-                # Get ALL user memories for similarity calculation
+                # Optimized: Only get recent memories with high confidence, limit to 20 max
                 result = session.run(
                     """
                     MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
-                    WHERE m.embedding IS NOT NULL
+                    WHERE m.embedding IS NOT NULL AND m.confidence > 0.5
                     RETURN m.id AS id, m.embedding AS embedding,
                            m.content AS content, m.confidence AS confidence,
                            m.timestamp AS timestamp
                     ORDER BY m.timestamp DESC
+                    LIMIT 20
                     """,
                     {"user_id": user_id}
                 )
@@ -255,39 +256,47 @@ class MemorySystem:
                 # Return empty list if no user_id provided to enforce user isolation
                 return []
             
-            # Calculate similarity scores with recency boost
+            # Calculate similarity scores for limited set only
             candidates = []
+            similarity_threshold = 0.3  # Only consider memories above threshold
+            
             for record in result:
                 stored_embedding = record["embedding"]
                 if stored_embedding:
                     similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
                     
-                    # Add recency boost - more recent memories get higher scores
+                    # Skip low similarity memories early
+                    if similarity < similarity_threshold:
+                        continue
+                    
+                    # Add recency boost for recent memories only
                     timestamp = record["timestamp"]
                     if timestamp:
                         from datetime import datetime
                         try:
-                            # Convert Neo4j datetime to Python datetime for comparison
                             memory_time = timestamp.to_native() if hasattr(timestamp, 'to_native') else timestamp
                             time_diff_hours = (datetime.now() - memory_time).total_seconds() / 3600
-                            # Boost recent memories: 10% boost for memories less than 1 hour old
-                            recency_boost = max(0, 0.1 * (1 - min(time_diff_hours / 24, 1)))
-                            similarity = min(1.0, similarity + recency_boost)
+                            if time_diff_hours < 24:  # Only boost recent memories
+                                recency_boost = 0.1 * (1 - min(time_diff_hours / 24, 1))
+                                similarity = min(1.0, similarity + recency_boost)
                         except:
-                            pass  # If timestamp parsing fails, use original similarity
+                            pass
                     
-                    candidates.append((record["id"], similarity))
+                    candidates.append((record["id"], similarity, record["content"], record["confidence"]))
             
-            # Sort by similarity and get top results
+            # Sort by similarity and limit to requested depth
             candidates.sort(key=lambda x: x[1], reverse=True)
-            top_ids = [candidate[0] for candidate in candidates[:depth]]
+            top_candidates = candidates[:min(depth, 3)]  # Cap at 3 memories max
             
-            # Retrieve full memory nodes
+            # Create memory nodes directly without additional DB queries
             memories = []
-            for memory_id in top_ids:
-                memory_node = self.get_memory_node(memory_id)
-                if memory_node:
+            for memory_id, similarity, content, confidence in top_candidates:
+                try:
+                    memory_node = MemoryNode(content, confidence)
+                    memory_node.id = memory_id
                     memories.append(memory_node)
+                except:
+                    continue
                     
             return memories
         

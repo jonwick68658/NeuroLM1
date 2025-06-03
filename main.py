@@ -64,10 +64,44 @@ def async_memory_storage(func, *args, **kwargs):
     thread = threading.Thread(target=run_in_thread, daemon=True)
     thread.start()
 
-# Database connection for file storage
+# Database connection pool for better performance
+import psycopg2.pool
+
+# Initialize connection pool
+db_pool = None
+
+def init_db_pool():
+    """Initialize PostgreSQL connection pool"""
+    global db_pool
+    try:
+        db_pool = psycopg2.pool.SimpleConnectionPool(
+            1, 20,  # min and max connections
+            os.getenv("DATABASE_URL")
+        )
+        print("Database connection pool initialized")
+    except Exception as e:
+        print(f"Failed to initialize DB pool: {e}")
+
 def get_db_connection():
-    """Get PostgreSQL database connection"""
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
+    """Get PostgreSQL database connection from pool"""
+    global db_pool
+    if db_pool is None:
+        init_db_pool()
+    
+    try:
+        return db_pool.getconn()
+    except:
+        # Fallback to direct connection if pool fails
+        return psycopg2.connect(os.getenv("DATABASE_URL"))
+
+def return_db_connection(conn):
+    """Return connection to pool"""
+    global db_pool
+    if db_pool and conn:
+        try:
+            db_pool.putconn(conn)
+        except:
+            conn.close()
 
 def init_file_storage():
     """Initialize file storage table"""
@@ -86,7 +120,7 @@ def init_file_storage():
         ''')
         conn.commit()
         cursor.close()
-        conn.close()
+        return_db_connection(conn)
     except Exception as e:
         print(f"Error initializing file storage: {e}")
 
