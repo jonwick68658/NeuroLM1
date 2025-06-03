@@ -150,6 +150,33 @@
                 margin-left: 0 !important;
                 width: 100% !important;
             }
+
+            /* Hide Model and Files dropdowns on mobile */
+            .header > div:not(.header-left) {
+                display: none !important;
+            }
+
+            /* Ensure hamburger menu is prominent on mobile */
+            .hamburger-btn {
+                font-size: 1.4rem;
+                padding: 0.5rem;
+                width: 40px;
+                height: 40px;
+            }
+
+            /* Compress header for mobile */
+            .header {
+                height: 50px;
+                padding: 0.5rem;
+            }
+
+            .header h1 {
+                font-size: 1.1rem;
+            }
+
+            .header p {
+                font-size: 0.65rem;
+            }
         }
 
         @media (min-width: 769px) {
