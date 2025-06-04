@@ -10,7 +10,6 @@ import httpx
 import hashlib
 import uuid
 import psycopg2
-from psycopg2 import pool
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -27,37 +26,12 @@ app.include_router(router, prefix="/api")
 user_sessions = {}
 memory_system = MemorySystem()
 
-# Database connection pool
-db_pool = None
-
-def init_db_pool():
-    """Initialize database connection pool"""
-    global db_pool
-    try:
-        db_pool = psycopg2.pool.SimpleConnectionPool(
-            1, 20,  # min=1, max=20 connections
-            os.getenv("DATABASE_URL")
-        )
-        print("Database connection pool initialized")
-    except Exception as e:
-        print(f"Error initializing database pool: {e}")
-
 def get_db_connection():
-    """Get PostgreSQL database connection from pool"""
-    if db_pool:
-        return db_pool.getconn()
-    else:
-        # Fallback to direct connection
-        return psycopg2.connect(os.getenv("DATABASE_URL"))
-
-def return_db_connection(conn):
-    """Return connection to pool"""
-    if db_pool and conn:
-        db_pool.putconn(conn)
+    """Get PostgreSQL database connection"""
+    return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 def init_file_storage():
     """Initialize file storage table"""
-    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -73,14 +47,11 @@ def init_file_storage():
         ''')
         conn.commit()
         cursor.close()
+        conn.close()
     except Exception as e:
         print(f"Error initializing file storage: {e}")
-    finally:
-        if conn:
-            return_db_connection(conn)
 
-# Initialize database pool and file storage on startup
-init_db_pool()
+# Initialize file storage on startup
 init_file_storage()
 
 # Conversation database helper functions
@@ -107,7 +78,6 @@ def create_conversation(user_id: str, title: str = None) -> str:
 
 def get_user_conversations(user_id: str) -> List[Dict]:
     """Get all conversations for a user"""
-    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -130,17 +100,14 @@ def get_user_conversations(user_id: str) -> List[Dict]:
             })
         
         cursor.close()
+        conn.close()
         return conversations
     except Exception as e:
         print(f"Error getting conversations: {e}")
         return []
-    finally:
-        if conn:
-            return_db_connection(conn)
 
 def save_conversation_message(conversation_id: str, message_type: str, content: str):
     """Save a message to a conversation"""
-    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -168,11 +135,9 @@ def save_conversation_message(conversation_id: str, message_type: str, content: 
         
         conn.commit()
         cursor.close()
+        conn.close()
     except Exception as e:
         print(f"Error saving message: {e}")
-    finally:
-        if conn:
-            return_db_connection(conn)
 
 def get_conversation_messages(conversation_id: str) -> List[Dict]:
     """Get all messages for a conversation"""
@@ -852,9 +817,6 @@ async def get_conversations(request: Request):
     """Get all conversations for the current user"""
     try:
         session_id = request.cookies.get("session_id")
-        print(f"DEBUG: Session ID: {session_id}")
-        print(f"DEBUG: Available sessions: {list(user_sessions.keys())}")
-        
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
@@ -862,7 +824,6 @@ async def get_conversations(request: Request):
         conversations = get_user_conversations(user_id)
         return conversations
     except Exception as e:
-        print(f"DEBUG: Conversations error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting conversations: {str(e)}")
 
 @app.post("/api/conversations/new", response_model=ConversationResponse)
@@ -987,7 +948,7 @@ async def get_user_files(request: Request, search: str = None):
             })
         
         cursor.close()
-        return_db_connection(conn)
+        conn.close()
         return files
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting files: {str(e)}")
