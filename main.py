@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Form, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from memory_api import *
 from pydantic import BaseModel
@@ -926,7 +926,6 @@ async def get_user_files(request: Request, search: str = None):
     """Get all files for the current user with optional search"""
     try:
         session_id = request.cookies.get("session_id")
-        print(f"Files endpoint - Session ID: {session_id}, Available sessions: {len(user_sessions)}")
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
