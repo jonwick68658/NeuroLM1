@@ -26,8 +26,7 @@ app.include_router(router, prefix="/api")
 user_sessions = {}
 memory_system = MemorySystem()
 
-# Clear sessions on startup to force fresh login
-user_sessions.clear()
+# Note: Sessions cleared on restart - users need to re-login
 
 def get_db_connection():
     """Get PostgreSQL database connection"""
@@ -719,7 +718,8 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         # Build context from memories
         context = ""
         if relevant_memories:
-            context = "\n".join([f"Memory: {mem.content}" for mem in relevant_memories[:3]])
+            context = "\n".join([f"- {mem.content}" for mem in relevant_memories[:5]])
+            print(f"DEBUG: Built context: {context[:200]}...")
         
         # Check if user is asking about files and add file content to context
         file_query_keywords = ["file", "main.py", "analyze", "code", "script", "upload"]
@@ -760,10 +760,14 @@ Respond naturally to the user's message, incorporating relevant memories when he
             "role": "system",
             "content": f"""You are NeuroLM, an AI with access to your memory system. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
 
-Relevant memories from previous conversations:
+IMPORTANT: Read and use these memories from your previous conversations:
 {context}
 
-Use these memories naturally in your responses when relevant. Be conversational, warm, and helpful."""
+Key instructions:
+- If you've met this user before, acknowledge them by name from your memories
+- Reference specific details from past conversations when relevant
+- Be conversational, warm, and helpful
+- Always check your memories for the user's name and past interactions"""
         }
         
         user_message = {
@@ -922,6 +926,7 @@ async def get_user_files(request: Request, search: str = None):
     """Get all files for the current user with optional search"""
     try:
         session_id = request.cookies.get("session_id")
+        print(f"Files endpoint - Session ID: {session_id}, Available sessions: {len(user_sessions)}")
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
