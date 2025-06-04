@@ -26,6 +26,9 @@ app.include_router(router, prefix="/api")
 user_sessions = {}
 memory_system = MemorySystem()
 
+# Clear sessions on startup to force fresh login
+user_sessions.clear()
+
 def get_db_connection():
     """Get PostgreSQL database connection"""
     return psycopg2.connect(os.getenv("DATABASE_URL"))
@@ -817,13 +820,19 @@ async def get_conversations(request: Request):
     """Get all conversations for the current user"""
     try:
         session_id = request.cookies.get("session_id")
+        print(f"Session ID: {session_id}, Available sessions: {len(user_sessions)}")
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
         
         conversations = get_user_conversations(user_id)
         return conversations
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Conversations error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error getting conversations: {str(e)}")
 
 @app.post("/api/conversations/new", response_model=ConversationResponse)
