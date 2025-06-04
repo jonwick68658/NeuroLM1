@@ -16,5 +16,4 @@ dependencies = [
     "itsdangerous>=2.2.0",
     "starlette>=0.45.3",
     "psycopg2-binary>=2.9.10",
-    "psycopg2-pool>=1.2",
 ]

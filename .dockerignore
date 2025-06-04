@@ -11,6 +11,7 @@ __pycache__/
 .gitignore
 attached_assets/
 uv.lock
+generated-icon.png
 
 # IDE and editor files
 .vscode/
