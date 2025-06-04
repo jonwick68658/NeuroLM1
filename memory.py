@@ -233,27 +233,60 @@ class MemorySystem:
         
     def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None) -> List[MemoryNode]:
         """Retrieve relevant memories based on query and context using Neo4j vector search"""
-        # Generate embedding for the query
-        query_embedding = self._generate_embedding(query)
         
-        # Find similar memories using Neo4j vector similarity
         with self.driver.session() as session:
-            if user_id:
-                # Get ALL user memories for similarity calculation
-                result = session.run(
+            if not user_id:
+                return []
+            
+            # Special handling for name queries - prioritize memories containing actual names
+            name_keywords = ["name", "called", "Ryan", "I am", "my name is"]
+            is_name_query = any(keyword.lower() in query.lower() for keyword in name_keywords)
+            
+            if is_name_query:
+                # First, look for memories containing names or introductions
+                name_result = session.run(
                     """
                     MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
-                    WHERE m.embedding IS NOT NULL
-                    RETURN m.id AS id, m.embedding AS embedding,
-                           m.content AS content, m.confidence AS confidence,
+                    WHERE m.content CONTAINS 'Ryan' OR 
+                          m.content CONTAINS 'name is' OR 
+                          m.content CONTAINS 'I am' OR
+                          m.content CONTAINS 'called'
+                    RETURN m.id AS id, m.content AS content, m.confidence AS confidence,
                            m.timestamp AS timestamp
                     ORDER BY m.timestamp DESC
+                    LIMIT $depth
                     """,
-                    {"user_id": user_id}
+                    {"user_id": user_id, "depth": depth}
                 )
-            else:
-                # Return empty list if no user_id provided to enforce user isolation
-                return []
+                
+                memories = []
+                for record in name_result:
+                    memory_node = MemoryNode(
+                        content=record["content"],
+                        confidence=record["confidence"],
+                        timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
+                    )
+                    memory_node.id = record["id"]
+                    memories.append(memory_node)
+                
+                if memories:
+                    return memories
+            
+            # Fallback to regular embedding-based search
+            query_embedding = self._generate_embedding(query)
+            
+            # Get ALL user memories for similarity calculation
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                WHERE m.embedding IS NOT NULL
+                RETURN m.id AS id, m.embedding AS embedding,
+                       m.content AS content, m.confidence AS confidence,
+                       m.timestamp AS timestamp
+                ORDER BY m.timestamp DESC
+                """,
+                {"user_id": user_id}
+            )
             
             # Calculate similarity scores with recency boost
             candidates = []

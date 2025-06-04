@@ -710,6 +710,7 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         
         # Debug logging
         print(f"DEBUG: Query: {chat_request.message}")
+        print(f"DEBUG: User ID: {user_id}")
         print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
         if relevant_memories:
             for i, mem in enumerate(relevant_memories[:3]):
