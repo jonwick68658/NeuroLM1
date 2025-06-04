@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Form, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
 from memory_api import *
 from pydantic import BaseModel
@@ -261,8 +261,26 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                         date = uploaded_at.strftime("%Y-%m-%d %H:%M")
                         response += f"• `{filename}` ({file_type}) - {date}\n"
         
+        elif cmd == '/download':
+            if len(parts) < 2:
+                response = "Usage: `/download [filename]`\nExample: `/download main.py`"
+            else:
+                filename = ' '.join(parts[1:])
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT filename FROM user_files WHERE user_id = %s AND filename = %s", (user_id, filename))
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if result:
+                    download_url = f"/api/download/{filename}"
+                    response = f"**Download ready:** `{filename}`\n\nClick here to download: [Download {filename}]({download_url})\n\nOr visit: `{download_url}`"
+                else:
+                    response = f"File '{filename}' not found. Use `/files` to see available files."
+        
         else:
-            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name"
+            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file"
         
         # Save command and response to conversation
         save_conversation_message(conversation_id, 'user', command)
@@ -920,6 +938,43 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         return {"message": f"File {file.filename} uploaded successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Download file endpoint
+@app.get("/api/download/{filename}")
+async def download_file(filename: str, request: Request):
+    """Download a file for the current user"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT content, file_type FROM user_files WHERE user_id = %s AND filename = %s",
+            (user_id, filename)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        content, file_type = result
+        
+        # Set appropriate headers for file download
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": file_type or "application/octet-stream"
+        }
+        
+        return Response(content=content, headers=headers)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error downloading file: {str(e)}")
 
 # Get user files endpoint
 @app.get("/api/user-files")
