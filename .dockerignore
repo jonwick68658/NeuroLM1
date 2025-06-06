@@ -16,25 +16,11 @@ dist/
 .cache/uv/
 .cache/replit/
 
-# Python package cache
-.pythonlibs/
-.local/
+# Python package cache (moved to backup)
+.pythonlibs_backup/
+.local_backup/
 .upm/
 .config/
-
-# Large unused libraries (explicit paths)
-.pythonlibs/lib/python3.11/site-packages/nvidia/
-.pythonlibs/lib/python3.11/site-packages/torch/
-.pythonlibs/lib/python3.11/site-packages/triton/
-.pythonlibs/lib/python3.11/site-packages/transformers/
-.pythonlibs/lib/python3.11/site-packages/sklearn/
-.pythonlibs/lib/python3.11/site-packages/scipy/
-.pythonlibs/lib/python3.11/site-packages/pandas/
-.pythonlibs/lib/python3.11/site-packages/onnxruntime/
-.pythonlibs/lib/python3.11/site-packages/streamlit/
-.pythonlibs/lib/python3.11/site-packages/chromadb_rust_bindings/
-.pythonlibs/lib/python3.11/site-packages/cusparselt/
-.pythonlibs/lib/python3.11/site-packages/pyarrow/
 
 # Development files
 .git/
