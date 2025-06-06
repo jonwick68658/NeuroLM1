@@ -16,6 +16,24 @@ dist/
 .cache/uv/
 .cache/replit/
 
+# Python package cache
+.pythonlibs/
+.local/
+.upm/
+.config/
+
+# Large unused libraries (preserved locally)
+**/*nvidia*
+**/*torch*
+**/*triton*
+**/*streamlit*
+**/*chromadb*
+**/*transformers*
+**/*sklearn*
+**/*scipy*
+**/*pandas*
+**/*onnxruntime*
+
 # Development files
 .git/
 .gitignore
