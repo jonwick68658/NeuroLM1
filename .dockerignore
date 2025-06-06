@@ -1,10 +1,20 @@
-# Cache directories
+# UV Package Manager Cache
 .cache/
+.uv/
 .upm/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Large dependency caches
+.cache/uv/
+.cache/replit/
 
 # Development files
 .git/
