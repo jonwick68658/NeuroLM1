@@ -151,9 +151,24 @@
                 width: 100% !important;
             }
 
-            /* Hide Model and Files dropdowns on mobile */
-            .header > div:not(.header-left) {
+            /* Show model selector on mobile, hide files dropdown */
+            .header > div:nth-child(3) {
                 display: none !important;
+            }
+            
+            /* Make model selector mobile-friendly */
+            .header > div:nth-child(2) {
+                margin-left: 0.5rem !important;
+            }
+            
+            .header > div:nth-child(2) label {
+                font-size: 0.6rem !important;
+            }
+            
+            .header > div:nth-child(2) #modelSearch {
+                min-width: 120px !important;
+                font-size: 0.7rem !important;
+                padding: 0.1rem !important;
             }
 
             /* Ensure hamburger menu is prominent on mobile */
