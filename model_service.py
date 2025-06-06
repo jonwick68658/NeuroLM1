@@ -6,6 +6,7 @@ import os
 from typing import List, Dict, Optional
 import asyncio
 import httpx
+from cerebras.cloud.sdk import Cerebras
 
 class ModelService:
     """Service for managing OpenRouter AI models and chat completions"""
@@ -14,7 +15,9 @@ class ModelService:
         self.api_key = os.getenv("OPENROUTER_API_KEY")
         self.base_url = "https://openrouter.ai/api/v1"
         self._models_cache = None
+        self.cerebras_client = Cerebras(api_key=os.environ.get("CEREBRAS_API_KEY"))
         self.default_models = [
+            {"id": "cerebras/llama-4-scout-17b-16e-instruct", "name": "Llama 4 Scout (Cerebras)", "description": "Fast inference via Cerebras - Default"},
             {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "description": "Fast and efficient model for general chat"},
             {"id": "google/gemini-2.0-flash-001", "name": "Gemini 2.0 Flash", "description": "Google's latest fast model"}
         ]
@@ -55,8 +58,26 @@ class ModelService:
             print(f"Error fetching models: {e}")
             return self.default_models
     
-    async def chat_completion(self, messages: List[Dict], model: str = "openai/gpt-4o-mini") -> str:
-        """Generate chat completion using OpenRouter API"""
+    async def chat_completion(self, messages: List[Dict], model: str = "cerebras/llama-4-scout-17b-16e-instruct") -> str:
+        """Generate chat completion using Cerebras or OpenRouter API"""
+        
+        # Use Cerebras for default model
+        if model.startswith("cerebras/"):
+            try:
+                cerebras_model = model.replace("cerebras/", "")
+                response = self.cerebras_client.chat.completions.create(
+                    messages=messages,
+                    model=cerebras_model,
+                    max_completion_tokens=2048,
+                    temperature=0.2,
+                    top_p=1,
+                    stream=False
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                raise Exception(f"Cerebras chat completion failed: {str(e)}")
+        
+        # Use OpenRouter for all other models
         if not self.api_key:
             raise Exception("OpenRouter API key is required for chat completions")
         

@@ -30,6 +30,23 @@ wheels = [
 ]
 
 [[package]]
+name = "cerebras-cloud-sdk"
+version = "1.35.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/c9/b140f033fac39a6f94d8e3ee90aa5eb1282a203bcb75ec4774446e65229d/cerebras_cloud_sdk-1.35.0.tar.gz", hash = "sha256:1b65185b4688516f41716aa5ec19c5c9645e24b259a841cfff17542615e376a4", size = 112833 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/c6/36d7a1461463c6c1034b20385eef7cb5a334302e7ceea054d41418e33eb6/cerebras_cloud_sdk-1.35.0-py3-none-any.whl", hash = "sha256:4103972e4a36ca5be92190958ffc3b6a14fefca6d60d743a72d3e3a119642160", size = 89455 },
+]
+
+[[package]]
 name = "certifi"
 version = "2025.4.26"
 source = { registry = "https://pypi.org/simple" }
@@ -320,18 +337,6 @@ wheels = [
 ]
 
 [[package]]
-name = "psycopg2-pool"
-version = "1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "psycopg2-binary" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ba/8f/a5ae396ec7aa955e9d234b7d38ae3e975a47fbf45c7f4571be4b0e7473b4/psycopg2-pool-1.2.tar.gz", hash = "sha256:e9ec38d5af15b7cef5546452797935129c99482b25646f258a21786bfb826bf3", size = 11385 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/37/99fc8b2725df9b9c3df8a184209480290d1300cd7a4cb14ed6b29ce6ef9e/psycopg2_pool-1.2-py2.py3-none-any.whl", hash = "sha256:3c8251f6fac3145eb4c5bf3407bb61543dbbcbb8117af1341cd7a8b5468aedbb", size = 7349 },
-]
-
-[[package]]
 name = "pydantic"
 version = "2.11.5"
 source = { registry = "https://pypi.org/simple" }
@@ -443,13 +448,13 @@ name = "repl-nix-workspace"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "cerebras-cloud-sdk" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "itsdangerous" },
     { name = "neo4j" },
     { name = "openai" },
     { name = "psycopg2-binary" },
-    { name = "psycopg2-pool" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
@@ -460,13 +465,13 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cerebras-cloud-sdk", specifier = ">=1.35.0" },
     { name = "fastapi", specifier = ">=0.115.9" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "neo4j", specifier = ">=5.0.0" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
-    { name = "psycopg2-pool", specifier = ">=1.2" },
     { name = "pydantic", specifier = ">=2.11.5" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "python-multipart", specifier = ">=0.0.20" },
