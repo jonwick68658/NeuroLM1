@@ -11,17 +11,38 @@ from neo4j import GraphDatabase
 # Note: sentence_transformers removed to resolve dependency conflicts
 # We'll use OpenAI embeddings through utils.py instead
 
+class TopicNode:
+    """
+    Represents a topic that contains related memory nodes.
+    Topics form a hierarchical structure with subtopics.
+    """
+    
+    def __init__(self, name: str, description: str = None, parent_topic_id: str = None, 
+                 timestamp: datetime.datetime = None):
+        self.id = str(uuid.uuid4())
+        self.name = name
+        self.description = description or f"Topic about {name}"
+        self.parent_topic_id = parent_topic_id
+        self.timestamp = timestamp or datetime.datetime.now()
+        self.memory_count = 0
+        self.subtopic_count = 0
+        
+    def __repr__(self):
+        return f"TopicNode(id={self.id}, name={self.name}, memories={self.memory_count})"
+
 class MemoryNode:
     """
     Represents a unit of memory with content and metadata.
+    Now organized under topic nodes.
     """
 
     def __init__(self, content: str, confidence: float = 0.8, 
-                 category: str = None, timestamp: datetime.datetime = None):
+                 category: str = None, topic_id: str = None, timestamp: datetime.datetime = None):
         self.id = str(uuid.uuid4())
         self.content = content
         self.confidence = confidence
         self.category = category or self._detect_category(content)
+        self.topic_id = topic_id  # Link to parent topic
         self.timestamp = timestamp or datetime.datetime.now()
         self.connections = set()  # Will store only IDs for now
         self.reinforcement = 0.0  # How much this memory has been reinforced
