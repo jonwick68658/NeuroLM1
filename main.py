@@ -751,6 +751,8 @@ async def serve_chat(request: Request):
 # Conversation models
 class ConversationCreate(BaseModel):
     title: Optional[str] = None
+    topic: Optional[str] = None
+    sub_topic: Optional[str] = None
 
 class ConversationResponse(BaseModel):
     id: str
@@ -939,7 +941,13 @@ async def create_new_conversation(request: Request, conversation_data: Conversat
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
         
-        conversation_id = create_conversation(user_id, conversation_data.title)
+        # Validate sub-topic limit if provided
+        if conversation_data.topic and conversation_data.sub_topic:
+            sub_topic_count = get_sub_topic_count(user_id, conversation_data.topic)
+            if sub_topic_count >= 5:
+                raise HTTPException(status_code=400, detail=f"Maximum 5 sub-topics allowed per topic. Topic '{conversation_data.topic}' already has {sub_topic_count} sub-topics.")
+        
+        conversation_id = create_conversation(user_id, conversation_data.title, conversation_data.topic, conversation_data.sub_topic)
         if not conversation_id:
             raise HTTPException(status_code=500, detail="Failed to create conversation")
         
@@ -966,6 +974,20 @@ async def get_conversation_messages_endpoint(conversation_id: str, request: Requ
         return messages
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting conversation messages: {str(e)}")
+
+@app.get("/api/topics")
+async def get_topics_endpoint(request: Request):
+    """Get all topics and sub-topics for the current user"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        topics = get_all_topics(user_id)
+        return topics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting topics: {str(e)}")
 
 # Clear database endpoint
 @app.post("/api/clear-memory")

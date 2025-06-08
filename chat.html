@@ -270,6 +270,33 @@
             background: var(--secondary-color);
         }
 
+        .topic-selection {
+            margin-bottom: 1rem;
+        }
+
+        .topic-selection label {
+            display: block;
+            font-size: 0.8rem;
+            margin-bottom: 0.3rem;
+            color: var(--dark-text);
+            font-weight: 500;
+        }
+
+        .topic-select, .subtopic-select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+            background: white;
+        }
+
+        .topic-select:focus, .subtopic-select:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
         .conversations-list {
             flex: 1;
             overflow-y: auto;
@@ -739,6 +766,19 @@
     <div class="main-container">
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
+                <div class="topic-selection">
+                    <label for="topicSelect">Topic:</label>
+                    <select class="topic-select" id="topicSelect">
+                        <option value="">Select or create topic</option>
+                        <option value="__new__">+ Create New Topic</option>
+                    </select>
+                    
+                    <label for="subtopicSelect">Sub-topic:</label>
+                    <select class="subtopic-select" id="subtopicSelect" disabled>
+                        <option value="">Select or create sub-topic</option>
+                        <option value="__new__">+ Create New Sub-topic</option>
+                    </select>
+                </div>
                 <button class="new-chat-btn" id="newChatBtn">+ Start New Chat</button>
             </div>
             <div class="conversations-list" id="conversationsList">
