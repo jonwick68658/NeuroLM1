@@ -1041,13 +1041,19 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             except Exception as e:
                 print(f"Error fetching user files: {e}")
         
+        # Get user's first name for personalized responses
+        user_first_name = get_user_first_name(user_id)
+        
         # Call LLM with context
         system_prompt = f"""You are NeuroLM, an AI with access to your memory system. 
         
+User Information:
+- User's name: {user_first_name if user_first_name else "User"}
+
 Relevant memories:
 {context}
 
-Respond naturally to the user's message, incorporating relevant memories when helpful."""
+Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
         # Store user message in memory
         user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}", user_id=user_id)
@@ -1211,6 +1217,22 @@ async def get_topics_endpoint(request: Request):
         return topics
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting topics: {str(e)}")
+
+@app.get("/api/user/name")
+async def get_user_name_endpoint(request: Request):
+    """Get the current user's first name"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        first_name = get_user_first_name(user_id)
+        return {"first_name": first_name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting user name: {str(e)}")
 
 class TopicCreate(BaseModel):
     name: str

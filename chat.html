@@ -895,6 +895,7 @@
         let allTopics = {};
         let selectedTopic = '';
         let selectedSubtopic = '';
+        let userName = '';
         
         // Topic selection elements
         const topicSelect = document.getElementById('topicSelect');
@@ -1450,7 +1451,8 @@
                     chatMessages.innerHTML = '';
                     
                     // Add welcome message with topic info
-                    let welcomeMessage = 'Hello! I\'m NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?';
+                    let greeting = userName ? `Hello, ${userName}!` : 'Hello!';
+                    let welcomeMessage = `${greeting} I'm NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?`;
                     let memoryInfo = 'Memory system active • Ready to learn';
                     
                     if (selectedTopic && selectedTopic !== '__new__') {
@@ -1630,6 +1632,19 @@
         });
 
         newChatBtn.addEventListener('click', startNewChat);
+
+        // User management functions
+        async function loadUserName() {
+            try {
+                const response = await fetch('/api/user/name');
+                if (response.ok) {
+                    const data = await response.json();
+                    userName = data.first_name || '';
+                }
+            } catch (error) {
+                console.error('Error loading user name:', error);
+            }
+        }
 
         // File management functions
         async function loadFiles() {
