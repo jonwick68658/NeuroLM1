@@ -543,7 +543,7 @@ def hash_password(password: str) -> str:
     """Hash password using SHA256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
-def create_user_in_db(username: str, email: str, password_hash: str) -> bool:
+def create_user_in_db(first_name: str, username: str, email: str, password_hash: str) -> bool:
     """Create user in Neo4j database"""
     try:
         with memory_system.driver.session() as session:
@@ -555,10 +555,19 @@ def create_user_in_db(username: str, email: str, password_hash: str) -> bool:
             if result.single():
                 return False  # Username already exists
             
+            # Check if email already exists
+            result = session.run(
+                "MATCH (u:User {email: $email}) RETURN u",
+                email=email
+            )
+            if result.single():
+                return False  # Email already exists
+            
             # Create new user
             session.run(
-                "CREATE (u:User {id: $id, username: $username, email: $email, password_hash: $password_hash, created_at: datetime()})",
+                "CREATE (u:User {id: $id, first_name: $first_name, username: $username, email: $email, password_hash: $password_hash, created_at: datetime()})",
                 id=str(uuid.uuid4()),
+                first_name=first_name,
                 username=username,
                 email=email,
                 password_hash=password_hash
@@ -582,6 +591,20 @@ def verify_user_login(username: str, password: str) -> Optional[str]:
             return record["user_id"] if record else None
     except Exception as e:
         print(f"Error verifying login: {e}")
+        return None
+
+def get_user_first_name(user_id: str) -> Optional[str]:
+    """Get user's first name by user ID"""
+    try:
+        with memory_system.driver.session() as session:
+            result = session.run(
+                "MATCH (u:User {id: $user_id}) RETURN u.first_name as first_name",
+                user_id=user_id
+            )
+            record = result.single()
+            return record["first_name"] if record else None
+    except Exception as e:
+        print(f"Error getting user first name: {e}")
         return None
 
 # Registration and login pages
@@ -683,6 +706,10 @@ async def register_page():
             </div>
             <form action="/register" method="post" onsubmit="return validateForm()">
                 <div class="form-group">
+                    <label for="first_name">First Name / Preferred Name:</label>
+                    <input type="text" id="first_name" name="first_name" required>
+                </div>
+                <div class="form-group">
                     <label for="username">Username:</label>
                     <input type="text" id="username" name="username" required>
                 </div>
@@ -726,6 +753,7 @@ async def register_page():
 
 @app.post("/register")
 async def register_user(
+    first_name: str = Form(...),
     username: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
@@ -743,12 +771,12 @@ async def register_user(
     
     # Hash password and create user
     password_hash = hash_password(password)
-    success = create_user_in_db(username, email, password_hash)
+    success = create_user_in_db(first_name, username, email, password_hash)
     
     if not success:
         return HTMLResponse("""
         <script>
-            alert('Username already exists. Please choose a different username.');
+            alert('Username or email already exists. Please choose different credentials.');
             window.location.href = '/register';
         </script>
         """)
