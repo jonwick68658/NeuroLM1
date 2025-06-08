@@ -84,18 +84,32 @@ def create_conversation(user_id: str, title: Optional[str] = None, topic: Option
         print(f"Error creating conversation: {e}")
         return None
 
-def get_user_conversations(user_id: str) -> List[Dict]:
-    """Get all conversations for a user"""
+def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0) -> Dict:
+    """Get paginated conversations for a user with previews"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Get total count
+        cursor.execute('SELECT COUNT(*) FROM conversations WHERE user_id = %s', (user_id,))
+        total_count = cursor.fetchone()[0]
+        
+        # Get paginated conversations with latest message preview
         cursor.execute('''
-            SELECT id, title, topic, sub_topic, created_at, updated_at, message_count
-            FROM conversations
-            WHERE user_id = %s
-            ORDER BY updated_at DESC
-            LIMIT 10
-        ''', (user_id,))
+            SELECT c.id, c.title, c.topic, c.sub_topic, c.created_at, c.updated_at, c.message_count,
+                   m.content as last_message, m.message_type as last_message_type
+            FROM conversations c
+            LEFT JOIN LATERAL (
+                SELECT content, message_type 
+                FROM conversation_messages 
+                WHERE conversation_id = c.id 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            ) m ON true
+            WHERE c.user_id = %s
+            ORDER BY c.updated_at DESC
+            LIMIT %s OFFSET %s
+        ''', (user_id, limit, offset))
         
         conversations = []
         for row in cursor.fetchall():
@@ -106,15 +120,23 @@ def get_user_conversations(user_id: str) -> List[Dict]:
                 'sub_topic': row[3],
                 'created_at': row[4].isoformat(),
                 'updated_at': row[5].isoformat(),
-                'message_count': row[6]
+                'message_count': row[6],
+                'last_message': row[7],
+                'last_message_type': row[8]
             })
         
         cursor.close()
         conn.close()
-        return conversations
+        
+        return {
+            'conversations': conversations,
+            'total_count': total_count,
+            'has_more': offset + limit < total_count,
+            'next_offset': offset + limit if offset + limit < total_count else None
+        }
     except Exception as e:
         print(f"Error getting conversations: {e}")
-        return []
+        return {'conversations': [], 'total_count': 0, 'has_more': False, 'next_offset': None}
 
 def save_conversation_message(conversation_id: str, message_type: str, content: str):
     """Save a message to a conversation"""
@@ -149,8 +171,80 @@ def save_conversation_message(conversation_id: str, message_type: str, content: 
     except Exception as e:
         print(f"Error saving message: {e}")
 
-def get_conversation_messages(conversation_id: str) -> List[Dict]:
-    """Get all messages for a conversation"""
+def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: str = None) -> Dict:
+    """Get paginated messages for a conversation"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get total message count
+        cursor.execute('SELECT COUNT(*) FROM conversation_messages WHERE conversation_id = %s', (conversation_id,))
+        total_count = cursor.fetchone()[0]
+        
+        if before_id:
+            # Load messages before a specific message ID
+            cursor.execute('''
+                SELECT m1.id, m1.message_type, m1.content, m1.created_at
+                FROM conversation_messages m1
+                JOIN conversation_messages m2 ON m2.id = %s AND m2.conversation_id = %s
+                WHERE m1.conversation_id = %s AND m1.created_at < m2.created_at
+                ORDER BY m1.created_at DESC
+                LIMIT %s
+            ''', (before_id, conversation_id, conversation_id, limit))
+            
+            # Reverse to get chronological order
+            rows = list(reversed(cursor.fetchall()))
+        else:
+            # Load most recent messages
+            cursor.execute('''
+                SELECT id, message_type, content, created_at
+                FROM conversation_messages
+                WHERE conversation_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+            ''', (conversation_id, limit))
+            
+            # Reverse to get chronological order
+            rows = list(reversed(cursor.fetchall()))
+        
+        messages = []
+        for row in rows:
+            messages.append({
+                'id': row[0],
+                'message_type': row[1],
+                'content': row[2],
+                'created_at': row[3].isoformat()
+            })
+        
+        cursor.close()
+        conn.close()
+        
+        # Check if there are more messages before the oldest returned message
+        has_more = False
+        if messages:
+            oldest_id = messages[0]['id']
+            cursor = get_db_connection().cursor()
+            cursor.execute('''
+                SELECT COUNT(*) FROM conversation_messages 
+                WHERE conversation_id = %s AND created_at < (
+                    SELECT created_at FROM conversation_messages WHERE id = %s
+                )
+            ''', (conversation_id, oldest_id))
+            has_more = cursor.fetchone()[0] > 0
+            cursor.close()
+        
+        return {
+            'messages': messages,
+            'total_count': total_count,
+            'has_more': has_more,
+            'oldest_id': messages[0]['id'] if messages else None
+        }
+    except Exception as e:
+        print(f"Error getting messages: {e}")
+        return {'messages': [], 'total_count': 0, 'has_more': False, 'oldest_id': None}
+
+def get_conversation_messages_all(conversation_id: str) -> List[Dict]:
+    """Get all messages for a conversation (legacy function for backward compatibility)"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -829,9 +923,13 @@ class ConversationCreate(BaseModel):
 class ConversationResponse(BaseModel):
     id: str
     title: str
+    topic: Optional[str]
+    sub_topic: Optional[str]
     created_at: str
     updated_at: str
     message_count: int
+    last_message: Optional[str] = None
+    last_message_type: Optional[str] = None
 
 class ConversationMessage(BaseModel):
     id: str
@@ -984,9 +1082,15 @@ Key instructions:
         raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
 
 # Conversation management endpoints
-@app.get("/api/conversations", response_model=List[ConversationResponse])
-async def get_conversations(request: Request):
-    """Get all conversations for the current user"""
+class ConversationListResponse(BaseModel):
+    conversations: List[ConversationResponse]
+    total_count: int
+    has_more: bool
+    next_offset: Optional[int]
+
+@app.get("/api/conversations", response_model=ConversationListResponse)
+async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
+    """Get paginated conversations for the current user"""
     try:
         session_id = request.cookies.get("session_id")
         print(f"Session ID: {session_id}, Available sessions: {len(user_sessions)}")
@@ -994,8 +1098,8 @@ async def get_conversations(request: Request):
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
         
-        conversations = get_user_conversations(user_id)
-        return conversations
+        result = get_user_conversations(user_id, limit, offset)
+        return result
     except HTTPException:
         raise
     except Exception as e:
