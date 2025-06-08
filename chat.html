@@ -833,6 +833,13 @@
         let filteredFiles = [];
         let sidebarOpen = false; // Default closed on all devices
         let highlightedSuggestion = -1;
+        let allTopics = {};
+        let selectedTopic = '';
+        let selectedSubtopic = '';
+        
+        // Topic selection elements
+        const topicSelect = document.getElementById('topicSelect');
+        const subtopicSelect = document.getElementById('subtopicSelect');
         
         // Slash command definitions
         const slashCommands = [
@@ -855,6 +862,11 @@
                 cmd: '/search',
                 desc: 'Search files by name',
                 usage: '/search term'
+            },
+            {
+                cmd: '/topics',
+                desc: 'List all topics and sub-topics',
+                usage: '/topics'
             }
         ];
 
@@ -1220,12 +1232,22 @@
 
         async function startNewChat() {
             try {
+                const conversationData = {};
+                
+                // Include topic and sub-topic if selected
+                if (selectedTopic && selectedTopic !== '__new__') {
+                    conversationData.topic = selectedTopic;
+                    if (selectedSubtopic && selectedSubtopic !== '__new__') {
+                        conversationData.sub_topic = selectedSubtopic;
+                    }
+                }
+                
                 const response = await fetch('/api/conversations/new', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify(conversationData)
                 });
                 
                 if (response.ok) {
@@ -1235,18 +1257,122 @@
                     // Clear chat messages
                     chatMessages.innerHTML = '';
                     
-                    // Add welcome message
-                    addMessage('Hello! I\'m NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?', 'assistant', 'Memory system active • Ready to learn');
+                    // Add welcome message with topic info
+                    let welcomeMessage = 'Hello! I\'m NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?';
+                    let memoryInfo = 'Memory system active • Ready to learn';
                     
-                    // Reload conversations list
+                    if (selectedTopic && selectedTopic !== '__new__') {
+                        memoryInfo += ` • Topic: ${selectedTopic}`;
+                        if (selectedSubtopic && selectedSubtopic !== '__new__') {
+                            memoryInfo += ` → ${selectedSubtopic}`;
+                        }
+                    }
+                    
+                    addMessage(welcomeMessage, 'assistant', memoryInfo);
+                    
+                    // Reload conversations list and topics
                     loadConversations();
+                    loadTopics();
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.detail || 'Error creating conversation');
                 }
             } catch (error) {
                 console.error('Error creating new conversation:', error);
             }
         }
 
+        // Topic management functions
+        async function loadTopics() {
+            try {
+                const response = await fetch('/api/topics');
+                if (response.ok) {
+                    allTopics = await response.json();
+                    updateTopicDropdowns();
+                }
+            } catch (error) {
+                console.error('Error loading topics:', error);
+            }
+        }
+
+        function updateTopicDropdowns() {
+            // Update topic dropdown
+            topicSelect.innerHTML = '<option value="">Select or create topic</option><option value="__new__">+ Create New Topic</option>';
+            
+            Object.keys(allTopics).forEach(topic => {
+                const option = document.createElement('option');
+                option.value = topic;
+                option.textContent = topic;
+                topicSelect.appendChild(option);
+            });
+            
+            // Update subtopic dropdown
+            updateSubtopicDropdown();
+        }
+
+        function updateSubtopicDropdown() {
+            subtopicSelect.innerHTML = '<option value="">Select or create sub-topic</option>';
+            
+            if (selectedTopic && selectedTopic !== '__new__' && allTopics[selectedTopic]) {
+                subtopicSelect.disabled = false;
+                
+                // Add existing sub-topics
+                allTopics[selectedTopic].forEach(subtopic => {
+                    const option = document.createElement('option');
+                    option.value = subtopic;
+                    option.textContent = subtopic;
+                    subtopicSelect.appendChild(option);
+                });
+                
+                // Add create new option only if less than 5 sub-topics
+                if (allTopics[selectedTopic].length < 5) {
+                    const newOption = document.createElement('option');
+                    newOption.value = '__new__';
+                    newOption.textContent = '+ Create New Sub-topic';
+                    subtopicSelect.appendChild(newOption);
+                }
+            } else {
+                subtopicSelect.disabled = true;
+            }
+        }
+
         // Event listeners
+        topicSelect.addEventListener('change', function() {
+            selectedTopic = this.value;
+            selectedSubtopic = '';
+            subtopicSelect.value = '';
+            
+            if (selectedTopic === '__new__') {
+                const newTopic = prompt('Enter new topic name:');
+                if (newTopic && newTopic.trim()) {
+                    selectedTopic = newTopic.toLowerCase().trim();
+                    // Topic will be created when starting new chat
+                    this.value = selectedTopic;
+                } else {
+                    selectedTopic = '';
+                    this.value = '';
+                }
+            }
+            
+            updateSubtopicDropdown();
+        });
+
+        subtopicSelect.addEventListener('change', function() {
+            selectedSubtopic = this.value;
+            
+            if (selectedSubtopic === '__new__') {
+                const newSubtopic = prompt('Enter new sub-topic name:');
+                if (newSubtopic && newSubtopic.trim()) {
+                    selectedSubtopic = newSubtopic.toLowerCase().trim();
+                    // Sub-topic will be created when starting new chat
+                    this.value = selectedSubtopic;
+                } else {
+                    selectedSubtopic = '';
+                    this.value = '';
+                }
+            }
+        });
+
         newChatBtn.addEventListener('click', startNewChat);
 
         // File management functions
@@ -1435,6 +1561,7 @@
             await loadModels();
             await loadConversations();
             await loadFiles();
+            await loadTopics();
             
             // Initialize sidebar state
             updateSidebarState();
