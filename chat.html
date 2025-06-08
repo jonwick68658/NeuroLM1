@@ -1833,6 +1833,7 @@
             await loadConversations(true);
             await loadFiles();
             await loadTopics();
+            await loadUserName();
             
             // Initialize sidebar state
             updateSidebarState();
@@ -1840,7 +1841,9 @@
             // If no current conversation, start a new one
             if (!currentConversationId) {
                 // Add initial welcome message without creating conversation yet
-                addMessage('Hello! I\'m NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?', 'assistant', 'Memory system active • Ready to learn');
+                let greeting = userName ? `Hello, ${userName}!` : 'Hello!';
+                let welcomeMessage = `${greeting} I'm NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?`;
+                addMessage(welcomeMessage, 'assistant', 'Memory system active • Ready to learn');
             }
             
             // Focus input
