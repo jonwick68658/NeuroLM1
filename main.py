@@ -937,6 +937,12 @@ class ConversationMessage(BaseModel):
     content: str
     created_at: str
 
+class MessageListResponse(BaseModel):
+    messages: List[ConversationMessage]
+    total_count: int
+    has_more: bool
+    oldest_id: Optional[str]
+
 # Chat endpoint
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_with_memory(chat_request: ChatMessage, request: Request):
@@ -1138,15 +1144,28 @@ async def create_new_conversation(request: Request, conversation_data: Conversat
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating conversation: {str(e)}")
 
-@app.get("/api/conversations/{conversation_id}/messages", response_model=List[ConversationMessage])
-async def get_conversation_messages_endpoint(conversation_id: str, request: Request):
-    """Get all messages for a specific conversation"""
+@app.get("/api/conversations/{conversation_id}/messages", response_model=MessageListResponse)
+async def get_conversation_messages_endpoint(conversation_id: str, request: Request, limit: int = 30, before_id: str = None):
+    """Get paginated messages for a specific conversation"""
     try:
         session_id = request.cookies.get("session_id")
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
         
-        messages = get_conversation_messages(conversation_id)
+        result = get_conversation_messages(conversation_id, limit, before_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting conversation messages: {str(e)}")
+
+@app.get("/api/conversations/{conversation_id}/messages/all", response_model=List[ConversationMessage])
+async def get_conversation_messages_all_endpoint(conversation_id: str, request: Request):
+    """Get all messages for a specific conversation (legacy endpoint)"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        messages = get_conversation_messages_all(conversation_id)
         return messages
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting conversation messages: {str(e)}")

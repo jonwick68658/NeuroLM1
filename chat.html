@@ -829,6 +829,13 @@
         let filteredModels = [];
         let currentConversationId = null;
         let conversations = [];
+        let conversationsOffset = 0;
+        let hasMoreConversations = false;
+        let loadingConversations = false;
+        let currentMessages = [];
+        let hasMoreMessages = false;
+        let loadingMessages = false;
+        let oldestMessageId = null;
         let userFiles = [];
         let filteredFiles = [];
         let sidebarOpen = false; // Default closed on all devices
@@ -1175,16 +1182,42 @@
         });
 
         // Conversation management functions
-        async function loadConversations() {
+        async function loadConversations(reset = false) {
+            if (loadingConversations) return;
+            
             try {
-                const response = await fetch('/api/conversations');
+                loadingConversations = true;
+                
+                if (reset) {
+                    conversationsOffset = 0;
+                    conversations = [];
+                }
+                
+                const response = await fetch(`/api/conversations?limit=20&offset=${conversationsOffset}`);
                 if (response.ok) {
-                    conversations = await response.json();
+                    const result = await response.json();
+                    
+                    if (reset) {
+                        conversations = result.conversations;
+                    } else {
+                        conversations = conversations.concat(result.conversations);
+                    }
+                    
+                    hasMoreConversations = result.has_more;
+                    conversationsOffset = result.next_offset || 0;
+                    
                     renderConversations();
                 }
             } catch (error) {
                 console.error('Error loading conversations:', error);
+            } finally {
+                loadingConversations = false;
             }
+        }
+
+        async function loadMoreConversations() {
+            if (!hasMoreConversations || loadingConversations) return;
+            await loadConversations(false);
         }
 
         function renderConversations() {
@@ -1198,26 +1231,66 @@
                 }
                 
                 const date = new Date(conversation.updated_at).toLocaleDateString();
+                let topicInfo = '';
+                if (conversation.topic && conversation.topic !== 'general') {
+                    topicInfo = `<div class="conversation-topic">${conversation.topic}${conversation.sub_topic ? ' → ' + conversation.sub_topic : ''}</div>`;
+                }
+                
+                let messagePreview = '';
+                if (conversation.last_message) {
+                    const preview = conversation.last_message.length > 60 
+                        ? conversation.last_message.substring(0, 60) + '...' 
+                        : conversation.last_message;
+                    messagePreview = `<div class="conversation-preview">${preview}</div>`;
+                }
+                
                 conversationDiv.innerHTML = `
                     <div class="conversation-title">${conversation.title}</div>
+                    ${topicInfo}
+                    ${messagePreview}
                     <div class="conversation-meta">${date} • ${conversation.message_count} messages</div>
                 `;
                 
                 conversationDiv.addEventListener('click', () => loadConversation(conversation.id));
                 conversationsList.appendChild(conversationDiv);
             });
+            
+            // Add "Load More" button if there are more conversations
+            if (hasMoreConversations) {
+                const loadMoreDiv = document.createElement('div');
+                loadMoreDiv.className = 'load-more-conversations';
+                loadMoreDiv.innerHTML = `
+                    <button class="load-more-btn" onclick="loadMoreConversations()">
+                        ${loadingConversations ? 'Loading...' : 'Load More Conversations'}
+                    </button>
+                `;
+                conversationsList.appendChild(loadMoreDiv);
+            }
         }
 
         async function loadConversation(conversationId) {
             try {
-                // Clear current chat
+                // Clear current chat and reset message state
                 chatMessages.innerHTML = '';
+                currentMessages = [];
+                hasMoreMessages = false;
+                oldestMessageId = null;
                 
-                // Load messages
-                const response = await fetch(`/api/conversations/${conversationId}/messages`);
+                // Get recent messages for conversation
+                const response = await fetch(`/api/conversations/${conversationId}/messages?limit=30`);
                 if (response.ok) {
-                    const messages = await response.json();
-                    messages.forEach(message => {
+                    const result = await response.json();
+                    currentMessages = result.messages;
+                    hasMoreMessages = result.has_more;
+                    oldestMessageId = result.oldest_id;
+                    
+                    // Add "Load Earlier Messages" button if there are more
+                    if (hasMoreMessages) {
+                        addLoadEarlierButton();
+                    }
+                    
+                    // Render messages
+                    result.messages.forEach(message => {
                         addMessage(message.content, message.message_type, 
                                  message.message_type === 'assistant' ? 'Loaded from conversation' : null);
                     });
@@ -1227,6 +1300,73 @@
                 }
             } catch (error) {
                 console.error('Error loading conversation:', error);
+            }
+        }
+
+        function addLoadEarlierButton() {
+            const loadMoreDiv = document.createElement('div');
+            loadMoreDiv.className = 'load-earlier-messages';
+            loadMoreDiv.id = 'loadEarlierMessages';
+            loadMoreDiv.innerHTML = `
+                <button class="load-more-btn" onclick="loadEarlierMessages()">
+                    Load Earlier Messages
+                </button>
+            `;
+            chatMessages.insertBefore(loadMoreDiv, chatMessages.firstChild);
+        }
+
+        async function loadEarlierMessages() {
+            if (loadingMessages || !hasMoreMessages || !oldestMessageId) return;
+            
+            try {
+                loadingMessages = true;
+                const loadButton = document.querySelector('#loadEarlierMessages button');
+                if (loadButton) loadButton.textContent = 'Loading...';
+                
+                const response = await fetch(`/api/conversations/${currentConversationId}/messages?limit=30&before_id=${oldestMessageId}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    // Remove existing load button
+                    const existingButton = document.getElementById('loadEarlierMessages');
+                    if (existingButton) existingButton.remove();
+                    
+                    // Add new messages at the top
+                    const tempDiv = document.createElement('div');
+                    result.messages.forEach(message => {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = `message ${message.message_type}-message`;
+                        
+                        let messageHTML = '';
+                        if (message.message_type === 'assistant') {
+                            const renderedContent = marked.parse(message.content);
+                            messageHTML = `<div>${renderedContent}</div><div class="message-info">Loaded from conversation</div>`;
+                        } else {
+                            messageHTML = `<div>${message.content}</div>`;
+                        }
+                        
+                        messageDiv.innerHTML = messageHTML;
+                        tempDiv.appendChild(messageDiv);
+                    });
+                    
+                    // Insert at beginning of chat
+                    while (tempDiv.firstChild) {
+                        chatMessages.insertBefore(tempDiv.firstChild, chatMessages.firstChild);
+                    }
+                    
+                    // Update state
+                    hasMoreMessages = result.has_more;
+                    oldestMessageId = result.oldest_id;
+                    
+                    // Add new load button if there are still more messages
+                    if (hasMoreMessages) {
+                        addLoadEarlierButton();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading earlier messages:', error);
+            } finally {
+                loadingMessages = false;
             }
         }
 
