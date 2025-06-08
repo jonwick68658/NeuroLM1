@@ -57,19 +57,25 @@ def init_file_storage():
 init_file_storage()
 
 # Conversation database helper functions
-def create_conversation(user_id: str, title: str = None) -> str:
+def create_conversation(user_id: str, title: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Optional[str]:
     """Create a new conversation and return its ID"""
     try:
         conversation_id = str(uuid.uuid4())
         if not title:
             title = "New Conversation"
+        if not topic:
+            topic = "general"
+        
+        # Normalize topic and sub_topic to lowercase
+        topic = topic.lower().strip() if topic else "general"
+        sub_topic = sub_topic.lower().strip() if sub_topic else None
         
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO conversations (id, user_id, title, created_at, updated_at, message_count)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        ''', (conversation_id, user_id, title, datetime.now(), datetime.now(), 0))
+            INSERT INTO conversations (id, user_id, title, topic, sub_topic, created_at, updated_at, message_count)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (conversation_id, user_id, title, topic, sub_topic, datetime.now(), datetime.now(), 0))
         conn.commit()
         cursor.close()
         conn.close()
@@ -84,7 +90,7 @@ def get_user_conversations(user_id: str) -> List[Dict]:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT id, title, created_at, updated_at, message_count
+            SELECT id, title, topic, sub_topic, created_at, updated_at, message_count
             FROM conversations
             WHERE user_id = %s
             ORDER BY updated_at DESC
@@ -96,9 +102,11 @@ def get_user_conversations(user_id: str) -> List[Dict]:
             conversations.append({
                 'id': row[0],
                 'title': row[1],
-                'created_at': row[2].isoformat(),
-                'updated_at': row[3].isoformat(),
-                'message_count': row[4]
+                'topic': row[2],
+                'sub_topic': row[3],
+                'created_at': row[4].isoformat(),
+                'updated_at': row[5].isoformat(),
+                'message_count': row[6]
             })
         
         cursor.close()
@@ -168,6 +176,54 @@ def get_conversation_messages(conversation_id: str) -> List[Dict]:
     except Exception as e:
         print(f"Error getting messages: {e}")
         return []
+
+# Topic management functions
+def get_all_topics(user_id: str) -> Dict:
+    """Get all topics and sub-topics for a user"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT DISTINCT topic, sub_topic
+            FROM conversations
+            WHERE user_id = %s AND topic IS NOT NULL
+            ORDER BY topic, sub_topic
+        ''', (user_id,))
+        
+        topics = {}
+        for row in cursor.fetchall():
+            topic = row[0]
+            sub_topic = row[1]
+            if topic not in topics:
+                topics[topic] = []
+            if sub_topic and sub_topic not in topics[topic]:
+                topics[topic].append(sub_topic)
+        
+        cursor.close()
+        conn.close()
+        return topics
+    except Exception as e:
+        print(f"Error getting topics: {e}")
+        return {}
+
+def get_sub_topic_count(user_id: str, topic: str) -> int:
+    """Get count of sub-topics for a topic"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT COUNT(DISTINCT sub_topic)
+            FROM conversations
+            WHERE user_id = %s AND topic = %s AND sub_topic IS NOT NULL
+        ''', (user_id, topic.lower()))
+        
+        count = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        return count
+    except Exception as e:
+        print(f"Error getting sub-topic count: {e}")
+        return 0
 
 # Chat models - define before usage
 class ChatMessage(BaseModel):
@@ -279,8 +335,24 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                 else:
                     response = f"File '{filename}' not found. Use `/files` to see available files."
         
+        elif cmd == '/topics':
+            # List all topics and sub-topics
+            topics = get_all_topics(user_id)
+            if not topics:
+                response = "No topics created yet. Start a conversation with a topic to organize your chats."
+            else:
+                response = "**Your Topics:**\n\n"
+                for topic, sub_topics in topics.items():
+                    response += f"• **{topic}**\n"
+                    if sub_topics:
+                        for sub_topic in sub_topics:
+                            response += f"  - {sub_topic}\n"
+                    else:
+                        response += f"  - (no sub-topics)\n"
+                response += "\nUse topics when creating new conversations to organize your chats."
+        
         else:
-            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file"
+            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file\n• `/topics` - List all topics and sub-topics"
         
         # Save command and response to conversation
         save_conversation_message(conversation_id, 'user', command)
