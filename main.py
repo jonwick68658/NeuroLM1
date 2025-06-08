@@ -225,6 +225,78 @@ def get_sub_topic_count(user_id: str, topic: str) -> int:
         print(f"Error getting sub-topic count: {e}")
         return 0
 
+def create_topic_entry(user_id: str, topic: str) -> bool:
+    """Create a topic entry without a conversation"""
+    try:
+        topic = topic.lower().strip()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if topic already exists
+        cursor.execute('''
+            SELECT COUNT(*) FROM conversations 
+            WHERE user_id = %s AND topic = %s
+        ''', (user_id, topic))
+        
+        if cursor.fetchone()[0] > 0:
+            cursor.close()
+            conn.close()
+            return True  # Topic already exists
+        
+        # Create a placeholder conversation for the topic
+        conversation_id = str(uuid.uuid4())
+        cursor.execute('''
+            INSERT INTO conversations (id, user_id, title, topic, created_at, updated_at, message_count)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (conversation_id, user_id, f"[Topic: {topic}]", topic, datetime.now(), datetime.now(), 0))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error creating topic: {e}")
+        return False
+
+def create_subtopic_entry(user_id: str, topic: str, sub_topic: str) -> bool:
+    """Create a sub-topic entry under an existing topic"""
+    try:
+        topic = topic.lower().strip()
+        sub_topic = sub_topic.lower().strip()
+        
+        # Check sub-topic limit
+        if get_sub_topic_count(user_id, topic) >= 5:
+            return False
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if sub-topic already exists
+        cursor.execute('''
+            SELECT COUNT(*) FROM conversations 
+            WHERE user_id = %s AND topic = %s AND sub_topic = %s
+        ''', (user_id, topic, sub_topic))
+        
+        if cursor.fetchone()[0] > 0:
+            cursor.close()
+            conn.close()
+            return True  # Sub-topic already exists
+        
+        # Create a placeholder conversation for the sub-topic
+        conversation_id = str(uuid.uuid4())
+        cursor.execute('''
+            INSERT INTO conversations (id, user_id, title, topic, sub_topic, created_at, updated_at, message_count)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (conversation_id, user_id, f"[Sub-topic: {topic} → {sub_topic}]", topic, sub_topic, datetime.now(), datetime.now(), 0))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error creating sub-topic: {e}")
+        return False
+
 # Chat models - define before usage
 class ChatMessage(BaseModel):
     message: str
@@ -988,6 +1060,65 @@ async def get_topics_endpoint(request: Request):
         return topics
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting topics: {str(e)}")
+
+class TopicCreate(BaseModel):
+    name: str
+
+class SubtopicCreate(BaseModel):
+    name: str
+
+@app.post("/api/topics")
+async def create_topic_endpoint(request: Request, topic_data: TopicCreate):
+    """Create a new topic"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        if not topic_data.name or not topic_data.name.strip():
+            raise HTTPException(status_code=400, detail="Topic name cannot be empty")
+        
+        success = create_topic_entry(user_id, topic_data.name)
+        if success:
+            return {"success": True, "topic": topic_data.name.lower().strip()}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create topic")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating topic: {str(e)}")
+
+@app.post("/api/topics/{topic}/subtopics")
+async def create_subtopic_endpoint(request: Request, topic: str, subtopic_data: SubtopicCreate):
+    """Create a new sub-topic under an existing topic"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        if not subtopic_data.name or not subtopic_data.name.strip():
+            raise HTTPException(status_code=400, detail="Sub-topic name cannot be empty")
+        
+        # Check if topic exists
+        topics = get_all_topics(user_id)
+        if topic.lower() not in topics:
+            raise HTTPException(status_code=404, detail="Topic not found")
+        
+        # Check sub-topic limit
+        if get_sub_topic_count(user_id, topic) >= 5:
+            raise HTTPException(status_code=400, detail="Maximum 5 sub-topics allowed per topic")
+        
+        success = create_subtopic_entry(user_id, topic, subtopic_data.name)
+        if success:
+            return {"success": True, "topic": topic.lower(), "sub_topic": subtopic_data.name.lower().strip()}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create sub-topic")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating sub-topic: {str(e)}")
 
 # Clear database endpoint
 @app.post("/api/clear-memory")

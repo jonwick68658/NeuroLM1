@@ -1313,19 +1313,22 @@
         function updateSubtopicDropdown() {
             subtopicSelect.innerHTML = '<option value="">Select or create sub-topic</option>';
             
-            if (selectedTopic && selectedTopic !== '__new__' && allTopics[selectedTopic]) {
+            if (selectedTopic && selectedTopic !== '__new__') {
                 subtopicSelect.disabled = false;
                 
-                // Add existing sub-topics
-                allTopics[selectedTopic].forEach(subtopic => {
-                    const option = document.createElement('option');
-                    option.value = subtopic;
-                    option.textContent = subtopic;
-                    subtopicSelect.appendChild(option);
-                });
+                // Add existing sub-topics if topic exists in allTopics
+                if (allTopics[selectedTopic]) {
+                    allTopics[selectedTopic].forEach(subtopic => {
+                        const option = document.createElement('option');
+                        option.value = subtopic;
+                        option.textContent = subtopic;
+                        subtopicSelect.appendChild(option);
+                    });
+                }
                 
-                // Add create new option only if less than 5 sub-topics
-                if (allTopics[selectedTopic].length < 5) {
+                // Add create new option if less than 5 sub-topics (or no sub-topics yet)
+                const subtopicCount = allTopics[selectedTopic] ? allTopics[selectedTopic].length : 0;
+                if (subtopicCount < 5) {
                     const newOption = document.createElement('option');
                     newOption.value = '__new__';
                     newOption.textContent = '+ Create New Sub-topic';
@@ -1336,8 +1339,59 @@
             }
         }
 
+        // Topic creation functions
+        async function createTopicNow(topicName) {
+            try {
+                const response = await fetch('/api/topics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: topicName })
+                });
+                
+                if (response.ok) {
+                    await loadTopics(); // Refresh topics
+                    return true;
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.detail || 'Error creating topic');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error creating topic:', error);
+                alert('Error creating topic');
+                return false;
+            }
+        }
+
+        async function createSubtopicNow(topicName, subtopicName) {
+            try {
+                const response = await fetch(`/api/topics/${encodeURIComponent(topicName)}/subtopics`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: subtopicName })
+                });
+                
+                if (response.ok) {
+                    await loadTopics(); // Refresh topics
+                    return true;
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.detail || 'Error creating sub-topic');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error creating sub-topic:', error);
+                alert('Error creating sub-topic');
+                return false;
+            }
+        }
+
         // Event listeners
-        topicSelect.addEventListener('change', function() {
+        topicSelect.addEventListener('change', async function() {
             selectedTopic = this.value;
             selectedSubtopic = '';
             subtopicSelect.value = '';
@@ -1345,9 +1399,14 @@
             if (selectedTopic === '__new__') {
                 const newTopic = prompt('Enter new topic name:');
                 if (newTopic && newTopic.trim()) {
-                    selectedTopic = newTopic.toLowerCase().trim();
-                    // Topic will be created when starting new chat
-                    this.value = selectedTopic;
+                    const success = await createTopicNow(newTopic);
+                    if (success) {
+                        selectedTopic = newTopic.toLowerCase().trim();
+                        this.value = selectedTopic;
+                    } else {
+                        selectedTopic = '';
+                        this.value = '';
+                    }
                 } else {
                     selectedTopic = '';
                     this.value = '';
@@ -1357,15 +1416,20 @@
             updateSubtopicDropdown();
         });
 
-        subtopicSelect.addEventListener('change', function() {
+        subtopicSelect.addEventListener('change', async function() {
             selectedSubtopic = this.value;
             
             if (selectedSubtopic === '__new__') {
                 const newSubtopic = prompt('Enter new sub-topic name:');
                 if (newSubtopic && newSubtopic.trim()) {
-                    selectedSubtopic = newSubtopic.toLowerCase().trim();
-                    // Sub-topic will be created when starting new chat
-                    this.value = selectedSubtopic;
+                    const success = await createSubtopicNow(selectedTopic, newSubtopic);
+                    if (success) {
+                        selectedSubtopic = newSubtopic.toLowerCase().trim();
+                        this.value = selectedSubtopic;
+                    } else {
+                        selectedSubtopic = '';
+                        this.value = '';
+                    }
                 } else {
                     selectedSubtopic = '';
                     this.value = '';
