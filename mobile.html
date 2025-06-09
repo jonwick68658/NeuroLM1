@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>NeuroLM Mobile</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/static/mobile.css">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="NeuroLM">
+    <link rel="apple-touch-icon" href="/icon.svg">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <!-- Menu Button -->
+    <button class="menu-button" onclick="toggleSidebar()">☰</button>
+
+    <!-- Header -->
+    <div class="header">
+        <h1>NeuroLM AI</h1>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="new-chat-btn" onclick="createNewConversation()">+ New Chat</button>
+            <div class="topic-selection">
+                <label>Topic:</label>
+                <select class="topic-select" id="topicSelect" onchange="onTopicChange()">
+                    <option value="">Select topic...</option>
+                </select>
+                <label>Sub-topic:</label>
+                <select class="subtopic-select" id="subtopicSelect">
+                    <option value="">Select sub-topic...</option>
+                </select>
+            </div>
+        </div>
+        <div class="conversations-list" id="conversationsList">
+            <!-- Conversations will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- Main Chat -->
+    <div class="chat-container">
+        <div class="messages-area" id="messagesArea">
+            <!-- Messages will appear here -->
+        </div>
+        
+        <div class="input-area">
+            <div class="model-selector">
+                <select id="modelSearch">
+                    <option value="cerebras/llama-4-scout-17b-16e-instruct">Cerebras Llama Scout</option>
+                </select>
+            </div>
+            <div class="input-container">
+                <textarea class="message-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+                <button class="file-button" onclick="document.getElementById('fileInput').click()">📎</button>
+                <button class="send-button" onclick="sendMessage()">▶</button>
+            </div>
+            <input type="file" id="fileInput" style="display: none;" onchange="handleFileUpload(event)">
+        </div>
+    </div>
+
+    <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered'))
+                    .catch(error => console.log('SW registration failed'));
+            });
+        }
+
+        // Global variables
+        let currentConversationId = null;
+        let models = [];
+        let conversations = [];
+        let currentOffset = 0;
+        let hasMoreConversations = true;
+        let isLoadingConversations = false;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadModels();
+            await loadTopics();
+            await loadConversations();
+            setupAutoResize();
+            
+            // Check for install prompt
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                setTimeout(() => {
+                    e.prompt();
+                }, 3000);
+            });
+        });
+
+        // Sidebar functions
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+        }
+
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+        }
+
+        // Auto-resize textarea
+        function setupAutoResize() {
+            const textarea = document.getElementById('messageInput');
+            textarea.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
+
+            // Send on Enter, new line on Shift+Enter
+            textarea.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        }
+
+        // Load models
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                models = await response.json();
+                
+                const modelSelect = document.getElementById('modelSearch');
+                modelSelect.innerHTML = '';
+                
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.name || model.id;
+                    modelSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading models:', error);
+            }
+        }
+
+        // Load topics
+        async function loadTopics() {
+            try {
+                const response = await fetch('/api/topics');
+                const data = await response.json();
+                
+                const topicSelect = document.getElementById('topicSelect');
+                topicSelect.innerHTML = '<option value="">Select topic...</option>';
+                
+                if (data.topics) {
+                    data.topics.forEach(topic => {
+                        const option = document.createElement('option');
+                        option.value = topic.name;
+                        option.textContent = topic.name;
+                        topicSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading topics:', error);
+            }
+        }
+
+        // Topic change handler
+        function onTopicChange() {
+            const topicSelect = document.getElementById('topicSelect');
+            const subtopicSelect = document.getElementById('subtopicSelect');
+            const selectedTopic = topicSelect.value;
+            
+            subtopicSelect.innerHTML = '<option value="">Select sub-topic...</option>';
+            
+            if (selectedTopic) {
+                // Load sub-topics for selected topic
+                loadSubtopics(selectedTopic);
+            }
+        }
+
+        // Load subtopics
+        async function loadSubtopics(topic) {
+            try {
+                const response = await fetch('/api/topics');
+                const data = await response.json();
+                
+                const subtopicSelect = document.getElementById('subtopicSelect');
+                
+                if (data.topics) {
+                    const topicData = data.topics.find(t => t.name === topic);
+                    if (topicData && topicData.subtopics) {
+                        topicData.subtopics.forEach(subtopic => {
+                            const option = document.createElement('option');
+                            option.value = subtopic;
+                            option.textContent = subtopic;
+                            subtopicSelect.appendChild(option);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading subtopics:', error);
+            }
+        }
+
+        // Load conversations
+        async function loadConversations() {
+            if (isLoadingConversations || !hasMoreConversations) return;
+            
+            isLoadingConversations = true;
+            
+            try {
+                const response = await fetch(`/api/conversations?limit=20&offset=${currentOffset}`);
+                const data = await response.json();
+                
+                const conversationsList = document.getElementById('conversationsList');
+                
+                if (currentOffset === 0) {
+                    conversationsList.innerHTML = '';
+                }
+                
+                data.conversations.forEach(conv => {
+                    const item = createConversationItem(conv);
+                    conversationsList.appendChild(item);
+                });
+                
+                conversations = conversations.concat(data.conversations);
+                currentOffset += data.conversations.length;
+                hasMoreConversations = data.has_more;
+                
+                if (hasMoreConversations) {
+                    addLoadMoreButton();
+                }
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+            } finally {
+                isLoadingConversations = false;
+            }
+        }
+
+        // Create conversation item
+        function createConversationItem(conv) {
+            const item = document.createElement('div');
+            item.className = 'conversation-item';
+            item.onclick = () => selectConversation(conv.id);
+            
+            item.innerHTML = `
+                <div class="conversation-title">${conv.title}</div>
+                ${conv.topic ? `<div class="conversation-topic">${conv.topic}${conv.sub_topic ? ' > ' + conv.sub_topic : ''}</div>` : ''}
+                ${conv.last_message ? `<div class="conversation-preview">${conv.last_message.substring(0, 50)}...</div>` : ''}
+                <div class="conversation-meta">${new Date(conv.updated_at).toLocaleDateString()}</div>
+            `;
+            
+            return item;
+        }
+
+        // Add load more button
+        function addLoadMoreButton() {
+            const conversationsList = document.getElementById('conversationsList');
+            
+            // Remove existing load more button
+            const existingBtn = conversationsList.querySelector('.load-more-conversations');
+            if (existingBtn) existingBtn.remove();
+            
+            const loadMoreDiv = document.createElement('div');
+            loadMoreDiv.className = 'load-more-conversations';
+            loadMoreDiv.innerHTML = '<button class="load-more-btn" onclick="loadConversations()">Load More</button>';
+            
+            conversationsList.appendChild(loadMoreDiv);
+        }
+
+        // Select conversation
+        async function selectConversation(conversationId) {
+            currentConversationId = conversationId;
+            
+            // Update UI
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Load messages
+            await loadMessages(conversationId);
+            closeSidebar();
+        }
+
+        // Load messages
+        async function loadMessages(conversationId) {
+            try {
+                const response = await fetch(`/api/conversations/${conversationId}/messages`);
+                const data = await response.json();
+                
+                const messagesArea = document.getElementById('messagesArea');
+                messagesArea.innerHTML = '';
+                
+                data.messages.forEach(msg => {
+                    addMessageToUI(msg.content, msg.message_type === 'user' ? 'user' : 'ai');
+                });
+                
+                scrollToBottom();
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        // Create new conversation
+        async function createNewConversation() {
+            const topicSelect = document.getElementById('topicSelect');
+            const subtopicSelect = document.getElementById('subtopicSelect');
+            
+            const requestData = {};
+            if (topicSelect.value) requestData.topic = topicSelect.value;
+            if (subtopicSelect.value) requestData.sub_topic = subtopicSelect.value;
+            
+            try {
+                const response = await fetch('/api/conversations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const newConv = await response.json();
+                currentConversationId = newConv.id;
+                
+                // Clear messages
+                document.getElementById('messagesArea').innerHTML = '';
+                
+                // Reload conversations
+                currentOffset = 0;
+                hasMoreConversations = true;
+                conversations = [];
+                await loadConversations();
+                
+                closeSidebar();
+            } catch (error) {
+                console.error('Error creating conversation:', error);
+            }
+        }
+
+        // Send message
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            const modelSelect = document.getElementById('modelSearch');
+            const selectedModel = modelSelect.value;
+            
+            // Add user message to UI
+            addMessageToUI(message, 'user');
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        model: selectedModel,
+                        conversation_id: currentConversationId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Remove typing indicator
+                removeTypingIndicator();
+                
+                // Add AI response to UI
+                addMessageToUI(data.response, 'ai');
+                
+                // Update conversation ID
+                if (data.conversation_id) {
+                    currentConversationId = data.conversation_id;
+                }
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                removeTypingIndicator();
+                addMessageToUI('Sorry, there was an error processing your message.', 'ai');
+            }
+        }
+
+        // Add message to UI
+        function addMessageToUI(content, type) {
+            const messagesArea = document.getElementById('messagesArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            
+            if (type === 'ai') {
+                messageDiv.innerHTML = marked.parse(content);
+            } else {
+                messageDiv.textContent = content;
+            }
+            
+            messagesArea.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Show typing indicator
+        function showTypingIndicator() {
+            const messagesArea = document.getElementById('messagesArea');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message ai-message typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+            
+            messagesArea.appendChild(typingDiv);
+            scrollToBottom();
+        }
+
+        // Remove typing indicator
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // Scroll to bottom
+        function scrollToBottom() {
+            const messagesArea = document.getElementById('messagesArea');
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        // Handle file upload
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/upload-file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.message) {
+                    addMessageToUI(`📎 Uploaded: ${file.name}`, 'user');
+                    addMessageToUI(data.message, 'ai');
+                }
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                addMessageToUI('Error uploading file.', 'ai');
+            }
+            
+            // Clear file input
+            event.target.value = '';
+        }
+    </script>
+</body>
+</html>

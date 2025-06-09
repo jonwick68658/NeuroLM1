@@ -22,6 +22,9 @@ app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 # Include memory API routes
 app.include_router(router, prefix="/api")
 
+# Mount static files for PWA
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Global session storage (in production, use Redis or database)
 user_sessions = {}
 memory_system = MemorySystem()
