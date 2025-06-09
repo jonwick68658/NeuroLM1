@@ -1189,8 +1189,8 @@ async def create_new_conversation(request: Request, conversation_data: Conversat
             raise HTTPException(status_code=500, detail="Failed to create conversation")
         
         # Get the created conversation details
-        conversations = get_user_conversations(user_id)
-        new_conversation = next((c for c in conversations if c['id'] == conversation_id), None)
+        conversations_data = get_user_conversations(user_id)
+        new_conversation = next((c for c in conversations_data['conversations'] if c['id'] == conversation_id), None)
         
         if not new_conversation:
             raise HTTPException(status_code=500, detail="Created conversation not found")
