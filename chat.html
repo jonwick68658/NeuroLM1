@@ -388,6 +388,113 @@
             border-top: none;
         }
 
+        .chat-header {
+            padding: 0.75rem 1rem;
+            background: #f8f9fa;
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 10px 10px 0 0;
+        }
+
+        .conversation-topic-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #topicDisplayText {
+            font-size: 0.9rem;
+            color: var(--dark-text);
+            font-weight: 500;
+        }
+
+        .edit-topic-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .edit-topic-btn:hover {
+            background: var(--secondary-color);
+        }
+
+        .topic-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .topic-modal.show {
+            display: flex;
+        }
+
+        .topic-modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .topic-modal h3 {
+            margin: 0 0 1rem 0;
+            color: var(--primary-color);
+        }
+
+        .topic-modal-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .modal-btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+        }
+
+        .modal-btn.save {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .modal-btn.save:hover {
+            background: var(--secondary-color);
+        }
+
+        .modal-btn.cancel {
+            background: #6c757d;
+            color: white;
+        }
+
+        .modal-btn.cancel:hover {
+            background: #545b62;
+        }
+
+        .modal-btn.remove {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-btn.remove:hover {
+            background: #c82333;
+        }
+
         .chat-container {
             flex: 1;
             display: flex;
@@ -839,7 +946,13 @@
         </div>
 
         <div class="chat-container">
-        <div class="chat-messages" id="chatMessages">
+            <div class="chat-header" id="chatHeader">
+                <div class="conversation-topic-display" id="conversationTopicDisplay">
+                    <span id="topicDisplayText">No topic assigned</span>
+                    <button id="editTopicBtn" class="edit-topic-btn">Edit</button>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages">
             <div class="message assistant-message">
                 <div>Hello! I'm NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?</div>
                 <div class="message-info">Memory system active • Ready to learn</div>
@@ -855,6 +968,31 @@
                 <input type="file" id="fileInput" style="display: none;" accept=".txt,.py,.js,.html,.css,.md,.json,.xml,.csv">
                 <button id="uploadButton" class="upload-button" title="Upload file">+</button>
                 <button id="sendButton" class="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Topic Edit Modal -->
+    <div class="topic-modal" id="topicModal">
+        <div class="topic-modal-content">
+            <h3>Edit Conversation Topic</h3>
+            <div class="topic-selection">
+                <label for="modalTopicSelect">Topic:</label>
+                <select class="topic-select" id="modalTopicSelect">
+                    <option value="">No topic</option>
+                    <option value="__new__">+ Create New Topic</option>
+                </select>
+                
+                <label for="modalSubtopicSelect">Sub-topic:</label>
+                <select class="subtopic-select" id="modalSubtopicSelect" disabled>
+                    <option value="">No sub-topic</option>
+                    <option value="__new__">+ Create New Sub-topic</option>
+                </select>
+            </div>
+            <div class="topic-modal-buttons">
+                <button class="modal-btn save" id="saveTopicBtn">Save</button>
+                <button class="modal-btn remove" id="removeTopicBtn">Remove Topic</button>
+                <button class="modal-btn cancel" id="cancelTopicBtn">Cancel</button>
             </div>
         </div>
     </div>
@@ -876,6 +1014,16 @@
         const chatContainer = document.querySelector('.chat-container');
         const slashSuggestions = document.getElementById('slashSuggestions');
         
+        // Topic modal elements
+        const topicModal = document.getElementById('topicModal');
+        const editTopicBtn = document.getElementById('editTopicBtn');
+        const modalTopicSelect = document.getElementById('modalTopicSelect');
+        const modalSubtopicSelect = document.getElementById('modalSubtopicSelect');
+        const saveTopicBtn = document.getElementById('saveTopicBtn');
+        const removeTopicBtn = document.getElementById('removeTopicBtn');
+        const cancelTopicBtn = document.getElementById('cancelTopicBtn');
+        const topicDisplayText = document.getElementById('topicDisplayText');
+        
         let selectedModel = 'cerebras/llama-4-scout-17b-16e-instruct';
         let allModels = [];
         let filteredModels = [];
@@ -896,6 +1044,8 @@
         let selectedTopic = '';
         let selectedSubtopic = '';
         let userName = '';
+        let currentConversationTopic = null;
+        let currentConversationSubtopic = null;
         
         // Topic selection elements
         const topicSelect = document.getElementById('topicSelect');

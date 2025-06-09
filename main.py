@@ -84,6 +84,27 @@ def create_conversation(user_id: str, title: Optional[str] = None, topic: Option
         print(f"Error creating conversation: {e}")
         return None
 
+def update_conversation_topic(conversation_id: str, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> bool:
+    """Update the topic and sub-topic of an existing conversation"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE conversations 
+            SET topic = %s, sub_topic = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (topic, sub_topic, conversation_id))
+        
+        success = cursor.rowcount > 0
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return success
+    except Exception as e:
+        print(f"Error updating conversation topic: {e}")
+        return False
+
 def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0) -> Dict:
     """Get paginated conversations for a user with previews"""
     try:
@@ -1292,6 +1313,38 @@ async def create_subtopic_endpoint(request: Request, topic: str, subtopic_data: 
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating sub-topic: {str(e)}")
+
+class ConversationTopicUpdate(BaseModel):
+    topic: Optional[str] = None
+    sub_topic: Optional[str] = None
+
+@app.put("/api/conversations/{conversation_id}/topic")
+async def update_conversation_topic_endpoint(conversation_id: str, request: Request, topic_data: ConversationTopicUpdate):
+    """Update the topic and sub-topic of an existing conversation"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        # Verify the conversation belongs to the user
+        conversations = get_user_conversations(user_id, limit=1000, offset=0)  # Get all conversations to check ownership
+        conversation_exists = any(conv['id'] == conversation_id for conv in conversations['conversations'])
+        
+        if not conversation_exists:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        # Update the conversation topic
+        success = update_conversation_topic(conversation_id, topic_data.topic, topic_data.sub_topic)
+        
+        if success:
+            return {"success": True, "conversation_id": conversation_id, "topic": topic_data.topic, "sub_topic": topic_data.sub_topic}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update conversation topic")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating conversation topic: {str(e)}")
 
 # Clear database endpoint
 @app.post("/api/clear-memory")
