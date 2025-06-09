@@ -57,6 +57,23 @@
                     <option value="cerebras/llama-4-scout-17b-16e-instruct">Cerebras Llama Scout</option>
                 </select>
             </div>
+            
+            <!-- Quick Topic Selection -->
+            <div class="quick-topic-selection" id="quickTopicSelection">
+                <button class="topic-toggle-btn" onclick="toggleQuickTopics()">
+                    <span>Set Topic</span>
+                    <span id="topicToggleIcon">▼</span>
+                </button>
+                <div class="topic-controls" id="topicControls">
+                    <select id="quickTopicSelect" onchange="onQuickTopicChange()">
+                        <option value="">Select topic...</option>
+                    </select>
+                    <select id="quickSubtopicSelect">
+                        <option value="">Select sub-topic...</option>
+                    </select>
+                </div>
+            </div>
+            
             <div class="input-container">
                 <textarea class="message-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
                 <button class="file-button" onclick="document.getElementById('fileInput').click()">📎</button>
@@ -88,8 +105,10 @@
         document.addEventListener('DOMContentLoaded', async function() {
             await loadModels();
             await loadTopics();
+            await loadQuickTopics();
             await loadConversations();
             setupAutoResize();
+            setupQuickTopics();
             
             // Check for install prompt
             window.addEventListener('beforeinstallprompt', (e) => {
@@ -117,12 +136,23 @@
             overlay.classList.remove('show');
         }
 
-        // Auto-resize textarea
+        // Auto-resize textarea with improved functionality
         function setupAutoResize() {
             const textarea = document.getElementById('messageInput');
+            
+            // Auto-resize on input
             textarea.addEventListener('input', function() {
                 this.style.height = 'auto';
-                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                const newHeight = Math.min(this.scrollHeight, 150);
+                this.style.height = newHeight + 'px';
+                
+                // Adjust input area padding if needed
+                const inputArea = document.querySelector('.input-area');
+                if (newHeight > 48) {
+                    inputArea.style.paddingBottom = '24px';
+                } else {
+                    inputArea.style.paddingBottom = '20px';
+                }
             });
 
             // Send on Enter, new line on Shift+Enter
@@ -132,6 +162,94 @@
                     sendMessage();
                 }
             });
+
+            // Focus handling for better mobile experience
+            textarea.addEventListener('focus', function() {
+                setTimeout(() => {
+                    this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            });
+        }
+
+        // Quick topic selection functions
+        function setupQuickTopics() {
+            const topicControls = document.getElementById('topicControls');
+            topicControls.style.display = 'none'; // Initially hidden
+        }
+
+        function toggleQuickTopics() {
+            const topicControls = document.getElementById('topicControls');
+            const toggleIcon = document.getElementById('topicToggleIcon');
+            
+            if (topicControls.style.display === 'none') {
+                topicControls.style.display = 'flex';
+                toggleIcon.textContent = '▲';
+            } else {
+                topicControls.style.display = 'none';
+                toggleIcon.textContent = '▼';
+            }
+        }
+
+        async function loadQuickTopics() {
+            try {
+                const response = await fetch('/api/topics');
+                const data = await response.json();
+                
+                const quickTopicSelect = document.getElementById('quickTopicSelect');
+                quickTopicSelect.innerHTML = '<option value="">Select topic...</option>';
+                
+                if (data.topics) {
+                    data.topics.forEach(topic => {
+                        const option = document.createElement('option');
+                        option.value = topic.name;
+                        option.textContent = topic.name;
+                        quickTopicSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading quick topics:', error);
+            }
+        }
+
+        function onQuickTopicChange() {
+            const quickTopicSelect = document.getElementById('quickTopicSelect');
+            const quickSubtopicSelect = document.getElementById('quickSubtopicSelect');
+            const selectedTopic = quickTopicSelect.value;
+            
+            quickSubtopicSelect.innerHTML = '<option value="">Select sub-topic...</option>';
+            
+            if (selectedTopic) {
+                loadQuickSubtopics(selectedTopic);
+                // Also update sidebar selections
+                const sidebarTopicSelect = document.getElementById('topicSelect');
+                if (sidebarTopicSelect) {
+                    sidebarTopicSelect.value = selectedTopic;
+                    onTopicChange();
+                }
+            }
+        }
+
+        async function loadQuickSubtopics(topic) {
+            try {
+                const response = await fetch('/api/topics');
+                const data = await response.json();
+                
+                const quickSubtopicSelect = document.getElementById('quickSubtopicSelect');
+                
+                if (data.topics) {
+                    const topicData = data.topics.find(t => t.name === topic);
+                    if (topicData && topicData.subtopics) {
+                        topicData.subtopics.forEach(subtopic => {
+                            const option = document.createElement('option');
+                            option.value = subtopic;
+                            option.textContent = subtopic;
+                            quickSubtopicSelect.appendChild(option);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading quick subtopics:', error);
+            }
         }
 
         // Load models
@@ -316,12 +434,20 @@
 
         // Create new conversation
         async function createNewConversation() {
+            // Try quick topic selections first, then fallback to sidebar
+            const quickTopicSelect = document.getElementById('quickTopicSelect');
+            const quickSubtopicSelect = document.getElementById('quickSubtopicSelect');
             const topicSelect = document.getElementById('topicSelect');
             const subtopicSelect = document.getElementById('subtopicSelect');
             
             const requestData = {};
-            if (topicSelect.value) requestData.topic = topicSelect.value;
-            if (subtopicSelect.value) requestData.sub_topic = subtopicSelect.value;
+            
+            // Use quick topic selection if available, otherwise use sidebar
+            const selectedTopic = quickTopicSelect.value || topicSelect.value;
+            const selectedSubtopic = quickSubtopicSelect.value || subtopicSelect.value;
+            
+            if (selectedTopic) requestData.topic = selectedTopic;
+            if (selectedSubtopic) requestData.sub_topic = selectedSubtopic;
             
             try {
                 const response = await fetch('/api/conversations', {
@@ -335,6 +461,18 @@
                 
                 // Clear messages
                 document.getElementById('messagesArea').innerHTML = '';
+                
+                // Sync selections between quick and sidebar
+                if (selectedTopic) {
+                    quickTopicSelect.value = selectedTopic;
+                    topicSelect.value = selectedTopic;
+                    await loadQuickSubtopics(selectedTopic);
+                    await loadSubtopics(selectedTopic);
+                }
+                if (selectedSubtopic) {
+                    quickSubtopicSelect.value = selectedSubtopic;
+                    subtopicSelect.value = selectedSubtopic;
+                }
                 
                 // Reload conversations
                 currentOffset = 0;
