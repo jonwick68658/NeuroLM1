@@ -1,6 +1,6 @@
-# NeuroLM
+# NeuroLM - Advanced AI Memory System
 
-An advanced AI chat application with intelligent memory processing capabilities, featuring a sophisticated Neo4j-based memory system that learns and remembers conversations over time with complete user isolation and semantic relationship building.
+An intelligent AI chat system with integrated memory, topic organization, and personalized user management. Features progressive loading, conversation management, and dynamic topic assignment for optimal performance and organization.
 
 ## 🚀 DEPLOYMENT STATUS: READY
 Container optimized from 8+ GiB to deployment-ready size through strategic exclusions while preserving complete Neo4j memory functionality.
