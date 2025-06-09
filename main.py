@@ -962,6 +962,26 @@ async def serve_chat(request: Request):
     
     return FileResponse("chat.html")
 
+@app.get("/mobile")
+async def serve_mobile(request: Request):
+    """Serve the mobile PWA interface"""
+    # Check if user is logged in
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in user_sessions:
+        return RedirectResponse(url="/login")
+    
+    return FileResponse("mobile.html")
+
+@app.get("/manifest.json")
+async def serve_manifest():
+    """Serve PWA manifest"""
+    return FileResponse("manifest.json")
+
+@app.get("/sw.js")
+async def serve_service_worker():
+    """Serve service worker"""
+    return FileResponse("sw.js")
+
 
 
 
