@@ -1499,10 +1499,35 @@
                     });
                     
                     currentConversationId = conversationId;
+                    
+                    // Update current conversation topic state and display
+                    updateCurrentTopicDisplay(result.messages[0]);
                     renderConversations(); // Update active state
                 }
             } catch (error) {
                 console.error('Error loading conversation:', error);
+            }
+        }
+
+        function updateCurrentTopicDisplay(firstMessage) {
+            // Get current conversation from the conversations list
+            const currentConv = conversations.find(conv => conv.id === currentConversationId);
+            if (currentConv) {
+                currentConversationTopic = currentConv.topic;
+                currentConversationSubtopic = currentConv.sub_topic;
+                updateTopicDisplayText();
+            }
+        }
+
+        function updateTopicDisplayText() {
+            if (currentConversationTopic && currentConversationTopic !== 'general') {
+                let displayText = currentConversationTopic;
+                if (currentConversationSubtopic) {
+                    displayText += ` → ${currentConversationSubtopic}`;
+                }
+                topicDisplayText.textContent = displayText;
+            } else {
+                topicDisplayText.textContent = 'No topic assigned';
             }
         }
 
@@ -1778,6 +1803,179 @@
                     selectedSubtopic = '';
                     this.value = '';
                 }
+            }
+        });
+
+        newChatBtn.addEventListener('click', startNewChat);
+
+        // Topic modal functionality
+        function openTopicModal() {
+            // Populate modal dropdowns with current topics
+            populateModalTopicDropdowns();
+            
+            // Set current selections
+            modalTopicSelect.value = currentConversationTopic || '';
+            updateModalSubtopicDropdown();
+            modalSubtopicSelect.value = currentConversationSubtopic || '';
+            
+            topicModal.classList.add('show');
+        }
+
+        function closeTopicModal() {
+            topicModal.classList.remove('show');
+        }
+
+        function populateModalTopicDropdowns() {
+            modalTopicSelect.innerHTML = '<option value="">No topic</option>';
+            
+            if (Object.keys(allTopics).length > 0) {
+                Object.keys(allTopics).forEach(topic => {
+                    const option = document.createElement('option');
+                    option.value = topic;
+                    option.textContent = topic;
+                    modalTopicSelect.appendChild(option);
+                });
+            }
+            
+            const newOption = document.createElement('option');
+            newOption.value = '__new__';
+            newOption.textContent = '+ Create New Topic';
+            modalTopicSelect.appendChild(newOption);
+        }
+
+        function updateModalSubtopicDropdown() {
+            modalSubtopicSelect.innerHTML = '<option value="">No sub-topic</option>';
+            
+            const selectedTopic = modalTopicSelect.value;
+            
+            if (selectedTopic && selectedTopic !== '__new__' && allTopics[selectedTopic]) {
+                modalSubtopicSelect.disabled = false;
+                
+                allTopics[selectedTopic].forEach(subtopic => {
+                    const option = document.createElement('option');
+                    option.value = subtopic;
+                    option.textContent = subtopic;
+                    modalSubtopicSelect.appendChild(option);
+                });
+                
+                if (allTopics[selectedTopic].length < 5) {
+                    const newOption = document.createElement('option');
+                    newOption.value = '__new__';
+                    newOption.textContent = '+ Create New Sub-topic';
+                    modalSubtopicSelect.appendChild(newOption);
+                }
+            } else {
+                modalSubtopicSelect.disabled = true;
+            }
+        }
+
+        async function saveTopicChanges() {
+            if (!currentConversationId) return;
+            
+            let topic = modalTopicSelect.value;
+            let subTopic = modalSubtopicSelect.value;
+            
+            // Handle new topic creation
+            if (topic === '__new__') {
+                const newTopic = prompt('Enter new topic name:');
+                if (newTopic && newTopic.trim()) {
+                    const success = await createTopicNow(newTopic);
+                    if (success) {
+                        topic = newTopic.toLowerCase().trim();
+                    } else {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+            
+            // Handle new sub-topic creation
+            if (subTopic === '__new__' && topic) {
+                const newSubtopic = prompt('Enter new sub-topic name:');
+                if (newSubtopic && newSubtopic.trim()) {
+                    const success = await createSubtopicNow(topic, newSubtopic);
+                    if (success) {
+                        subTopic = newSubtopic.toLowerCase().trim();
+                    } else {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+            
+            // Update conversation topic
+            try {
+                const response = await fetch(`/api/conversations/${currentConversationId}/topic`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        topic: topic || null,
+                        sub_topic: subTopic || null
+                    })
+                });
+                
+                if (response.ok) {
+                    currentConversationTopic = topic || null;
+                    currentConversationSubtopic = subTopic || null;
+                    updateTopicDisplayText();
+                    closeTopicModal();
+                    loadConversations(true); // Refresh conversation list
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.detail || 'Error updating topic');
+                }
+            } catch (error) {
+                console.error('Error updating topic:', error);
+                alert('Error updating topic');
+            }
+        }
+
+        // Topic modal event listeners
+        editTopicBtn.addEventListener('click', openTopicModal);
+        cancelTopicBtn.addEventListener('click', closeTopicModal);
+        saveTopicBtn.addEventListener('click', saveTopicChanges);
+        
+        removeTopicBtn.addEventListener('click', async () => {
+            if (!currentConversationId) return;
+            
+            try {
+                const response = await fetch(`/api/conversations/${currentConversationId}/topic`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        topic: null,
+                        sub_topic: null
+                    })
+                });
+                
+                if (response.ok) {
+                    currentConversationTopic = null;
+                    currentConversationSubtopic = null;
+                    updateTopicDisplayText();
+                    closeTopicModal();
+                    loadConversations(true);
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.detail || 'Error removing topic');
+                }
+            } catch (error) {
+                console.error('Error removing topic:', error);
+                alert('Error removing topic');
+            }
+        });
+
+        modalTopicSelect.addEventListener('change', updateModalSubtopicDropdown);
+
+        // Close modal when clicking outside
+        topicModal.addEventListener('click', (e) => {
+            if (e.target === topicModal) {
+                closeTopicModal();
             }
         });
 
