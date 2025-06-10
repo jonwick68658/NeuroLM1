@@ -19,9 +19,16 @@ def generate_embedding(text):
         import openai
         import os
 
-        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        response = client.embeddings.create(model="text-embedding-3-small",
-                                            input=cleaned_text)
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logging.error("OPENAI_API_KEY not found in environment")
+            return None
+
+        client = openai.OpenAI(api_key=api_key)
+        response = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=cleaned_text
+        )
         return response.data[0].embedding
 
     except Exception as e:
