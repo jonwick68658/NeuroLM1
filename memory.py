@@ -3,11 +3,9 @@ import uuid
 import json
 import math
 import random
-import hashlib
 from typing import List, Dict, Set, Tuple, Optional
 import os
 from neo4j import GraphDatabase
-import redis
 
 
 # Note: sentence_transformers removed to resolve dependency conflicts
@@ -23,54 +21,53 @@ class TopicNode:
                  timestamp: datetime.datetime = None):
         self.id = str(uuid.uuid4())
         self.name = name
-        self.description = description or f"Topic about {name}"
+        self.description = description or name
         self.parent_topic_id = parent_topic_id
         self.timestamp = timestamp or datetime.datetime.now()
-        self.memory_count = 0
-        self.subtopic_count = 0
         
     def __repr__(self):
-        return f"TopicNode(id={self.id}, name={self.name}, memories={self.memory_count})"
+        return f"TopicNode(id={self.id}, name='{self.name}', parent={self.parent_topic_id})"
 
 class MemoryNode:
     """
     Represents a unit of memory with content and metadata.
     Now organized under topic nodes.
     """
-
+    
     def __init__(self, content: str, confidence: float = 0.8, 
                  category: str = None, topic_id: str = None, timestamp: datetime.datetime = None):
         self.id = str(uuid.uuid4())
         self.content = content
         self.confidence = confidence
         self.category = category or self._detect_category(content)
-        self.topic_id = topic_id  # Link to parent topic
+        self.topic_id = topic_id
         self.timestamp = timestamp or datetime.datetime.now()
-        self.connections = set()  # Will store only IDs for now
-        self.reinforcement = 0.0  # How much this memory has been reinforced
-        self.decay_rate = 0.0005  # Daily decay rate
         
     def _detect_category(self, text: str) -> str:
         """Attempt to detect the category of the memory content."""
-        # Basic rule-based categorization
-        if "person" in text or "name" in text or "meet" in text:
-            return "social_organizational"
-        elif "buy" in text or "sell" in text or "price" in text or "cost" in text:
-            return "economic"
-        elif "error" in text.lower() or "exception" in text.lower():
-            return "technical_issues"
-        elif any(doc_word in text.lower() for doc_word in ["read", "document", "file", "pdf"]):
-            return "document_related"
+        text_lower = text.lower()
+        
+        if any(word in text_lower for word in ['learn', 'study', 'understand', 'know', 'fact']):
+            return 'learning'
+        elif any(word in text_lower for word in ['feel', 'emotion', 'happy', 'sad', 'angry', 'excited']):
+            return 'emotion'
+        elif any(word in text_lower for word in ['conversation', 'chat', 'talk', 'discuss']):
+            return 'conversation'
+        elif any(word in text_lower for word in ['personal', 'about me', 'my', 'i am', 'i like']):
+            return 'personal'
+        elif any(word in text_lower for word in ['work', 'job', 'career', 'professional']):
+            return 'professional'
         else:
-            return "general_knowledge"
-
+            return 'general_knowledge'
+    
     def __repr__(self):
-        return f"MemoryNode(id={self.id}, content={self.content[:50]}..., confidence={self.confidence})"
-
+        return f"MemoryNode(id={self.id}, content='{self.content[:50]}...', confidence={self.confidence})"
+    
     def get_similarity_embedding(self) -> List[float]:
         """Get the embedding vector for this memory node - temporarily disabled"""
-        # return EMBEDDING_MODEL.encode(self.content).tolist()
-        return [0.0] * 384  # Return dummy embedding vector
+        # This would normally return the embedding vector for similarity calculations
+        # For now, we'll use a simplified approach
+        return []
 
 class MemoryConnection:
     """
@@ -84,15 +81,14 @@ class MemoryConnection:
         self.target_id = target_id
         self.strength = strength
         self.relationship_type = relationship_type
-        self.timestamp = timestamp if timestamp else datetime.datetime.now()
+        self.timestamp = timestamp or datetime.datetime.now()
         
     def decay(self):
         """Decay the relationship strength over time"""
-        self.strength = max(0.1, self.strength * 0.995)  # Slight decay but keep some minimum strength
+        self.strength *= 0.95  # Decay by 5%
         
     def __repr__(self):
-        return (f"MemoryConnection(id={self.id}, source={self.source_id}, "
-                f"target={self.target_id}, strength={self.strength})")
+        return f"MemoryConnection({self.source_id} -> {self.target_id}, strength={self.strength})"
 
 class MemorySystem:
     """
@@ -107,23 +103,6 @@ class MemorySystem:
         self.conversation_history = []
         self.past_queries = {}
         self.usefulness_history = []
-        
-        # Initialize Redis cache for ultra-fast retrieval
-        try:
-            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-            self.redis_client = redis.from_url(
-                redis_url, 
-                decode_responses=True,
-                socket_connect_timeout=1,
-                socket_timeout=1,
-                retry_on_timeout=False
-            )
-            self.redis_client.ping()  # Test connection
-            print("Redis cache initialized successfully")
-        except Exception as e:
-            print(f"Redis not available, running without cache: {e}")
-            self.redis_client = None
-            
         self._create_schema()
         
     def _create_schema(self):
@@ -140,49 +119,10 @@ class MemorySystem:
             session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.confidence)")
             session.run("CREATE INDEX IF NOT EXISTS FOR (u:User) ON (u.username)")
             
-            # Create vector index for high-performance similarity search
-            try:
-                session.run("""
-                    CREATE VECTOR INDEX memory_embeddings IF NOT EXISTS
-                    FOR (m:MemoryNode) ON (m.embedding)
-                    OPTIONS { indexConfig: {
-                        `vector.dimensions`: 1536,
-                        `vector.similarity_function`: 'cosine'
-                    }}
-                """)
-                print("Vector index 'memory_embeddings' configured successfully")
-            except Exception as e:
-                print(f"Vector index setup: {e}")
-                # Continue without vector index if not supported
-            
     def _generate_embedding(self, text: str) -> List[float]:
-        """Generate embeddings with intelligent caching to reduce API costs"""
-        # Check cache first to avoid API calls
-        if self.redis_client:
-            cache_key = self._get_embedding_cache_key(text)
-            try:
-                cached_embedding = self.redis_client.get(cache_key)
-                if cached_embedding:
-                    return json.loads(cached_embedding)
-            except Exception:
-                pass
-        
-        try:
-            from utils import generate_embedding
-            embedding = generate_embedding(text)
-            
-            # Cache for 1 hour to dramatically reduce costs
-            if self.redis_client and embedding:
-                try:
-                    cache_key = self._get_embedding_cache_key(text)
-                    self.redis_client.setex(cache_key, 3600, json.dumps(embedding))
-                except Exception:
-                    pass
-            
-            return embedding
-        except Exception as e:
-            print(f"Warning: Could not generate embedding: {e}")
-            return [0.0] * 1536
+        """Generate embeddings using OpenAI API"""
+        from utils import get_embedding_sync  # Import here to avoid circular imports
+        return get_embedding_sync(text)
     
     def _calculate_cosine_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
         """Calculate cosine similarity between two embeddings"""
@@ -213,141 +153,89 @@ class MemorySystem:
         # Generate embedding for semantic search
         embedding = self._generate_embedding(content)
         
-        # Save to Neo4j with embedding and user relationship
         with self.driver.session() as session:
-            if user_id:
-                # Create memory and link to user
-                session.run(
-                    """
-                    MATCH (u:User {id: $user_id})
-                    CREATE (m:MemoryNode {
-                        id: $id,
-                        content: $content,
-                        confidence: $confidence,
-                        category: $category,
-                        timestamp: datetime($timestamp),
-                        embedding: $embedding
-                    })
-                    CREATE (u)-[:HAS_MEMORY]->(m)
-                    """,
-                    {
-                        "user_id": user_id,
-                        "id": memory_node.id,
-                        "content": memory_node.content,
-                        "confidence": memory_node.confidence,
-                        "category": memory_node.category,
-                        "timestamp": memory_node.timestamp.isoformat(),
-                        "embedding": embedding
-                    }
-                )
-            else:
-                # Create memory without user link (backward compatibility)
-                session.run(
-                    """
-                    CREATE (m:MemoryNode {
-                        id: $id,
-                        content: $content,
-                        confidence: $confidence,
-                        category: $category,
-                        timestamp: datetime($timestamp),
-                        embedding: $embedding
-                    })
-                    """,
-                    {
-                        "id": memory_node.id,
-                        "content": memory_node.content,
-                        "confidence": memory_node.confidence,
-                        "category": memory_node.category,
-                        "timestamp": memory_node.timestamp.isoformat(),
-                        "embedding": embedding
-                    }
-                )
+            # Store memory node in Neo4j
+            session.run(
+                """
+                MERGE (u:User {id: $user_id})
+                CREATE (m:MemoryNode {
+                    id: $memory_id,
+                    content: $content,
+                    confidence: $confidence,
+                    category: $category,
+                    timestamp: $timestamp,
+                    embedding: $embedding
+                })
+                CREATE (u)-[:HAS_MEMORY]->(m)
+                """,
+                {
+                    "user_id": user_id or "default_user",
+                    "memory_id": memory_node.id,
+                    "content": memory_node.content,
+                    "confidence": memory_node.confidence,
+                    "category": memory_node.category,
+                    "timestamp": memory_node.timestamp,
+                    "embedding": embedding
+                }
+            )
         
-        # Create semantic relationships with existing memories for the same user
+        # Create relationships with existing memories
         if user_id:
             self._create_memory_relationships(memory_node.id, embedding, user_id)
         
         return memory_node.id
-    
+        
     def _create_memory_relationships(self, new_memory_id: str, new_embedding: List[float], user_id: str):
         """Create semantic relationships between the new memory and existing memories"""
-        similarity_threshold = 0.7  # Only create relationships for highly similar memories
-        
         with self.driver.session() as session:
-            # Find similar memories for the same user
+            # Get existing memories for this user
             result = session.run(
                 """
                 MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
                 WHERE m.id <> $new_memory_id AND m.embedding IS NOT NULL
                 RETURN m.id AS id, m.embedding AS embedding
+                LIMIT 20
                 """,
                 {"user_id": user_id, "new_memory_id": new_memory_id}
             )
             
-            # Calculate similarities and create relationships
+            # Calculate similarities and create connections
             for record in result:
-                existing_embedding = record["embedding"]
-                similarity = self._calculate_cosine_similarity(new_embedding, existing_embedding)
-                
-                if similarity >= similarity_threshold:
-                    # Create bidirectional RELATES_TO relationship
-                    session.run(
-                        """
-                        MATCH (m1:MemoryNode {id: $memory1_id})
-                        MATCH (m2:MemoryNode {id: $memory2_id})
-                        MERGE (m1)-[:RELATES_TO {similarity: $similarity, created_at: datetime()}]->(m2)
-                        MERGE (m2)-[:RELATES_TO {similarity: $similarity, created_at: datetime()}]->(m1)
-                        """,
-                        {
-                            "memory1_id": new_memory_id,
-                            "memory2_id": record["id"],
-                            "similarity": similarity
-                        }
-                    )
+                stored_embedding = record["embedding"]
+                if stored_embedding:
+                    similarity = self._calculate_cosine_similarity(new_embedding, stored_embedding)
+                    
+                    # Create connection if similarity is above threshold
+                    if similarity > 0.7:
+                        session.run(
+                            """
+                            MATCH (m1:MemoryNode {id: $source_id})
+                            MATCH (m2:MemoryNode {id: $target_id})
+                            CREATE (m1)-[:SIMILAR_TO {
+                                strength: $strength,
+                                similarity: $similarity
+                            }]->(m2)
+                            """,
+                            {
+                                "source_id": new_memory_id,
+                                "target_id": record["id"],
+                                "strength": similarity,
+                                "similarity": similarity
+                            }
+                        )
         
-    def _get_cache_key(self, query: str, user_id: str, depth: int) -> str:
-        """Generate cache key for query results"""
-        query_hash = hashlib.md5(f"{query}:{user_id}:{depth}".encode()).hexdigest()
-        return f"memories:{query_hash}"
-    
-    def _get_embedding_cache_key(self, query: str) -> str:
-        """Generate cache key for embeddings"""
-        query_hash = hashlib.md5(query.encode()).hexdigest()
-        return f"embedding:{query_hash}"
-
     def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None) -> List[MemoryNode]:
-        """Retrieve relevant memories using Neo4j vector search with intelligent caching"""
-        
+        """Retrieve relevant memories based on semantic similarity"""
         if not user_id:
             return []
-        
-        # Try cache first for instant response (1-5ms)
-        if self.redis_client:
-            try:
-                cache_key = self._get_cache_key(query, user_id, depth)
-                cached_result = self.redis_client.get(cache_key)
-                if cached_result:
-                    memories_data = json.loads(cached_result)
-                    memories = []
-                    for mem_data in memories_data:
-                        memory_node = MemoryNode(
-                            content=mem_data['content'],
-                            confidence=mem_data['confidence'],
-                            category=mem_data.get('category', 'general_knowledge')
-                        )
-                        memory_node.id = mem_data['id']
-                        memories.append(memory_node)
-                    return memories
-            except Exception as e:
-                print(f"Cache read error: {e}")
             
         with self.driver.session() as session:
-            # Special handling for name queries - prioritize memories containing actual names
+            # Check for name-specific queries first
             name_keywords = ["name", "called", "Ryan", "I am", "my name is"]
             is_name_query = any(keyword.lower() in query.lower() for keyword in name_keywords)
             
             if is_name_query:
-                # Direct query for name-related memories
+                # Prioritize name-related memories
                 name_result = session.run(
                     """
                     MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
@@ -377,447 +265,338 @@ class MemorySystem:
                 if memories:
                     return memories
             
-            # Generate query embedding with caching for cost reduction
-            embedding_cache_key = self._get_embedding_cache_key(query)
-            query_embedding = None
-            
-            if self.redis_client:
-                try:
-                    cached_embedding = self.redis_client.get(embedding_cache_key)
-                    if cached_embedding:
-                        query_embedding = json.loads(cached_embedding)
-                except Exception as e:
-                    print(f"Embedding cache read error: {e}")
-            
+            # Generate embedding for semantic search
+            query_embedding = self._generate_embedding(query)
             if not query_embedding:
-                query_embedding = self._generate_embedding(query)
-                if not query_embedding:
-                    return []
-                    
-                # Cache embedding for 5 minutes to reduce API costs
-                if self.redis_client and query_embedding:
-                    try:
-                        self.redis_client.setex(embedding_cache_key, 300, json.dumps(query_embedding))
-                    except Exception as e:
-                        print(f"Embedding cache write error: {e}")
+                return []
             
-            # Try vector index search first (100x faster)
-            try:
-                vector_result = session.run(
-                    """
-                    CALL db.index.vector.queryNodes('memory_embeddings', $depth, $embedding) 
-                    YIELD node, score
-                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(node)
-                    RETURN node.id AS id, node.content AS content, 
-                           node.confidence AS confidence, node.category AS category,
-                           node.timestamp AS timestamp, score
-                    ORDER BY score DESC
-                    """,
-                    {
-                        "depth": depth,
-                        "embedding": query_embedding,
-                        "user_id": user_id
-                    }
-                )
-                
-                memories = []
-                for record in vector_result:
-                    memory_node = MemoryNode(
-                        content=record["content"],
-                        confidence=record["confidence"],
-                        category=record["category"],
-                        timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
-                    )
-                    memory_node.id = record["id"]
-                    memories.append(memory_node)
-                
-                # Cache results for 60 seconds for ultra-fast repeat queries
-                if self.redis_client and memories:
-                    try:
-                        cache_key = self._get_cache_key(query, user_id, depth)
-                        memories_data = []
-                        for mem in memories:
-                            memories_data.append({
-                                'id': mem.id,
-                                'content': mem.content,
-                                'confidence': mem.confidence,
-                                'category': mem.category
-                            })
-                        self.redis_client.setex(cache_key, 60, json.dumps(memories_data))
-                    except Exception as e:
-                        print(f"Cache write error: {e}")
-                
-                return memories
-                
-            except Exception as e:
-                print(f"Vector index not available, falling back to manual search: {e}")
-                
-                # Fallback to optimized manual search (still faster than before)
-                result = session.run(
-                    """
-                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
-                    WHERE m.embedding IS NOT NULL
-                    RETURN m.id AS id, m.embedding AS embedding,
-                           m.content AS content, m.confidence AS confidence,
-                           m.category AS category, m.timestamp AS timestamp
-                    ORDER BY m.timestamp DESC
-                    LIMIT 100
-                    """,
-                    {"user_id": user_id}
-                )
-                
-                # Calculate similarity scores efficiently
-                candidates = []
-                for record in result:
-                    stored_embedding = record["embedding"]
-                    if stored_embedding:
-                        similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
-                        candidates.append((record, similarity))
-                
-                # Sort by similarity and get top results
-                candidates.sort(key=lambda x: x[1], reverse=True)
-                
-                memories = []
-                for record, similarity in candidates[:depth]:
-                    memory_node = MemoryNode(
-                        content=record["content"],
-                        confidence=record["confidence"],
-                        category=record["category"],
-                        timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
-                    )
-                    memory_node.id = record["id"]
-                    memories.append(memory_node)
-                
-                # Cache fallback results too for consistency
-                if self.redis_client and memories:
-                    try:
-                        cache_key = self._get_cache_key(query, user_id, depth)
-                        memories_data = []
-                        for mem in memories:
-                            memories_data.append({
-                                'id': mem.id,
-                                'content': mem.content,
-                                'confidence': mem.confidence,
-                                'category': mem.category
-                            })
-                        self.redis_client.setex(cache_key, 60, json.dumps(memories_data))
-                    except Exception as e:
-                        print(f"Fallback cache write error: {e}")
-                
-                return memories
-        
-    def _calculate_relevance_score(self, memory_node: MemoryNode, query: str) -> float:
-        """Calculate a relevance score based on semantic similarity"""
-        # In a complete implementation, we'd use the actual embedding vectors
-        # Since we don't have the full implementation, we'll simulate this
-        return random.uniform(0.5, 1.0)
-        
-    def _contextual_filter(self, context: str, memory_nodes: List[MemoryNode]) -> List[MemoryNode]:
-        """Filter memories based on conversational context"""
-        # Simple implementation that returns all nodes but weights recent ones
-        return memory_nodes
-        
-    def reinforce_memory(self, memory_id: str, reinforcement: float = 1.0) -> bool:
-        """Increase the strength of a memory based on its usefulness"""
-        # Log the reinforcement
-        self.usefulness_history.append({
-            "memory_id": memory_id,
-            "reinforcement": reinforcement,
-            "timestamp": datetime.datetime.now().isoformat()
-        })
-        
-        # If we have enough data, train the embedding model
-        if len(self.usefulness_history) % 10 == 0:
-            self._train_embedding_model()
-            
-        with self.driver.session() as session:
-            session.write_transaction(
-                self._cypher_query,
+            # Get all memories for this user
+            result = session.run(
                 """
-                MATCH (m:MemoryNode {id: $memory_id})
-                SET m.reinforcement = COALESCE(m.reinforcement, 0) + $reinforcement,
-                    m.confidence = m.confidence + $reinforcement * 0.01
-                RETURN m.confidence AS new_confidence
+                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                RETURN m.id AS id, m.embedding AS embedding,
+                       m.content AS content, m.confidence AS confidence,
+                       m.category AS category, m.timestamp AS timestamp
+                ORDER BY m.timestamp DESC
                 """,
-                {
-                    "memory_id": memory_id,
-                    "reinforcement": reinforcement
-                }
+                {"user_id": user_id}
             )
             
-        return self._get_memory_confidence(memory_id)
+            # Calculate similarities
+            memories = []
+            for record in result:
+                stored_embedding = record["embedding"]
+                if stored_embedding:
+                    similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
+                    if similarity > 0.1:  # Low threshold to be inclusive
+                        memory_node = MemoryNode(
+                            content=record["content"],
+                            confidence=record["confidence"],
+                            category=record["category"],
+                            timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
+                        )
+                        memory_node.id = record["id"]
+                        memories.append((memory_node, similarity))
+            
+            # Sort by similarity and return top results
+            memories.sort(key=lambda x: x[1], reverse=True)
+            return [mem[0] for mem in memories[:depth]]
+    
+    def _calculate_relevance_score(self, memory_node: MemoryNode, query: str) -> float:
+        """Calculate a relevance score based on semantic similarity"""
+        # Simple keyword matching as fallback
+        query_words = set(query.lower().split())
+        content_words = set(memory_node.content.lower().split())
         
+        if not query_words or not content_words:
+            return 0.0
+            
+        intersection = query_words.intersection(content_words)
+        union = query_words.union(content_words)
+        
+        jaccard_similarity = len(intersection) / len(union) if union else 0.0
+        
+        # Boost score based on confidence and recency
+        confidence_boost = memory_node.confidence
+        recency_boost = 1.0  # Could be based on timestamp
+        
+        return jaccard_similarity * confidence_boost * recency_boost
+    
+    def _contextual_filter(self, context: str, memory_nodes: List[MemoryNode]) -> List[MemoryNode]:
+        """Filter memories based on conversational context"""
+        if not context:
+            return memory_nodes
+        
+        # Simple context filtering based on category matching
+        context_lower = context.lower()
+        relevant_categories = []
+        
+        if any(word in context_lower for word in ['personal', 'about', 'me', 'myself']):
+            relevant_categories.append('personal')
+        if any(word in context_lower for word in ['work', 'job', 'professional']):
+            relevant_categories.append('professional')
+        if any(word in context_lower for word in ['feel', 'emotion', 'mood']):
+            relevant_categories.append('emotion')
+        
+        if not relevant_categories:
+            return memory_nodes
+        
+        # Filter and sort by category relevance
+        filtered_memories = []
+        for memory in memory_nodes:
+            if memory.category in relevant_categories:
+                filtered_memories.append(memory)
+        
+        return filtered_memories or memory_nodes  # Return original if no matches
+    
+    def reinforce_memory(self, memory_id: str, reinforcement: float = 1.0) -> bool:
+        """Increase the strength of a memory based on its usefulness"""
+        try:
+            with self.driver.session() as session:
+                result = session.run(
+                    """
+                    MATCH (m:MemoryNode {id: $memory_id})
+                    SET m.confidence = m.confidence + $reinforcement
+                    RETURN m.confidence AS new_confidence
+                    """,
+                    {"memory_id": memory_id, "reinforcement": reinforcement}
+                )
+                
+                record = result.single()
+                if record:
+                    new_confidence = min(record["new_confidence"], 1.0)  # Cap at 1.0
+                    session.run(
+                        "MATCH (m:MemoryNode {id: $memory_id}) SET m.confidence = $confidence",
+                        {"memory_id": memory_id, "confidence": new_confidence}
+                    )
+                    return True
+        except Exception as e:
+            print(f"Error reinforcing memory: {e}")
+        
+        return False
+    
     def decay_memories(self, force_decay=False):
         """Decay unused memories according to the forgetting algorithm"""
-        # Only decay under certain conditions
-        if not force_decay and datetime.datetime.now().hour != 3:  # Only at 3AM
-            return
-            
-        # 1. Calculate daily decay rate based on system load (for simulation purposes)
-        decay_rate = self.decay_rate * random.uniform(0.8, 1.2)
+        current_time = datetime.datetime.now()
         
-        # 2. Retrieve memories with low confidence
         with self.driver.session() as session:
-            result = session.read_transaction(
-                self._cypher_query,
+            # Get all memories with their last access times
+            result = session.run(
                 """
                 MATCH (m:MemoryNode)
-                RETURN m.id AS id, m.confidence AS confidence
-                ORDER BY m.confidence ASC  # Lowest confidence first
-                LIMIT 100  # Sample a subset for decay
+                RETURN m.id AS id, m.confidence AS confidence, 
+                       m.timestamp AS timestamp, m.category AS category
                 """
             )
             
             for record in result:
-                memory_id = record["id"]
-                current_confidence = record["confidence"]
-                new_confidence = max(0.1, current_confidence - decay_rate)
+                memory_time = record["timestamp"]
+                if hasattr(memory_time, 'to_native'):
+                    memory_time = memory_time.to_native()
                 
-                if new_confidence != current_confidence:
-                    self._update_memory_confidence(memory_id, new_confidence)
-                    
-        # 3. Remove memories with very low confidence (simulated version)
-        self._forget_low_confidence_memories()
+                # Calculate time since creation
+                time_diff = current_time - memory_time
+                days_old = time_diff.days
+                
+                # Apply different decay rates based on category
+                category = record["category"]
+                if category == 'personal':
+                    decay_rate = 0.01  # Very slow decay for personal info
+                elif category == 'professional':
+                    decay_rate = 0.02  # Slow decay for work-related
+                elif category == 'emotion':
+                    decay_rate = 0.05  # Faster decay for emotions
+                else:
+                    decay_rate = 0.03  # Standard decay rate
+                
+                # Calculate new confidence
+                confidence = record["confidence"]
+                new_confidence = confidence * (1 - decay_rate * days_old)
+                new_confidence = max(new_confidence, 0.1)  # Minimum confidence
+                
+                # Update confidence in database
+                session.run(
+                    "MATCH (m:MemoryNode {id: $memory_id}) SET m.confidence = $confidence",
+                    {"memory_id": record["id"], "confidence": new_confidence}
+                )
         
+        # Remove very low confidence memories
+        self._forget_low_confidence_memories()
+    
     def _forget_low_confidence_memories(self):
         """Remove memories that have decayed below a threshold"""
-        # In a real system, we'd remove these entirely
-        # In this simulation, we mark them as decayed
         with self.driver.session() as session:
-            session.write_transaction(
-                self._cypher_query,
+            session.run(
                 """
                 MATCH (m:MemoryNode)
                 WHERE m.confidence < 0.1
-                SET m.decayed_at = datetime()
-                RETURN COUNT(m) AS memories_forget
+                DETACH DELETE m
                 """
             )
-            
+    
     def _update_memory_confidence(self, memory_id: str, confidence: float) -> None:
         """Update the confidence level of a memory"""
         with self.driver.session() as session:
-            session.write_transaction(
-                self._cypher_query,
-                """
-                MATCH (m:MemoryNode {id: $memory_id})
-                SET m.confidence = $confidence
-                RETURN m.confidence AS updated_confidence
-                """,
-                {
-                    "memory_id": memory_id,
-                    "confidence": confidence
-                }
+            session.run(
+                "MATCH (m:MemoryNode {id: $memory_id}) SET m.confidence = $confidence",
+                {"memory_id": memory_id, "confidence": confidence}
             )
-            
+    
     def learn_from_conversation(self, conversation: str) -> int:
         """Analyze and learn from a conversation"""
-        # Placeholder for full implementation
-        # This would extract key points, categorize them, and create new memories
-        # For now, just count sentences as "memorization events"
-        sentences = conversation.split(". ")  # Simple sentence splitter
-        new_memories_count = len(sentences)
+        # Split conversation into meaningful chunks
+        sentences = conversation.split('.')
+        memories_added = 0
         
-        # Create simplified memory entries for conversation structure
-        self.add_memory(f"Conversation about '{conversation[:50]}...'")
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) > 10:  # Only process substantial sentences
+                # Determine if this is worth remembering
+                if any(keyword in sentence.lower() for keyword in 
+                       ['i am', 'my name', 'i like', 'i work', 'i feel', 'remember', 'important']):
+                    self.add_memory(sentence, confidence=0.8)
+                    memories_added += 1
         
-        return new_memories_count
-        
+        return memories_added
+    
     def detect_forgetfulness_patterns(self) -> Dict[str, float]:
         """Identify patterns in how different categories are forgotten"""
-        # In a complete implementation, this would analyze forgetting rates
-        # by category
-        
-        categories = {}
         with self.driver.session() as session:
-            result = session.read_transaction(
-                self._cypher_query,
+            result = session.run(
                 """
                 MATCH (m:MemoryNode)
-                RETURN m.category AS category, COUNT(m) AS count
-                GROUP BY m.category
-                ORDER BY count DESC
+                RETURN m.category AS category, COUNT(m) AS count, AVG(m.confidence) AS avg_confidence
                 """
             )
             
-        for record in result:
-            category = record["category"]
-            count = record["count"]
-            if category:
-                categories[category] = count
+            patterns = {}
+            for record in result:
+                category = record["category"]
+                count = record["count"]
+                avg_confidence = record["avg_confidence"]
                 
-        # Simple simulation of decay patterns
-        def normal_decay_pattern(count):
-            return math.log(max(count, 1)) * 0.5
+                # Simple pattern: categories with lower average confidence are forgotten more
+                def normal_decay_pattern(count):
+                    return max(0.1, 1.0 - (count * 0.05))  # More memories = more decay
+                
+                expected_confidence = normal_decay_pattern(count)
+                deviation = avg_confidence - expected_confidence
+                
+                patterns[category] = {
+                    'count': count,
+                    'avg_confidence': avg_confidence,
+                    'expected_confidence': expected_confidence,
+                    'deviation': deviation
+                }
             
-        return {k: normal_decay_pattern(v) for k, v in categories.items()}
-        
+            return patterns
+    
     def explain_forgetting(self, memory_id: str) -> str:
         """Provide reasoning for why a memory might be forgotten"""
-        with self.driver.session() as session:
-            result = session.read_transaction(
-                self._cypher_query,
-                """
-                MATCH (m:MemoryNode {id: $memory_id})
-                RETURN m.confidence AS confidence, 
-                       m.category AS category,
-                       date(m.timestamp) AS creation_date,
-                       date() AS current_date
-                """,
-                {
-                    "memory_id": memory_id
-                }
-            )
-            
-            record = result.single()
-            if not record:
-                return "No memory found with that ID"
-                
-            confidence = record["confidence"]
-            category = record["category"]
-            creation_date = record["creation_date"].split("T")[0]
-            current_date = record["current_date"].split("T")[0]
-            
-            days_old = (datetime.datetime.strptime(current_date, "%Y-%m-%d") - 
-                        datetime.datetime.strptime(creation_date, "%Y-%m-%d")).days
-            
-            # Different reasons for forgetting based on category
-            reasons = {
-                "social_organizational": "This memory pertains to social or organizational matters. "
-                    "As such, it has higher importance and is protected from decay.",
-                "economic": "Economic information changes frequently, so this memory is prioritized "
-                    "for updating and reinforcement.",
-                "technical_issues": "Technical issues often require immediate attention. "
-                    "This memory remains easily accessible unless deprecated.",
-                "document_related": "Documents provide valuable information. This memory has been "
-                    "protected or accelerated decay based on relevance.",
-                "general_knowledge": ""
-            }
-            
-            explanation = (f"This memory about '{memory_id[:10]}...' was "
-                          f"created on {creation_date} and is {days_old} days old.\n\n"
-                          f"It currently has a confidence score of {confidence:.1f}.\n\n")
-                    
-            if category in reasons:
-                explanation += reasons[category]
-                
-            # Add decay-based explanation
-            decay_factor = days_old * 0.001
-            if confidence < 0.3:
-                decay_threshold = 30
-                explanation += (f"\nIts low confidence means it has been experiencing accelerated "
-                               f"decay, especially since its last reinforcement. Memories like "
-                               f"these typically fade after {decay_threshold} days of inactivity.")
-            else:
-                explanation += (f"\nThis memory has been reinforced and maintained at a higher "
-                               f"confidence level of {confidence:.1f}, so it has been preserved "
-                               "and is unlikely to decay soon.")
-                
-            return explanation[:1000] + "..." if len(explanation) > 1000 else explanation
-            
+        confidence = self._get_memory_confidence(memory_id)
+        content = self._get_memory_content(memory_id)
+        
+        if confidence < 0.3:
+            return f"Memory '{content[:30]}...' has low confidence ({confidence:.2f}) due to lack of recent reinforcement."
+        elif confidence < 0.5:
+            return f"Memory '{content[:30]}...' is moderately strong ({confidence:.2f}) but may decay without use."
+        else:
+            return f"Memory '{content[:30]}...' is well-established ({confidence:.2f}) and unlikely to be forgotten."
+    
     def _get_memory_content(self, memory_id: str) -> str:
         """Helper method to get memory content from database"""
         with self.driver.session() as session:
-            result = session.read_transaction(
-                self._cypher_query,
-                """
-                MATCH (m:MemoryNode {id: $memory_id})
-                RETURN m.content AS content
-                """,
+            result = session.run(
+                "MATCH (m:MemoryNode {id: $memory_id}) RETURN m.content AS content",
                 {"memory_id": memory_id}
             )
             record = result.single()
-            return record["content"] if record else ""
-            
+            return record["content"] if record else "Unknown memory"
+    
     def _get_memory_confidence(self, memory_id: str) -> float:
         """Helper method to get memory confidence from database"""
         with self.driver.session() as session:
-            result = session.read_transaction(
-                self._cypher_query,
-                """
-                MATCH (m:MemoryNode {id: $memory_id})
-                RETURN m.confidence AS confidence
-                """,
+            result = session.run(
+                "MATCH (m:MemoryNode {id: $memory_id}) RETURN m.confidence AS confidence",
                 {"memory_id": memory_id}
             )
             record = result.single()
             return record["confidence"] if record else 0.0
-            
+    
     def _train_embedding_model(self):
         """Placeholder for embedding model training based on usefulness feedback"""
-        # In a complete implementation, this would retrain the embedding model
-        # based on which memories were marked as useful
+        # This would involve training or fine-tuning the embedding model
+        # based on which memories were found useful in conversations
         pass
-        
+    
     def get_memory_node(self, memory_id: str) -> Optional[MemoryNode]:
         """Retrieve a specific memory node from the database by ID"""
         with self.driver.session() as session:
             result = session.run(
                 """
                 MATCH (m:MemoryNode {id: $memory_id})
-                RETURN m AS memory_node
+                RETURN m.id AS id, m.content AS content, m.confidence AS confidence,
+                       m.category AS category, m.timestamp AS timestamp
                 """,
-                {
-                    "memory_id": memory_id
-                }
+                {"memory_id": memory_id}
             )
             
             record = result.single()
             if record:
-                memory_node_data = {
-                    "id": record["memory_node"].get("id"),
-                    "content": record["memory_node"].get("content"),
-                    "confidence": record["memory_node"].get("confidence", 0.5),
-                    "category": record["memory_node"].get("category"),
-                    "timestamp": record["memory_node"].get("timestamp"),
-                    "connections": record["memory_node"].get("connections", [])
-                }
-                
-                return MemoryNode(
-                    content=memory_node_data["content"],
-                    confidence=memory_node_data["confidence"],
-                    category=memory_node_data["category"],
-                    timestamp=memory_node_data["timestamp"] if memory_node_data["timestamp"] else None
+                memory_node = MemoryNode(
+                    content=record["content"],
+                    confidence=record["confidence"],
+                    category=record["category"],
+                    timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
                 )
-        return None
-        
+                memory_node.id = record["id"]
+                return memory_node
+            
+            return None
+    
     def forget_memory(self, memory_id: str) -> bool:
         """Permanently remove a memory from both Neo4j and ChromaDB vector store"""
         try:
-            # Remove from Neo4j
             with self.driver.session() as session:
-                session.run(
+                # Remove the memory node and its relationships
+                result = session.run(
                     """
                     MATCH (m:MemoryNode {id: $memory_id})
                     DETACH DELETE m
-                    RETURN count(m) AS deleted
+                    RETURN COUNT(m) AS deleted_count
                     """,
-                    {
-                        "memory_id": memory_id
-                    }
+                    {"memory_id": memory_id}
                 )
                 
-            # Neo4j deletion is complete (embedding stored in same node)
+                record = result.single()
+                return record["deleted_count"] > 0 if record else False
                 
-            return True
         except Exception as e:
-            print(f"Error forgetting memory {memory_id}: {str(e)}")
+            print(f"Error forgetting memory: {e}")
             return False
-            
+    
     def get_all_memory_nodes(self) -> List[MemoryNode]:
         """Retrieve all memory nodes from the database"""
+        memories = []
+        
         with self.driver.session() as session:
             result = session.run(
                 """
                 MATCH (m:MemoryNode)
-                RETURN m.id AS id
+                RETURN m.id AS id, m.content AS content, m.confidence AS confidence,
+                       m.category AS category, m.timestamp AS timestamp
+                ORDER BY m.timestamp DESC
                 """
             )
             
-            all_memory_nodes = []
             for record in result:
-                memory_node = self.get_memory_node(record["id"])
-                if memory_node:
-                    all_memory_nodes.append(memory_node)
-                    
-            return all_memory_nodes
+                memory_node = MemoryNode(
+                    content=record["content"],
+                    confidence=record["confidence"],
+                    category=record["category"],
+                    timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
+                )
+                memory_node.id = record["id"]
+                memories.append(memory_node)
+        
+        return memories
