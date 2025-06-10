@@ -234,7 +234,7 @@ def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: 
         messages = []
         for row in rows:
             messages.append({
-                'id': row[0],
+                'id': str(row[0]),
                 'message_type': row[1],
                 'content': row[2],
                 'created_at': row[3].isoformat()
@@ -261,7 +261,7 @@ def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: 
             'messages': messages,
             'total_count': total_count,
             'has_more': has_more,
-            'oldest_id': messages[0]['id'] if messages else None
+            'oldest_id': str(messages[0]['id']) if messages else None
         }
     except Exception as e:
         print(f"Error getting messages: {e}")
@@ -282,7 +282,7 @@ def get_conversation_messages_all(conversation_id: str) -> List[Dict]:
         messages = []
         for row in cursor.fetchall():
             messages.append({
-                'id': row[0],
+                'id': str(row[0]),
                 'message_type': row[1],
                 'content': row[2],
                 'created_at': row[3].isoformat()
