@@ -150,14 +150,33 @@ class MemorySystem:
                 # Continue without vector index if not supported
             
     def _generate_embedding(self, text: str) -> List[float]:
-        """Generate embeddings using OpenAI API and store in Neo4j"""
+        """Generate embeddings with intelligent caching to reduce API costs"""
+        # Check cache first to avoid API calls
+        if self.redis_client:
+            cache_key = self._get_embedding_cache_key(text)
+            try:
+                cached_embedding = self.redis_client.get(cache_key)
+                if cached_embedding:
+                    return json.loads(cached_embedding)
+            except Exception:
+                pass
+        
         try:
             from utils import generate_embedding
-            return generate_embedding(text)
+            embedding = generate_embedding(text)
+            
+            # Cache for 1 hour to dramatically reduce costs
+            if self.redis_client and embedding:
+                try:
+                    cache_key = self._get_embedding_cache_key(text)
+                    self.redis_client.setex(cache_key, 3600, json.dumps(embedding))
+                except Exception:
+                    pass
+            
+            return embedding
         except Exception as e:
             print(f"Warning: Could not generate embedding: {e}")
-            # Return a default zero vector if embedding generation fails
-            return [0.0] * 1536  # OpenAI text-embedding-3-small dimension
+            return [0.0] * 1536
     
     def _calculate_cosine_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
         """Calculate cosine similarity between two embeddings"""
@@ -280,11 +299,41 @@ class MemorySystem:
                         }
                     )
         
+    def _get_cache_key(self, query: str, user_id: str, depth: int) -> str:
+        """Generate cache key for query results"""
+        query_hash = hashlib.md5(f"{query}:{user_id}:{depth}".encode()).hexdigest()
+        return f"memories:{query_hash}"
+    
+    def _get_embedding_cache_key(self, query: str) -> str:
+        """Generate cache key for embeddings"""
+        query_hash = hashlib.md5(query.encode()).hexdigest()
+        return f"embedding:{query_hash}"
+
     def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None) -> List[MemoryNode]:
-        """Retrieve relevant memories using Neo4j vector search with 100x performance improvement"""
+        """Retrieve relevant memories using Neo4j vector search with intelligent caching"""
         
         if not user_id:
             return []
+        
+        # Try cache first for instant response (1-5ms)
+        if self.redis_client:
+            try:
+                cache_key = self._get_cache_key(query, user_id, depth)
+                cached_result = self.redis_client.get(cache_key)
+                if cached_result:
+                    memories_data = json.loads(cached_result)
+                    memories = []
+                    for mem_data in memories_data:
+                        memory_node = MemoryNode(
+                            content=mem_data['content'],
+                            confidence=mem_data['confidence'],
+                            category=mem_data.get('category', 'general_knowledge')
+                        )
+                        memory_node.id = mem_data['id']
+                        memories.append(memory_node)
+                    return memories
+            except Exception as e:
+                print(f"Cache read error: {e}")
             
         with self.driver.session() as session:
             # Special handling for name queries - prioritize memories containing actual names
@@ -322,10 +371,29 @@ class MemorySystem:
                 if memories:
                     return memories
             
-            # Generate query embedding for vector search
-            query_embedding = self._generate_embedding(query)
+            # Generate query embedding with caching for cost reduction
+            embedding_cache_key = self._get_embedding_cache_key(query)
+            query_embedding = None
+            
+            if self.redis_client:
+                try:
+                    cached_embedding = self.redis_client.get(embedding_cache_key)
+                    if cached_embedding:
+                        query_embedding = json.loads(cached_embedding)
+                except Exception as e:
+                    print(f"Embedding cache read error: {e}")
+            
             if not query_embedding:
-                return []
+                query_embedding = self._generate_embedding(query)
+                if not query_embedding:
+                    return []
+                    
+                # Cache embedding for 5 minutes to reduce API costs
+                if self.redis_client and query_embedding:
+                    try:
+                        self.redis_client.setex(embedding_cache_key, 300, json.dumps(query_embedding))
+                    except Exception as e:
+                        print(f"Embedding cache write error: {e}")
             
             # Try vector index search first (100x faster)
             try:
@@ -356,6 +424,22 @@ class MemorySystem:
                     )
                     memory_node.id = record["id"]
                     memories.append(memory_node)
+                
+                # Cache results for 60 seconds for ultra-fast repeat queries
+                if self.redis_client and memories:
+                    try:
+                        cache_key = self._get_cache_key(query, user_id, depth)
+                        memories_data = []
+                        for mem in memories:
+                            memories_data.append({
+                                'id': mem.id,
+                                'content': mem.content,
+                                'confidence': mem.confidence,
+                                'category': mem.category
+                            })
+                        self.redis_client.setex(cache_key, 60, json.dumps(memories_data))
+                    except Exception as e:
+                        print(f"Cache write error: {e}")
                 
                 return memories
                 
@@ -397,6 +481,22 @@ class MemorySystem:
                     )
                     memory_node.id = record["id"]
                     memories.append(memory_node)
+                
+                # Cache fallback results too for consistency
+                if self.redis_client and memories:
+                    try:
+                        cache_key = self._get_cache_key(query, user_id, depth)
+                        memories_data = []
+                        for mem in memories:
+                            memories_data.append({
+                                'id': mem.id,
+                                'content': mem.content,
+                                'confidence': mem.confidence,
+                                'category': mem.category
+                            })
+                        self.redis_client.setex(cache_key, 60, json.dumps(memories_data))
+                    except Exception as e:
+                        print(f"Fallback cache write error: {e}")
                 
                 return memories
         
