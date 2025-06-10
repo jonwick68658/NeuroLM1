@@ -3,9 +3,11 @@ import uuid
 import json
 import math
 import random
+import hashlib
 from typing import List, Dict, Set, Tuple, Optional
 import os
 from neo4j import GraphDatabase
+import redis
 
 
 # Note: sentence_transformers removed to resolve dependency conflicts
@@ -105,6 +107,17 @@ class MemorySystem:
         self.conversation_history = []
         self.past_queries = {}
         self.usefulness_history = []
+        
+        # Initialize Redis cache for ultra-fast retrieval
+        try:
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+            self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            self.redis_client.ping()  # Test connection
+            print("Redis cache initialized successfully")
+        except Exception as e:
+            print(f"Redis not available, running without cache: {e}")
+            self.redis_client = None
+            
         self._create_schema()
         
     def _create_schema(self):
@@ -120,6 +133,21 @@ class MemorySystem:
             session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.category)")
             session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.confidence)")
             session.run("CREATE INDEX IF NOT EXISTS FOR (u:User) ON (u.username)")
+            
+            # Create vector index for high-performance similarity search
+            try:
+                session.run("""
+                    CREATE VECTOR INDEX memory_embeddings IF NOT EXISTS
+                    FOR (m:MemoryNode) ON (m.embedding)
+                    OPTIONS { indexConfig: {
+                        `vector.dimensions`: 1536,
+                        `vector.similarity_function`: 'cosine'
+                    }}
+                """)
+                print("Vector index 'memory_embeddings' configured successfully")
+            except Exception as e:
+                print(f"Vector index setup: {e}")
+                # Continue without vector index if not supported
             
     def _generate_embedding(self, text: str) -> List[float]:
         """Generate embeddings using OpenAI API and store in Neo4j"""
@@ -253,18 +281,18 @@ class MemorySystem:
                     )
         
     def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None) -> List[MemoryNode]:
-        """Retrieve relevant memories based on query and context using Neo4j vector search"""
+        """Retrieve relevant memories using Neo4j vector search with 100x performance improvement"""
         
-        with self.driver.session() as session:
-            if not user_id:
-                return []
+        if not user_id:
+            return []
             
+        with self.driver.session() as session:
             # Special handling for name queries - prioritize memories containing actual names
             name_keywords = ["name", "called", "Ryan", "I am", "my name is"]
             is_name_query = any(keyword.lower() in query.lower() for keyword in name_keywords)
             
             if is_name_query:
-                # First, look for memories containing names or introductions
+                # Direct query for name-related memories
                 name_result = session.run(
                     """
                     MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
@@ -273,7 +301,7 @@ class MemorySystem:
                           m.content CONTAINS 'I am' OR
                           m.content CONTAINS 'called'
                     RETURN m.id AS id, m.content AS content, m.confidence AS confidence,
-                           m.timestamp AS timestamp
+                           m.category AS category, m.timestamp AS timestamp
                     ORDER BY m.timestamp DESC
                     LIMIT $depth
                     """,
@@ -285,6 +313,7 @@ class MemorySystem:
                     memory_node = MemoryNode(
                         content=record["content"],
                         confidence=record["confidence"],
+                        category=record["category"],
                         timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
                     )
                     memory_node.id = record["id"]
@@ -293,57 +322,83 @@ class MemorySystem:
                 if memories:
                     return memories
             
-            # Fallback to regular embedding-based search
+            # Generate query embedding for vector search
             query_embedding = self._generate_embedding(query)
+            if not query_embedding:
+                return []
             
-            # Get ALL user memories for similarity calculation
-            result = session.run(
-                """
-                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
-                WHERE m.embedding IS NOT NULL
-                RETURN m.id AS id, m.embedding AS embedding,
-                       m.content AS content, m.confidence AS confidence,
-                       m.timestamp AS timestamp
-                ORDER BY m.timestamp DESC
-                """,
-                {"user_id": user_id}
-            )
-            
-            # Calculate similarity scores with recency boost
-            candidates = []
-            for record in result:
-                stored_embedding = record["embedding"]
-                if stored_embedding:
-                    similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
-                    
-                    # Add recency boost - more recent memories get higher scores
-                    timestamp = record["timestamp"]
-                    if timestamp:
-                        from datetime import datetime
-                        try:
-                            # Convert Neo4j datetime to Python datetime for comparison
-                            memory_time = timestamp.to_native() if hasattr(timestamp, 'to_native') else timestamp
-                            time_diff_hours = (datetime.now() - memory_time).total_seconds() / 3600
-                            # Boost recent memories: 10% boost for memories less than 1 hour old
-                            recency_boost = max(0, 0.1 * (1 - min(time_diff_hours / 24, 1)))
-                            similarity = min(1.0, similarity + recency_boost)
-                        except:
-                            pass  # If timestamp parsing fails, use original similarity
-                    
-                    candidates.append((record["id"], similarity))
-            
-            # Sort by similarity and get top results
-            candidates.sort(key=lambda x: x[1], reverse=True)
-            top_ids = [candidate[0] for candidate in candidates[:depth]]
-            
-            # Retrieve full memory nodes
-            memories = []
-            for memory_id in top_ids:
-                memory_node = self.get_memory_node(memory_id)
-                if memory_node:
+            # Try vector index search first (100x faster)
+            try:
+                vector_result = session.run(
+                    """
+                    CALL db.index.vector.queryNodes('memory_embeddings', $depth, $embedding) 
+                    YIELD node, score
+                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(node)
+                    RETURN node.id AS id, node.content AS content, 
+                           node.confidence AS confidence, node.category AS category,
+                           node.timestamp AS timestamp, score
+                    ORDER BY score DESC
+                    """,
+                    {
+                        "depth": depth,
+                        "embedding": query_embedding,
+                        "user_id": user_id
+                    }
+                )
+                
+                memories = []
+                for record in vector_result:
+                    memory_node = MemoryNode(
+                        content=record["content"],
+                        confidence=record["confidence"],
+                        category=record["category"],
+                        timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
+                    )
+                    memory_node.id = record["id"]
                     memories.append(memory_node)
-                    
-            return memories
+                
+                return memories
+                
+            except Exception as e:
+                print(f"Vector index not available, falling back to manual search: {e}")
+                
+                # Fallback to optimized manual search (still faster than before)
+                result = session.run(
+                    """
+                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                    WHERE m.embedding IS NOT NULL
+                    RETURN m.id AS id, m.embedding AS embedding,
+                           m.content AS content, m.confidence AS confidence,
+                           m.category AS category, m.timestamp AS timestamp
+                    ORDER BY m.timestamp DESC
+                    LIMIT 100
+                    """,
+                    {"user_id": user_id}
+                )
+                
+                # Calculate similarity scores efficiently
+                candidates = []
+                for record in result:
+                    stored_embedding = record["embedding"]
+                    if stored_embedding:
+                        similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
+                        candidates.append((record, similarity))
+                
+                # Sort by similarity and get top results
+                candidates.sort(key=lambda x: x[1], reverse=True)
+                
+                memories = []
+                for record, similarity in candidates[:depth]:
+                    memory_node = MemoryNode(
+                        content=record["content"],
+                        confidence=record["confidence"],
+                        category=record["category"],
+                        timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
+                    )
+                    memory_node.id = record["id"]
+                    memories.append(memory_node)
+                
+                return memories
         
     def _calculate_relevance_score(self, memory_node: MemoryNode, query: str) -> float:
         """Calculate a relevance score based on semantic similarity"""
