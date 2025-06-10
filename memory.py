@@ -111,7 +111,13 @@ class MemorySystem:
         # Initialize Redis cache for ultra-fast retrieval
         try:
             redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-            self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            self.redis_client = redis.from_url(
+                redis_url, 
+                decode_responses=True,
+                socket_connect_timeout=1,
+                socket_timeout=1,
+                retry_on_timeout=False
+            )
             self.redis_client.ping()  # Test connection
             print("Redis cache initialized successfully")
         except Exception as e:
