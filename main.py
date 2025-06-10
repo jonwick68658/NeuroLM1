@@ -1039,8 +1039,7 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             depth=5
         )
         
-        # Get memory system instance
-        memory_system = MemorySystem()
+        # Use global memory system instance
         relevant_memories = memory_system.retrieve_memories(
             query=chat_request.message,
             context="",
