@@ -10,7 +10,7 @@ import redis
 import json
 import time
 import hashlib
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from datetime import datetime, timedelta
 import os
 from memory import MemoryNode
@@ -26,13 +26,14 @@ class ConversationCache:
         # Redis connection with fallback to localhost
         redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
         try:
-            self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            # Use direct Redis client initialization as suggested
+            self.redis_client: Optional[redis.Redis] = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
             # Test connection
             self.redis_client.ping()
         except Exception:
             # Fallback to in-memory storage if Redis unavailable
-            self.redis_client = None
-            self._memory_cache = {}
+            self.redis_client: Optional[redis.Redis] = None
+            self._memory_cache: Dict[str, Dict] = {}
             
         # Cache configuration
         self.default_ttl = 7200  # 2 hours
@@ -266,12 +267,22 @@ class ConversationCache:
         try:
             if self.redis_client:
                 info = self.redis_client.info()
+                # Handle Redis info response safely
+                memory_usage = "unknown"
+                keyspace_hits = 0
+                keyspace_misses = 0
+                
+                if isinstance(info, dict):
+                    memory_usage = info.get("used_memory_human", "unknown")
+                    keyspace_hits = info.get("keyspace_hits", 0)
+                    keyspace_misses = info.get("keyspace_misses", 0)
+                
                 return {
                     "cache_type": "redis",
                     "connected": True,
-                    "memory_usage": info.get("used_memory_human", "unknown"),
-                    "keyspace_hits": info.get("keyspace_hits", 0),
-                    "keyspace_misses": info.get("keyspace_misses", 0)
+                    "memory_usage": memory_usage,
+                    "keyspace_hits": keyspace_hits,
+                    "keyspace_misses": keyspace_misses
                 }
             else:
                 return {
