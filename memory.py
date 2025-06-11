@@ -127,14 +127,30 @@ class MemorySystem:
             session.run("CREATE INDEX IF NOT EXISTS FOR (st:SubTopic) ON (st.user_id)")
             
     def _generate_embedding(self, text: str) -> List[float]:
-        """Generate embeddings using OpenAI API and store in Neo4j"""
+        """Generate embeddings using OpenAI API"""
+        if not text or not text.strip():
+            return None
+
         try:
-            from utils import generate_embedding
-            return generate_embedding(text)
+            import openai
+            import os
+            import re
+
+            # Clean and normalize text
+            cleaned_text = re.sub(r'\s+', ' ', text.strip())
+            if not cleaned_text:
+                return None
+
+            client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=cleaned_text
+            )
+            return response.data[0].embedding
+
         except Exception as e:
             print(f"Warning: Could not generate embedding: {e}")
-            # Return a default zero vector if embedding generation fails
-            return [0.0] * 1536  # OpenAI text-embedding-3-small dimension
+            return None
     
     def _calculate_cosine_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
         """Calculate cosine similarity between two embeddings"""
@@ -369,7 +385,7 @@ class MemorySystem:
         return memory_node.id
     
     def hierarchical_retrieve_memories(self, query: str, user_id: str, topic: Optional[str] = None, sub_topic: Optional[str] = None, depth: int = 5) -> List[MemoryNode]:
-        """Hierarchical memory retrieval using graph relationships with fallback to property-based search"""
+        """Hierarchical memory retrieval using graph relationships with strict topic boundaries"""
         
         with self.driver.session() as session:
             if not user_id:
@@ -383,28 +399,27 @@ class MemorySystem:
             
             # Level 1: Try subtopic-specific graph search
             if topic and sub_topic:
-                memories.extend(self._search_subtopic_graph(session, query_embedding, user_id, topic, sub_topic, depth))
+                memories = self._search_subtopic_graph(session, query_embedding, user_id, topic, sub_topic, depth)
                 print(f"DEBUG: Subtopic graph search found {len(memories)} memories")
+                if memories:
+                    return memories[:depth]
             
-            # Level 2: If insufficient results, try topic-wide graph search
-            if len(memories) < 3 and topic:
-                topic_memories = self._search_topic_graph(session, query_embedding, user_id, topic, depth - len(memories))
-                memories.extend(topic_memories)
-                print(f"DEBUG: Topic graph search found {len(topic_memories)} additional memories")
+            # Level 2: Try topic-wide graph search (only if no subtopic results)
+            if topic:
+                memories = self._search_topic_graph(session, query_embedding, user_id, topic, depth)
+                print(f"DEBUG: Topic graph search found {len(memories)} memories")
+                if memories:
+                    return memories[:depth]
             
-            # Level 3: If still insufficient, fallback to property-based search
-            if len(memories) < 3:
-                fallback_memories = self._search_property_fallback(session, query_embedding, user_id, topic, sub_topic, depth - len(memories))
-                memories.extend(fallback_memories)
-                print(f"DEBUG: Property fallback search found {len(fallback_memories)} additional memories")
+            # Level 3: Property-based search within topic boundaries only
+            if topic or sub_topic:
+                memories = self._search_property_fallback(session, query_embedding, user_id, topic, sub_topic, depth)
+                print(f"DEBUG: Property fallback search found {len(memories)} memories")
+                return memories[:depth]
             
-            # Level 4: If still no results, try user-wide search
-            if len(memories) == 0:
-                user_wide_memories = self._search_user_wide(session, query_embedding, user_id, depth)
-                memories.extend(user_wide_memories)
-                print(f"DEBUG: User-wide search found {len(user_wide_memories)} memories")
-            
-            return memories[:depth]
+            # No cross-topic contamination - return empty if no topic context
+            print(f"DEBUG: No topic context provided - returning empty results to maintain topic boundaries")
+            return []
     
     def _search_subtopic_graph(self, session, query_embedding: List[float], user_id: str, topic: str, sub_topic: str, limit: int) -> List[MemoryNode]:
         """Search memories linked to specific subtopic via graph relationships"""
@@ -488,24 +503,7 @@ class MemorySystem:
             print(f"DEBUG: Property fallback search error: {e}")
             return []
     
-    def _search_user_wide(self, session, query_embedding: List[float], user_id: str, limit: int) -> List[MemoryNode]:
-        """Search all user memories as final fallback"""
-        try:
-            result = session.run(
-                """
-                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
-                WHERE m.embedding IS NOT NULL
-                RETURN m.id AS id, m.embedding AS embedding, m.content AS content,
-                       m.confidence AS confidence, m.timestamp AS timestamp
-                LIMIT $limit
-                """,
-                {"user_id": user_id, "limit": limit}
-            )
-            
-            return self._process_memory_results(result, query_embedding)
-        except Exception as e:
-            print(f"DEBUG: User-wide search error: {e}")
-            return []
+
     
     def _process_memory_results(self, result, query_embedding: List[float]) -> List[MemoryNode]:
         """Process Neo4j query results and calculate similarities"""

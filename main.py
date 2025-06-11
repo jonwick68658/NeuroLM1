@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Form, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
-from memory_api import *
+
 from pydantic import BaseModel
 import uvicorn
 import os
@@ -19,8 +19,7 @@ app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
 # Add session middleware
 app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 
-# Include memory API routes
-app.include_router(router, prefix="/api")
+# Memory API routes are now directly defined in this file
 
 # Mount static files for PWA
 app.mount("/static", StaticFiles(directory="static"), name="static")
