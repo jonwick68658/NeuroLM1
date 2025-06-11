@@ -41,9 +41,15 @@ class ConversationCache:
         self.max_promoted_memories = 10
         self.cache_size_limit = 51200  # 50KB per conversation
         
-    def _get_cache_key(self, conversation_id: str) -> str:
-        """Generate cache key for conversation"""
-        return f"conv_cache:{conversation_id}"
+    def _get_cache_key(self, conversation_id: str, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> str:
+        """Generate cache key for conversation with optional topic scoping"""
+        base_key = f"conv_cache:{conversation_id}"
+        if topic:
+            if sub_topic:
+                return f"{base_key}:topic:{topic}:sub:{sub_topic}"
+            else:
+                return f"{base_key}:topic:{topic}"
+        return base_key
     
     def _get_cache_data(self, key: str) -> Optional[Dict]:
         """Get data from cache (Redis or in-memory fallback)"""

@@ -1110,7 +1110,14 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if not conversation_id:
             raise HTTPException(status_code=500, detail="Failed to create or retrieve conversation")
         
-        # Tiered memory retrieval with conversation caching
+        # Get conversation topic context for scoped memory retrieval
+        topic_context = get_conversation_topic_context(conversation_id)
+        current_topic = topic_context.get('topic')
+        current_sub_topic = topic_context.get('sub_topic')
+        
+        print(f"DEBUG: Conversation topic context - Topic: {current_topic}, Sub-topic: {current_sub_topic}")
+        
+        # Tiered memory retrieval with conversation caching and topic scoping
         relevant_memories = []
         cache_start_time = time.time()
         
@@ -1129,12 +1136,14 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
                 context_text = "\n".join([f"{msg['role']}: {msg['content'][:100]}" for msg in recent_context[-3:]])
                 print(f"DEBUG: Loaded {len(recent_context)} recent messages for context")
             
-            # Level 3: Full memory search with enhanced context (target: <200ms)
+            # Level 3: Topic-scoped memory search with enhanced context (target: <50ms)
             relevant_memories = memory_system.retrieve_memories(
                 query=chat_request.message,
                 context=context_text,
                 depth=5,
-                user_id=user_id
+                user_id=user_id,
+                topic=current_topic,
+                sub_topic=current_sub_topic
             )
             
             # Promote top memories to conversation cache
@@ -1205,8 +1214,13 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
-        # Store user message in memory
-        user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}", user_id=user_id)
+        # Store user message in memory with topic context
+        user_memory_id = memory_system.add_memory(
+            f"User said: {chat_request.message}", 
+            user_id=user_id,
+            topic=current_topic,
+            sub_topic=current_sub_topic
+        )
         
         # Create LLM messages with memory context
         system_message = {
@@ -1246,8 +1260,13 @@ Key instructions:
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Store assistant response in memory
-        assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}", user_id=user_id)
+        # Store assistant response in memory with topic context
+        assistant_memory_id = memory_system.add_memory(
+            f"Assistant responded: {response_text}", 
+            user_id=user_id,
+            topic=current_topic,
+            sub_topic=current_sub_topic
+        )
         
         # Save user message to conversation and update cache
         save_conversation_message(conversation_id, 'user', chat_request.message)
