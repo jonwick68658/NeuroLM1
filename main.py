@@ -1039,7 +1039,8 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             depth=5
         )
         
-        # Use global memory system instance
+        # Get memory system instance
+        memory_system = MemorySystem()
         relevant_memories = memory_system.retrieve_memories(
             query=chat_request.message,
             context="",
@@ -1047,10 +1048,19 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             user_id=user_id
         )
         
+        # Debug logging
+        print(f"DEBUG: Query: {chat_request.message}")
+        print(f"DEBUG: User ID: {user_id}")
+        print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
+        if relevant_memories:
+            for i, mem in enumerate(relevant_memories[:3]):
+                print(f"DEBUG: Memory {i+1}: {mem.content[:100]}...")
+        
         # Build context from memories
         context = ""
         if relevant_memories:
             context = "\n".join([f"- {mem.content}" for mem in relevant_memories[:5]])
+            print(f"DEBUG: Built context: {context[:200]}...")
         
         # Check if user is asking about files and add file content to context
         file_query_keywords = ["file", "main.py", "analyze", "code", "script", "upload"]
@@ -1456,7 +1466,7 @@ async def get_user_files(request: Request, search: str = None):
         if search:
             cursor.execute("""
                 SELECT id, filename, file_type, uploaded_at, 
-                       SUBSTRING(content FROM 1 FOR 100) as content_preview
+                       LEFT(content, 100) as content_preview
                 FROM user_files 
                 WHERE user_id = %s AND filename ILIKE %s
                 ORDER BY uploaded_at DESC
@@ -1464,7 +1474,7 @@ async def get_user_files(request: Request, search: str = None):
         else:
             cursor.execute("""
                 SELECT id, filename, file_type, uploaded_at,
-                       SUBSTRING(content FROM 1 FOR 100) as content_preview
+                       LEFT(content, 100) as content_preview
                 FROM user_files 
                 WHERE user_id = %s
                 ORDER BY uploaded_at DESC
