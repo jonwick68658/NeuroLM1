@@ -49,7 +49,9 @@ class ConversationCache:
         try:
             if self.redis_client:
                 data = self.redis_client.get(key)
-                return json.loads(data) if data else None
+                if data and isinstance(data, str):
+                    return json.loads(data)
+                return None
             else:
                 # In-memory fallback
                 if key in self._memory_cache:
@@ -64,7 +66,7 @@ class ConversationCache:
             print(f"Cache get error: {e}")
             return None
     
-    def _set_cache_data(self, key: str, data: Dict, ttl: int = None) -> bool:
+    def _set_cache_data(self, key: str, data: Dict, ttl: Optional[int] = None) -> bool:
         """Set data in cache (Redis or in-memory fallback)"""
         try:
             ttl = ttl or self.default_ttl
@@ -76,7 +78,8 @@ class ConversationCache:
                 return False
             
             if self.redis_client:
-                return self.redis_client.setex(key, ttl, serialized_data)
+                result = self.redis_client.setex(key, ttl, serialized_data)
+                return bool(result)
             else:
                 # In-memory fallback
                 self._memory_cache[key] = {
