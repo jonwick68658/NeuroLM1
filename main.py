@@ -1190,28 +1190,88 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             context = "\n".join([f"- {mem.content}" for mem in relevant_memories[:5]])
             print(f"DEBUG: Built context: {context[:200]}...")
         
-        # Check if user is asking about files and add file content to context
-        file_query_keywords = ["file", "main.py", "analyze", "code", "script", "upload"]
+        # Extract specific filename from user message and retrieve that file
+        import re
+        
+        # Look for common file patterns in the message
+        file_patterns = [
+            r'([a-zA-Z_][a-zA-Z0-9_.-]*\.(py|md|txt|js|html|css|json|yaml|yml|toml|sh|sql))',
+            r'(?:review|analyze|check|read|show|view)\s+(?:the\s+)?([a-zA-Z_][a-zA-Z0-9_.-]*\.(py|md|txt|js|html|css|json|yaml|yml|toml|sh|sql))',
+            r'([a-zA-Z_][a-zA-Z0-9_.-]*\.(py|md|txt|js|html|css|json|yaml|yml|toml|sh|sql))\s+file'
+        ]
+        
+        extracted_filename = None
+        for pattern in file_patterns:
+            matches = re.findall(pattern, chat_request.message, re.IGNORECASE)
+            if matches:
+                # Extract filename from the first match
+                extracted_filename = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
+                break
+        
+        # Check if user is asking about files
+        file_query_keywords = ["file", "analyze", "review", "check", "read", "show", "view", "code", "script"]
         is_file_query = any(keyword in chat_request.message.lower() for keyword in file_query_keywords)
         
-        if is_file_query:
+        if is_file_query and extracted_filename:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                # Try to find the exact file first
+                cursor.execute(
+                    "SELECT filename, content FROM user_files WHERE user_id = %s AND filename = %s",
+                    (user_id, extracted_filename)
+                )
+                exact_match = cursor.fetchone()
+                
+                if exact_match:
+                    filename, content = exact_match
+                    context += f"\n\nFile content for {filename}:\n\n{content}\n"
+                    print(f"DEBUG: Retrieved specific file: {filename} ({len(content)} chars)")
+                else:
+                    # Try case-insensitive partial match
+                    cursor.execute(
+                        "SELECT filename, content FROM user_files WHERE user_id = %s AND filename ILIKE %s LIMIT 1",
+                        (user_id, f"%{extracted_filename}%")
+                    )
+                    partial_match = cursor.fetchone()
+                    
+                    if partial_match:
+                        filename, content = partial_match
+                        context += f"\n\nFile content for {filename}:\n\n{content}\n"
+                        print(f"DEBUG: Retrieved partial match file: {filename} ({len(content)} chars)")
+                    else:
+                        # List available files if no match found
+                        cursor.execute(
+                            "SELECT filename FROM user_files WHERE user_id = %s ORDER BY uploaded_at DESC",
+                            (user_id,)
+                        )
+                        available_files = [row[0] for row in cursor.fetchall()]
+                        if available_files:
+                            context += f"\n\nFile '{extracted_filename}' not found. Available files: {', '.join(available_files)}\n"
+                        print(f"DEBUG: File '{extracted_filename}' not found")
+                
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching specific file: {e}")
+        elif is_file_query:
+            # Fallback: if file query but no filename extracted, list available files
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT filename, content FROM user_files WHERE user_id = %s ORDER BY uploaded_at DESC LIMIT 5",
+                    "SELECT filename FROM user_files WHERE user_id = %s ORDER BY uploaded_at DESC LIMIT 10",
                     (user_id,)
                 )
-                user_files = cursor.fetchall()
+                available_files = [row[0] for row in cursor.fetchall()]
                 cursor.close()
                 conn.close()
                 
-                if user_files:
-                    context += "\n\nAvailable files:\n"
-                    for filename, content in user_files:
-                        context += f"\n--- {filename} ---\n{content}\n"
+                if available_files:
+                    context += f"\n\nAvailable files: {', '.join(available_files)}\nPlease specify which file you'd like to review.\n"
+                    print(f"DEBUG: Listed {len(available_files)} available files")
             except Exception as e:
-                print(f"Error fetching user files: {e}")
+                print(f"Error fetching file list: {e}")
         
         # Get user's first name for personalized responses
         user_first_name = get_user_first_name(user_id)
