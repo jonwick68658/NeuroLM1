@@ -1095,10 +1095,7 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             # At this point, slash_conversation_id is guaranteed to be a string
             return await handle_slash_command(chat_request.message, user_id, slash_conversation_id)
         
-        # Initialize conversation cache and memory system
-        import time
-        from conversation_cache import ConversationCache
-        conv_cache = ConversationCache()
+        # Initialize memory system
         memory_system = MemorySystem()
         
         # Ensure we have a conversation_id for caching
@@ -1110,79 +1107,19 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if not conversation_id:
             raise HTTPException(status_code=500, detail="Failed to create or retrieve conversation")
         
-        # Get conversation topic context for scoped memory retrieval
-        topic_context = get_conversation_topic_context(conversation_id)
-        current_topic = topic_context.get('topic')
-        current_sub_topic = topic_context.get('sub_topic')
+        # Simple context without topic scoping
         
-        print(f"DEBUG: Conversation topic context - Topic: {current_topic}, Sub-topic: {current_sub_topic}")
-        
-        # Tiered memory retrieval with conversation caching and topic scoping
+        # Simple memory retrieval without complex caching
         relevant_memories = []
-        cache_start_time = time.time()
-        
-        # Level 1: Check conversation cache first (target: <10ms)
-        cached_memories = conv_cache.get_cached_memories(conversation_id)
-        if cached_memories and len(cached_memories) >= 3:
-            relevant_memories = cached_memories[:5]
-            print(f"DEBUG: Cache hit - retrieved {len(relevant_memories)} memories from conversation cache")
-        else:
-            # Level 2: Load conversation context for search enhancement
-            recent_context = get_recent_conversation_context(conversation_id, 5)
-            context_text = ""
-            if recent_context:
-                # Warm cache with authentic conversation data if not already warmed
-                conv_cache.warm_conversation_cache(conversation_id, recent_context)
-                context_text = "\n".join([f"{msg['role']}: {msg['content'][:100]}" for msg in recent_context[-3:]])
-                print(f"DEBUG: Loaded {len(recent_context)} recent messages for context")
-            
-            # Level 3: Hierarchical memory search with fallback (target: <50ms)
-            try:
-                # Try new hierarchical search first
-                relevant_memories = memory_system.hierarchical_retrieve_memories(
-                    query=chat_request.message,
-                    user_id=user_id,
-                    topic=current_topic,
-                    sub_topic=current_sub_topic,
-                    depth=5
-                )
-                print(f"DEBUG: Hierarchical search completed with {len(relevant_memories)} memories")
-            except Exception as e:
-                print(f"DEBUG: Hierarchical search failed, falling back to original: {e}")
-                # Fallback to original property-based search
-                relevant_memories = memory_system.retrieve_memories(
-                    query=chat_request.message,
-                    context=context_text,
-                    depth=5,
-                    user_id=user_id,
-                    topic=current_topic,
-                    sub_topic=current_sub_topic
-                )
-            
-            # Promote top memories to conversation cache
-            if relevant_memories:
-                conv_cache.update_conversation_context(
-                    conversation_id, 
-                    "system", 
-                    f"Context query: {chat_request.message}",
-                    relevant_memories[:3]  # Promote top 3 memories
-                )
-                print(f"DEBUG: Promoted {min(3, len(relevant_memories))} memories to cache")
-            
-            # Prioritize frequently accessed conversations
-            conv_cache.prioritize_conversation_cache(conversation_id)
-        
-        cache_end_time = time.time()
-        cache_time_ms = (cache_end_time - cache_start_time) * 1000
-        
-        # Debug logging with performance metrics
-        print(f"DEBUG: Query: {chat_request.message}")
-        print(f"DEBUG: User ID: {user_id}")
-        print(f"DEBUG: Memory retrieval time: {cache_time_ms:.1f}ms")
-        print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
-        if relevant_memories:
-            for i, mem in enumerate(relevant_memories[:3]):
-                print(f"DEBUG: Memory {i+1}: {mem.content[:100]}...")
+        try:
+            relevant_memories = memory_system.retrieve_memories(
+                query=chat_request.message,
+                user_id=user_id,
+                depth=5
+            )
+        except Exception as e:
+            print(f"Memory retrieval error: {e}")
+            relevant_memories = []
         
         # Build context from memories
         context = ""
@@ -1190,88 +1127,28 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             context = "\n".join([f"- {mem.content}" for mem in relevant_memories[:5]])
             print(f"DEBUG: Built context: {context[:200]}...")
         
-        # Extract specific filename from user message and retrieve that file
-        import re
-        
-        # Look for common file patterns in the message
-        file_patterns = [
-            r'([a-zA-Z_][a-zA-Z0-9_.-]*\.(py|md|txt|js|html|css|json|yaml|yml|toml|sh|sql))',
-            r'(?:review|analyze|check|read|show|view)\s+(?:the\s+)?([a-zA-Z_][a-zA-Z0-9_.-]*\.(py|md|txt|js|html|css|json|yaml|yml|toml|sh|sql))',
-            r'([a-zA-Z_][a-zA-Z0-9_.-]*\.(py|md|txt|js|html|css|json|yaml|yml|toml|sh|sql))\s+file'
-        ]
-        
-        extracted_filename = None
-        for pattern in file_patterns:
-            matches = re.findall(pattern, chat_request.message, re.IGNORECASE)
-            if matches:
-                # Extract filename from the first match
-                extracted_filename = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
-                break
-        
-        # Check if user is asking about files
-        file_query_keywords = ["file", "analyze", "review", "check", "read", "show", "view", "code", "script"]
+        # Check if user is asking about files and add file content to context
+        file_query_keywords = ["file", "document", "upload"]
         is_file_query = any(keyword in chat_request.message.lower() for keyword in file_query_keywords)
         
-        if is_file_query and extracted_filename:
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                # Try to find the exact file first
-                cursor.execute(
-                    "SELECT filename, content FROM user_files WHERE user_id = %s AND filename = %s",
-                    (user_id, extracted_filename)
-                )
-                exact_match = cursor.fetchone()
-                
-                if exact_match:
-                    filename, content = exact_match
-                    context += f"\n\nFile content for {filename}:\n\n{content}\n"
-                    print(f"DEBUG: Retrieved specific file: {filename} ({len(content)} chars)")
-                else:
-                    # Try case-insensitive partial match
-                    cursor.execute(
-                        "SELECT filename, content FROM user_files WHERE user_id = %s AND filename ILIKE %s LIMIT 1",
-                        (user_id, f"%{extracted_filename}%")
-                    )
-                    partial_match = cursor.fetchone()
-                    
-                    if partial_match:
-                        filename, content = partial_match
-                        context += f"\n\nFile content for {filename}:\n\n{content}\n"
-                        print(f"DEBUG: Retrieved partial match file: {filename} ({len(content)} chars)")
-                    else:
-                        # List available files if no match found
-                        cursor.execute(
-                            "SELECT filename FROM user_files WHERE user_id = %s ORDER BY uploaded_at DESC",
-                            (user_id,)
-                        )
-                        available_files = [row[0] for row in cursor.fetchall()]
-                        if available_files:
-                            context += f"\n\nFile '{extracted_filename}' not found. Available files: {', '.join(available_files)}\n"
-                        print(f"DEBUG: File '{extracted_filename}' not found")
-                
-                cursor.close()
-                conn.close()
-            except Exception as e:
-                print(f"Error fetching specific file: {e}")
-        elif is_file_query:
-            # Fallback: if file query but no filename extracted, list available files
+        if is_file_query:
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT filename FROM user_files WHERE user_id = %s ORDER BY uploaded_at DESC LIMIT 10",
+                    "SELECT filename, content FROM user_files WHERE user_id = %s ORDER BY uploaded_at DESC LIMIT 5",
                     (user_id,)
                 )
-                available_files = [row[0] for row in cursor.fetchall()]
+                user_files = cursor.fetchall()
                 cursor.close()
                 conn.close()
                 
-                if available_files:
-                    context += f"\n\nAvailable files: {', '.join(available_files)}\nPlease specify which file you'd like to review.\n"
-                    print(f"DEBUG: Listed {len(available_files)} available files")
+                if user_files:
+                    context += "\n\nAvailable files:\n"
+                    for filename, content in user_files:
+                        context += f"\n--- {filename} ---\n{content}\n"
             except Exception as e:
-                print(f"Error fetching file list: {e}")
+                print(f"Error fetching user files: {e}")
         
         # Get user's first name for personalized responses
         user_first_name = get_user_first_name(user_id)
@@ -1287,12 +1164,10 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
-        # Store user message in memory with topic context
+        # Store user message in memory
         user_memory_id = memory_system.add_memory(
             f"User said: {chat_request.message}", 
-            user_id=user_id,
-            topic=current_topic,
-            sub_topic=current_sub_topic
+            user_id=user_id
         )
         
         # Create LLM messages with memory context
@@ -1333,21 +1208,17 @@ Key instructions:
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Store assistant response in memory with topic context
+        # Store assistant response in memory
         assistant_memory_id = memory_system.add_memory(
             f"Assistant responded: {response_text}", 
-            user_id=user_id,
-            topic=current_topic,
-            sub_topic=current_sub_topic
+            user_id=user_id
         )
         
-        # Save user message to conversation and update cache
+        # Save user message to conversation
         save_conversation_message(conversation_id, 'user', chat_request.message)
-        conv_cache.update_conversation_context(conversation_id, 'user', chat_request.message)
         
-        # Save assistant response to conversation and update cache
+        # Save assistant response to conversation
         save_conversation_message(conversation_id, 'assistant', response_text)
-        conv_cache.update_conversation_context(conversation_id, 'assistant', response_text)
         
         return ChatResponse(
             response=response_text,
