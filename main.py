@@ -295,6 +295,38 @@ def get_conversation_messages_all(conversation_id: str) -> List[Dict]:
         print(f"Error getting messages: {e}")
         return []
 
+def get_recent_conversation_context(conversation_id: str, limit: int = 10) -> List[Dict]:
+    """Get recent messages from a conversation for cache warming"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT message_type, content, created_at
+            FROM conversation_messages
+            WHERE conversation_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+        ''', (conversation_id, limit))
+        
+        # Reverse to get chronological order
+        rows = list(reversed(cursor.fetchall()))
+        
+        messages = []
+        for row in rows:
+            messages.append({
+                'role': row[0],
+                'content': row[1],
+                'timestamp': row[2].isoformat()
+            })
+        
+        cursor.close()
+        conn.close()
+        return messages
+    except Exception as e:
+        print(f"Error getting recent conversation context: {e}")
+        return []
+
 # Topic management functions
 def get_all_topics(user_id: str) -> Dict:
     """Get all topics and sub-topics for a user"""
@@ -1063,10 +1095,19 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             relevant_memories = cached_memories[:5]
             print(f"DEBUG: Cache hit - retrieved {len(relevant_memories)} memories from conversation cache")
         else:
-            # Level 2: Full memory search with cache population (target: <200ms)
+            # Level 2: Load conversation context for search enhancement
+            recent_context = get_recent_conversation_context(conversation_id, 5)
+            context_text = ""
+            if recent_context:
+                # Warm cache with authentic conversation data if not already warmed
+                conv_cache.warm_conversation_cache(conversation_id, recent_context)
+                context_text = "\n".join([f"{msg['role']}: {msg['content'][:100]}" for msg in recent_context[-3:]])
+                print(f"DEBUG: Loaded {len(recent_context)} recent messages for context")
+            
+            # Level 3: Full memory search with enhanced context (target: <200ms)
             relevant_memories = memory_system.retrieve_memories(
                 query=chat_request.message,
-                context="",
+                context=context_text,
                 depth=5,
                 user_id=user_id
             )
@@ -1079,6 +1120,10 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
                     f"Context query: {chat_request.message}",
                     relevant_memories[:3]  # Promote top 3 memories
                 )
+                print(f"DEBUG: Promoted {min(3, len(relevant_memories))} memories to cache")
+            
+            # Prioritize frequently accessed conversations
+            conv_cache.prioritize_conversation_cache(conversation_id)
         
         cache_end_time = time.time()
         cache_time_ms = (cache_end_time - cache_start_time) * 1000

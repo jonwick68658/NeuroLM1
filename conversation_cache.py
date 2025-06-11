@@ -319,3 +319,74 @@ class ConversationCache:
             cleaned += 1
         
         return cleaned
+    
+    def warm_conversation_cache(self, conversation_id: str, recent_messages: List[Dict]) -> bool:
+        """
+        Warm cache with recent conversation messages from authentic data
+        """
+        if not recent_messages:
+            return False
+        
+        try:
+            # Initialize cache context with real conversation data
+            cache_key = self._get_cache_key(conversation_id)
+            context = {
+                "conversation_id": conversation_id,
+                "messages": [],
+                "promoted_memories": [],
+                "topic_context": {
+                    "current_topic": None,
+                    "coherence_score": 1.0
+                },
+                "created_at": datetime.now().isoformat(),
+                "last_accessed": datetime.now().isoformat()
+            }
+            
+            # Add recent messages to cache
+            for msg in recent_messages:
+                context["messages"].append({
+                    "role": msg["role"],
+                    "content": msg["content"],
+                    "timestamp": msg["timestamp"]
+                })
+            
+            # Maintain message limit
+            if len(context["messages"]) > self.max_messages_per_conversation:
+                context["messages"] = context["messages"][-self.max_messages_per_conversation:]
+            
+            return self._set_cache_data(cache_key, context)
+        except Exception as e:
+            print(f"Cache warming error: {e}")
+            return False
+    
+    def get_active_conversations(self) -> List[str]:
+        """
+        Get list of currently cached conversation IDs
+        """
+        if self.redis_client:
+            try:
+                # Get all cache keys matching our pattern
+                pattern = "conv_cache:*"
+                keys = self.redis_client.keys(pattern)
+                return [key.replace("conv_cache:", "") for key in keys]
+            except Exception:
+                return []
+        else:
+            # Extract conversation IDs from in-memory cache
+            return [key.replace("conv_cache:", "") for key in self._memory_cache.keys()]
+    
+    def prioritize_conversation_cache(self, conversation_id: str) -> bool:
+        """
+        Mark a conversation as high priority for caching (extend TTL)
+        """
+        cache_key = self._get_cache_key(conversation_id)
+        context = self._get_cache_data(cache_key)
+        
+        if context:
+            # Extend TTL for high-priority conversations
+            extended_ttl = self.default_ttl * 2  # 4 hours instead of 2
+            context["last_accessed"] = datetime.now().isoformat()
+            context["priority"] = "high"
+            return self._set_cache_data(cache_key, context, extended_ttl)
+        
+        return False
