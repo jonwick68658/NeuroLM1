@@ -115,7 +115,7 @@ class ConversationCache:
         return context
     
     def update_conversation_context(self, conversation_id: str, message_role: str, 
-                                  message_content: str, promoted_memories: List[MemoryNode] = None) -> bool:
+                                  message_content: str, promoted_memories: Optional[List[MemoryNode]] = None) -> bool:
         """
         Update conversation context with new message and optionally promote memories
         """

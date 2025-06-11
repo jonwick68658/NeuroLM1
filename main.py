@@ -1030,7 +1030,13 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         
         # Check for slash commands
         if chat_request.message.startswith('/'):
-            return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
+            slash_conversation_id = chat_request.conversation_id
+            if not slash_conversation_id:
+                slash_conversation_id = create_conversation(user_id)
+            if not slash_conversation_id:
+                raise HTTPException(status_code=500, detail="Failed to create conversation for slash command")
+            # At this point, slash_conversation_id is guaranteed to be a string
+            return await handle_slash_command(chat_request.message, user_id, slash_conversation_id)
         
         # Initialize conversation cache and memory system
         import time
@@ -1042,6 +1048,10 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         conversation_id = chat_request.conversation_id
         if not conversation_id:
             conversation_id = create_conversation(user_id)
+        
+        # Validate conversation_id before proceeding
+        if not conversation_id:
+            raise HTTPException(status_code=500, detail="Failed to create or retrieve conversation")
         
         # Tiered memory retrieval with conversation caching
         relevant_memories = []
