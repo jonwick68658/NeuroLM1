@@ -114,12 +114,17 @@ class MemorySystem:
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE")
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (m:MemoryNode) REQUIRE m.id IS UNIQUE")
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (t:Topic) REQUIRE t.id IS UNIQUE")
+            session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (st:SubTopic) REQUIRE st.id IS UNIQUE")
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Connection) REQUIRE c.id IS UNIQUE")
             
-            # Create index for vector similarity search
+            # Create indexes for performance
             session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.category)")
             session.run("CREATE INDEX IF NOT EXISTS FOR (m:MemoryNode) ON (m.confidence)")
             session.run("CREATE INDEX IF NOT EXISTS FOR (u:User) ON (u.username)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (t:Topic) ON (t.name)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (st:SubTopic) ON (st.name)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (t:Topic) ON (t.user_id)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (st:SubTopic) ON (st.user_id)")
             
     def _generate_embedding(self, text: str) -> List[float]:
         """Generate embeddings using OpenAI API and store in Neo4j"""
@@ -151,6 +156,116 @@ class MemorySystem:
     def _cypher_query(self, tx, query: str, parameters: Optional[Dict] = None):
         """Helper method for executing Cypher queries"""
         return tx.run(query, parameters or {})
+    
+    def create_topic_node(self, user_id: str, topic_name: str) -> str:
+        """Create a Topic node in Neo4j and return its ID"""
+        import uuid
+        topic_id = str(uuid.uuid4())
+        
+        with self.driver.session() as session:
+            session.run(
+                """
+                MATCH (u:User {id: $user_id})
+                CREATE (t:Topic {
+                    id: $topic_id,
+                    name: $topic_name,
+                    user_id: $user_id,
+                    created_at: datetime()
+                })
+                CREATE (u)-[:HAS_TOPIC]->(t)
+                """,
+                {
+                    "user_id": user_id,
+                    "topic_id": topic_id,
+                    "topic_name": topic_name.lower().strip()
+                }
+            )
+        return topic_id
+    
+    def create_subtopic_node(self, user_id: str, topic_name: str, subtopic_name: str) -> str:
+        """Create a SubTopic node and link it to its parent Topic"""
+        import uuid
+        subtopic_id = str(uuid.uuid4())
+        
+        with self.driver.session() as session:
+            session.run(
+                """
+                MATCH (u:User {id: $user_id})
+                MATCH (t:Topic {name: $topic_name, user_id: $user_id})
+                CREATE (st:SubTopic {
+                    id: $subtopic_id,
+                    name: $subtopic_name,
+                    user_id: $user_id,
+                    parent_topic_id: t.id,
+                    created_at: datetime()
+                })
+                CREATE (u)-[:HAS_SUBTOPIC]->(st)
+                CREATE (t)-[:HAS_SUBTOPIC]->(st)
+                """,
+                {
+                    "user_id": user_id,
+                    "topic_name": topic_name.lower().strip(),
+                    "subtopic_id": subtopic_id,
+                    "subtopic_name": subtopic_name.lower().strip()
+                }
+            )
+        return subtopic_id
+    
+    def get_or_create_topic_node(self, user_id: str, topic_name: str) -> str:
+        """Get existing Topic node ID or create new one"""
+        if not topic_name:
+            return None
+            
+        topic_name = topic_name.lower().strip()
+        
+        with self.driver.session() as session:
+            # Check if topic exists
+            result = session.run(
+                """
+                MATCH (t:Topic {name: $topic_name, user_id: $user_id})
+                RETURN t.id as topic_id
+                """,
+                {"topic_name": topic_name, "user_id": user_id}
+            )
+            
+            record = result.single()
+            if record:
+                return record["topic_id"]
+            else:
+                # Create new topic
+                return self.create_topic_node(user_id, topic_name)
+    
+    def get_or_create_subtopic_node(self, user_id: str, topic_name: str, subtopic_name: str) -> str:
+        """Get existing SubTopic node ID or create new one"""
+        if not topic_name or not subtopic_name:
+            return None
+            
+        topic_name = topic_name.lower().strip()
+        subtopic_name = subtopic_name.lower().strip()
+        
+        with self.driver.session() as session:
+            # Check if subtopic exists
+            result = session.run(
+                """
+                MATCH (st:SubTopic {name: $subtopic_name, user_id: $user_id})
+                MATCH (t:Topic {name: $topic_name, user_id: $user_id})-[:HAS_SUBTOPIC]->(st)
+                RETURN st.id as subtopic_id
+                """,
+                {
+                    "topic_name": topic_name,
+                    "subtopic_name": subtopic_name,
+                    "user_id": user_id
+                }
+            )
+            
+            record = result.single()
+            if record:
+                return record["subtopic_id"]
+            else:
+                # Ensure topic exists first
+                self.get_or_create_topic_node(user_id, topic_name)
+                # Create new subtopic
+                return self.create_subtopic_node(user_id, topic_name, subtopic_name)
         
     def add_memory(self, content: str, confidence: float = 0.8, user_id: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> str:
         """Add a new memory to the system and return its ID"""
@@ -163,7 +278,7 @@ class MemorySystem:
         # Save to Neo4j with embedding and user relationship
         with self.driver.session() as session:
             if user_id:
-                # Create memory and link to user
+                # Create memory and link to user (maintains backward compatibility)
                 session.run(
                     """
                     MATCH (u:User {id: $user_id})
@@ -191,6 +306,35 @@ class MemorySystem:
                         "sub_topic": sub_topic
                     }
                 )
+                
+                # Create graph relationships for hierarchical search (additive enhancement)
+                if topic:
+                    # Get or create topic node
+                    topic_id = self.get_or_create_topic_node(user_id, topic)
+                    if topic_id:
+                        # Link memory to topic
+                        session.run(
+                            """
+                            MATCH (m:MemoryNode {id: $memory_id})
+                            MATCH (t:Topic {id: $topic_id})
+                            CREATE (m)-[:BELONGS_TO]->(t)
+                            """,
+                            {"memory_id": memory_node.id, "topic_id": topic_id}
+                        )
+                    
+                    if sub_topic:
+                        # Get or create subtopic node
+                        subtopic_id = self.get_or_create_subtopic_node(user_id, topic, sub_topic)
+                        if subtopic_id:
+                            # Link memory to subtopic
+                            session.run(
+                                """
+                                MATCH (m:MemoryNode {id: $memory_id})
+                                MATCH (st:SubTopic {id: $subtopic_id})
+                                CREATE (m)-[:BELONGS_TO]->(st)
+                                """,
+                                {"memory_id": memory_node.id, "subtopic_id": subtopic_id}
+                            )
             else:
                 # Create memory without user link (backward compatibility)
                 session.run(
@@ -223,6 +367,169 @@ class MemorySystem:
             self._create_memory_relationships(memory_node.id, embedding, user_id)
         
         return memory_node.id
+    
+    def hierarchical_retrieve_memories(self, query: str, user_id: str, topic: Optional[str] = None, sub_topic: Optional[str] = None, depth: int = 5) -> List[MemoryNode]:
+        """Hierarchical memory retrieval using graph relationships with fallback to property-based search"""
+        
+        with self.driver.session() as session:
+            if not user_id:
+                return []
+            
+            query_embedding = self._generate_embedding(query)
+            if not query_embedding or len(query_embedding) != 1536:
+                return []
+            
+            memories = []
+            
+            # Level 1: Try subtopic-specific graph search
+            if topic and sub_topic:
+                memories.extend(self._search_subtopic_graph(session, query_embedding, user_id, topic, sub_topic, depth))
+                print(f"DEBUG: Subtopic graph search found {len(memories)} memories")
+            
+            # Level 2: If insufficient results, try topic-wide graph search
+            if len(memories) < 3 and topic:
+                topic_memories = self._search_topic_graph(session, query_embedding, user_id, topic, depth - len(memories))
+                memories.extend(topic_memories)
+                print(f"DEBUG: Topic graph search found {len(topic_memories)} additional memories")
+            
+            # Level 3: If still insufficient, fallback to property-based search
+            if len(memories) < 3:
+                fallback_memories = self._search_property_fallback(session, query_embedding, user_id, topic, sub_topic, depth - len(memories))
+                memories.extend(fallback_memories)
+                print(f"DEBUG: Property fallback search found {len(fallback_memories)} additional memories")
+            
+            # Level 4: If still no results, try user-wide search
+            if len(memories) == 0:
+                user_wide_memories = self._search_user_wide(session, query_embedding, user_id, depth)
+                memories.extend(user_wide_memories)
+                print(f"DEBUG: User-wide search found {len(user_wide_memories)} memories")
+            
+            return memories[:depth]
+    
+    def _search_subtopic_graph(self, session, query_embedding: List[float], user_id: str, topic: str, sub_topic: str, limit: int) -> List[MemoryNode]:
+        """Search memories linked to specific subtopic via graph relationships"""
+        try:
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[:HAS_SUBTOPIC]->(st:SubTopic {name: $sub_topic})
+                MATCH (t:Topic {name: $topic, user_id: $user_id})-[:HAS_SUBTOPIC]->(st)
+                MATCH (m:MemoryNode)-[:BELONGS_TO]->(st)
+                WHERE m.embedding IS NOT NULL
+                RETURN m.id AS id, m.embedding AS embedding, m.content AS content,
+                       m.confidence AS confidence, m.timestamp AS timestamp
+                LIMIT $limit
+                """,
+                {
+                    "user_id": user_id,
+                    "topic": topic.lower().strip(),
+                    "sub_topic": sub_topic.lower().strip(),
+                    "limit": limit
+                }
+            )
+            
+            return self._process_memory_results(result, query_embedding)
+        except Exception as e:
+            print(f"DEBUG: Subtopic graph search error: {e}")
+            return []
+    
+    def _search_topic_graph(self, session, query_embedding: List[float], user_id: str, topic: str, limit: int) -> List[MemoryNode]:
+        """Search memories linked to topic via graph relationships"""
+        try:
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic {name: $topic})
+                MATCH (m:MemoryNode)-[:BELONGS_TO]->(t)
+                WHERE m.embedding IS NOT NULL
+                RETURN m.id AS id, m.embedding AS embedding, m.content AS content,
+                       m.confidence AS confidence, m.timestamp AS timestamp
+                LIMIT $limit
+                """,
+                {
+                    "user_id": user_id,
+                    "topic": topic.lower().strip(),
+                    "limit": limit
+                }
+            )
+            
+            return self._process_memory_results(result, query_embedding)
+        except Exception as e:
+            print(f"DEBUG: Topic graph search error: {e}")
+            return []
+    
+    def _search_property_fallback(self, session, query_embedding: List[float], user_id: str, topic: Optional[str], sub_topic: Optional[str], limit: int) -> List[MemoryNode]:
+        """Fallback to property-based search for backward compatibility"""
+        try:
+            # Build topic filter similar to original implementation
+            topic_filter = ""
+            params = {"user_id": user_id, "limit": limit}
+            
+            if topic:
+                if sub_topic:
+                    topic_filter = "AND m.topic = $topic AND m.sub_topic = $sub_topic"
+                    params["topic"] = topic
+                    params["sub_topic"] = sub_topic
+                else:
+                    topic_filter = "AND m.topic = $topic"
+                    params["topic"] = topic
+            
+            result = session.run(
+                f"""
+                MATCH (u:User {{id: $user_id}})-[:HAS_MEMORY]->(m:MemoryNode)
+                WHERE m.embedding IS NOT NULL {topic_filter}
+                RETURN m.id AS id, m.embedding AS embedding, m.content AS content,
+                       m.confidence AS confidence, m.timestamp AS timestamp
+                LIMIT $limit
+                """,
+                params
+            )
+            
+            return self._process_memory_results(result, query_embedding)
+        except Exception as e:
+            print(f"DEBUG: Property fallback search error: {e}")
+            return []
+    
+    def _search_user_wide(self, session, query_embedding: List[float], user_id: str, limit: int) -> List[MemoryNode]:
+        """Search all user memories as final fallback"""
+        try:
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                WHERE m.embedding IS NOT NULL
+                RETURN m.id AS id, m.embedding AS embedding, m.content AS content,
+                       m.confidence AS confidence, m.timestamp AS timestamp
+                LIMIT $limit
+                """,
+                {"user_id": user_id, "limit": limit}
+            )
+            
+            return self._process_memory_results(result, query_embedding)
+        except Exception as e:
+            print(f"DEBUG: User-wide search error: {e}")
+            return []
+    
+    def _process_memory_results(self, result, query_embedding: List[float]) -> List[MemoryNode]:
+        """Process Neo4j query results and calculate similarities"""
+        candidates = []
+        for record in result:
+            stored_embedding = record["embedding"]
+            if stored_embedding and len(stored_embedding) == 1536:
+                similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
+                candidates.append((record["id"], similarity, record["content"], record["confidence"], record["timestamp"]))
+        
+        # Sort by similarity
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        
+        memories = []
+        for candidate in candidates:
+            memory_node = MemoryNode(
+                content=candidate[2],
+                confidence=candidate[3],
+                timestamp=candidate[4].to_native() if hasattr(candidate[4], 'to_native') else candidate[4]
+            )
+            memory_node.id = candidate[0]
+            memories.append(memory_node)
+        
+        return memories
     
     def _create_memory_relationships(self, new_memory_id: str, new_embedding: List[float], user_id: str):
         """Create semantic relationships between the new memory and existing memories"""

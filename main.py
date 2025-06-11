@@ -1136,15 +1136,28 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
                 context_text = "\n".join([f"{msg['role']}: {msg['content'][:100]}" for msg in recent_context[-3:]])
                 print(f"DEBUG: Loaded {len(recent_context)} recent messages for context")
             
-            # Level 3: Topic-scoped memory search with enhanced context (target: <50ms)
-            relevant_memories = memory_system.retrieve_memories(
-                query=chat_request.message,
-                context=context_text,
-                depth=5,
-                user_id=user_id,
-                topic=current_topic,
-                sub_topic=current_sub_topic
-            )
+            # Level 3: Hierarchical memory search with fallback (target: <50ms)
+            try:
+                # Try new hierarchical search first
+                relevant_memories = memory_system.hierarchical_retrieve_memories(
+                    query=chat_request.message,
+                    user_id=user_id,
+                    topic=current_topic,
+                    sub_topic=current_sub_topic,
+                    depth=5
+                )
+                print(f"DEBUG: Hierarchical search completed with {len(relevant_memories)} memories")
+            except Exception as e:
+                print(f"DEBUG: Hierarchical search failed, falling back to original: {e}")
+                # Fallback to original property-based search
+                relevant_memories = memory_system.retrieve_memories(
+                    query=chat_request.message,
+                    context=context_text,
+                    depth=5,
+                    user_id=user_id,
+                    topic=current_topic,
+                    sub_topic=current_sub_topic
+                )
             
             # Promote top memories to conversation cache
             if relevant_memories:
