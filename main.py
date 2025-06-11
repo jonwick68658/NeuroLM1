@@ -327,6 +327,31 @@ def get_recent_conversation_context(conversation_id: str, limit: int = 10) -> Li
         print(f"Error getting recent conversation context: {e}")
         return []
 
+def get_conversation_topic_context(conversation_id: str) -> Dict[str, Optional[str]]:
+    """Get topic and subtopic for a conversation"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT topic, sub_topic
+            FROM conversations
+            WHERE id = %s
+        ''', (conversation_id,))
+        
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if result:
+            return {
+                'topic': result[0],
+                'sub_topic': result[1]
+            }
+        return {'topic': None, 'sub_topic': None}
+    except Exception as e:
+        print(f"Error getting conversation topic context: {e}")
+        return {'topic': None, 'sub_topic': None}
+
 # Topic management functions
 def get_all_topics(user_id: str) -> Dict:
     """Get all topics and sub-topics for a user"""

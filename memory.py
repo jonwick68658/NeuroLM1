@@ -152,7 +152,7 @@ class MemorySystem:
         """Helper method for executing Cypher queries"""
         return tx.run(query, parameters or {})
         
-    def add_memory(self, content: str, confidence: float = 0.8, user_id: Optional[str] = None) -> str:
+    def add_memory(self, content: str, confidence: float = 0.8, user_id: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> str:
         """Add a new memory to the system and return its ID"""
         # Create memory node
         memory_node = MemoryNode(content, confidence)
@@ -173,7 +173,9 @@ class MemorySystem:
                         confidence: $confidence,
                         category: $category,
                         timestamp: datetime($timestamp),
-                        embedding: $embedding
+                        embedding: $embedding,
+                        topic: $topic,
+                        sub_topic: $sub_topic
                     })
                     CREATE (u)-[:HAS_MEMORY]->(m)
                     """,
@@ -184,7 +186,9 @@ class MemorySystem:
                         "confidence": memory_node.confidence,
                         "category": memory_node.category,
                         "timestamp": memory_node.timestamp.isoformat(),
-                        "embedding": embedding
+                        "embedding": embedding,
+                        "topic": topic,
+                        "sub_topic": sub_topic
                     }
                 )
             else:
@@ -197,7 +201,9 @@ class MemorySystem:
                         confidence: $confidence,
                         category: $category,
                         timestamp: datetime($timestamp),
-                        embedding: $embedding
+                        embedding: $embedding,
+                        topic: $topic,
+                        sub_topic: $sub_topic
                     })
                     """,
                     {
@@ -206,7 +212,9 @@ class MemorySystem:
                         "confidence": memory_node.confidence,
                         "category": memory_node.category,
                         "timestamp": memory_node.timestamp.isoformat(),
-                        "embedding": embedding
+                        "embedding": embedding,
+                        "topic": topic,
+                        "sub_topic": sub_topic
                     }
                 )
         
@@ -252,8 +260,8 @@ class MemorySystem:
                         }
                     )
         
-    def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None) -> List[MemoryNode]:
-        """Retrieve relevant memories based on query and context using Neo4j vector search"""
+    def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> List[MemoryNode]:
+        """Retrieve relevant memories based on query and context using Neo4j vector search with topic scoping"""
         
         with self.driver.session() as session:
             if not user_id:
@@ -264,20 +272,32 @@ class MemorySystem:
             is_name_query = any(keyword.lower() in query.lower() for keyword in name_keywords)
             
             if is_name_query:
-                # First, look for memories containing names or introductions
+                # Build topic filter for name queries
+                topic_filter = ""
+                params = {"user_id": user_id, "depth": depth}
+                
+                if topic:
+                    if sub_topic:
+                        topic_filter = "AND (m.topic = $topic AND m.sub_topic = $sub_topic)"
+                        params["topic"] = topic
+                        params["sub_topic"] = sub_topic
+                    else:
+                        topic_filter = "AND m.topic = $topic"
+                        params["topic"] = topic
+                
                 name_result = session.run(
-                    """
-                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
-                    WHERE m.content CONTAINS 'Ryan' OR 
+                    f"""
+                    MATCH (u:User {{id: $user_id}})-[:HAS_MEMORY]->(m:MemoryNode)
+                    WHERE (m.content CONTAINS 'Ryan' OR 
                           m.content CONTAINS 'name is' OR 
                           m.content CONTAINS 'I am' OR
-                          m.content CONTAINS 'called'
+                          m.content CONTAINS 'called') {topic_filter}
                     RETURN m.id AS id, m.content AS content, m.confidence AS confidence,
                            m.timestamp AS timestamp
                     ORDER BY m.timestamp DESC
                     LIMIT $depth
                     """,
-                    {"user_id": user_id, "depth": depth}
+                    params
                 )
                 
                 memories = []
@@ -298,16 +318,29 @@ class MemorySystem:
             if not query_embedding or len(query_embedding) != 1536:
                 return []
             
+            # Build topic filter for vector search
+            topic_filter = ""
+            params = {"user_id": user_id}
+            
+            if topic:
+                if sub_topic:
+                    topic_filter = "AND m.topic = $topic AND m.sub_topic = $sub_topic"
+                    params["topic"] = topic
+                    params["sub_topic"] = sub_topic
+                else:
+                    topic_filter = "AND m.topic = $topic"
+                    params["topic"] = topic
+            
             # Optimized approach: Use vector similarity calculation but minimize data transfer
-            # Get only user memories with embeddings for efficient similarity calculation
+            # Get only user memories with embeddings for efficient similarity calculation, filtered by topic
             result = session.run(
-                """
-                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
-                WHERE m.embedding IS NOT NULL
+                f"""
+                MATCH (u:User {{id: $user_id}})-[:HAS_MEMORY]->(m:MemoryNode)
+                WHERE m.embedding IS NOT NULL {topic_filter}
                 RETURN m.id AS id, m.embedding AS embedding, m.content AS content, 
                        m.confidence AS confidence, m.timestamp AS timestamp
                 """,
-                {"user_id": user_id}
+                params
             )
             
             # Calculate similarities efficiently using vectorized operations
