@@ -1244,10 +1244,10 @@ IMPORTANT: Read and use these memories from your previous conversations:
 {context}
 
 Key instructions:
-- If you've met this user before, acknowledge them by name from your memories
 - Reference specific details from past conversations when relevant
 - Be conversational, warm, and helpful
-- Always check your memories for the user's name and past interactions"""
+- Use your memories to maintain conversation continuity naturally
+- Respond directly to the user's current message without unnecessary greetings"""
         }
         
         user_message = {
