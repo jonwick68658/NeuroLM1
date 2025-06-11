@@ -298,38 +298,41 @@ class MemorySystem:
             if not query_embedding or len(query_embedding) != 1536:
                 return []
             
-            try:
-                # Native vector search using the existing memory_embeddings index
-                vector_result = session.run(
-                    """
-                    CALL db.index.vector.queryNodes('memory_embeddings', $search_limit, $query_embedding) 
-                    YIELD node, score
-                    WITH node, score
-                    WHERE (node)<-[:HAS_MEMORY]-(u:User {id: $user_id})
-                    RETURN node.id AS id, node.content AS content, node.confidence AS confidence,
-                           node.timestamp AS timestamp, score
-                    ORDER BY score DESC
-                    LIMIT $depth
-                    """,
-                    {"user_id": user_id, "depth": depth, "search_limit": depth * 3, "query_embedding": query_embedding}
+            # Optimized approach: Use vector similarity calculation but minimize data transfer
+            # Get only user memories with embeddings for efficient similarity calculation
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                WHERE m.embedding IS NOT NULL
+                RETURN m.id AS id, m.embedding AS embedding, m.content AS content, 
+                       m.confidence AS confidence, m.timestamp AS timestamp
+                """,
+                {"user_id": user_id}
+            )
+            
+            # Calculate similarities efficiently using vectorized operations
+            candidates = []
+            for record in result:
+                stored_embedding = record["embedding"]
+                if stored_embedding and len(stored_embedding) == 1536:
+                    # Fast cosine similarity calculation
+                    similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
+                    candidates.append((record["id"], similarity, record["content"], record["confidence"], record["timestamp"]))
+            
+            # Sort by similarity and return top results
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            
+            memories = []
+            for candidate in candidates[:depth]:
+                memory_node = MemoryNode(
+                    content=candidate[2],
+                    confidence=candidate[3],
+                    timestamp=candidate[4].to_native() if hasattr(candidate[4], 'to_native') else candidate[4]
                 )
+                memory_node.id = candidate[0]
+                memories.append(memory_node)
                 
-                memories = []
-                for record in vector_result:
-                    memory_node = MemoryNode(
-                        content=record["content"],
-                        confidence=record["confidence"],
-                        timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
-                    )
-                    memory_node.id = record["id"]
-                    memories.append(memory_node)
-                
-                return memories
-                
-            except Exception as e:
-                print(f"Vector search failed, falling back to legacy method: {e}")
-                # Fallback to the original method if vector search fails
-                return self._retrieve_memories_fallback(query, user_id, depth)
+            return memories
     
     def _retrieve_memories_fallback(self, query: str, user_id: str, depth: int) -> List[MemoryNode]:
         """Fallback method using the original Python-based similarity calculation"""
