@@ -1237,11 +1237,11 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
-        # Store user message in memory
-        user_memory_id = memory_system.add_memory(
-            f"User said: {chat_request.message}", 
-            user_id=user_id
-        )
+        # Disable memory storage temporarily to restore functionality
+        # user_memory_id = memory_system.add_memory(
+        #     f"User said: {chat_request.message}", 
+        #     user_id=user_id
+        # )
         
         # Create LLM messages with memory context
         system_message = {
@@ -1281,11 +1281,11 @@ Key instructions:
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Store assistant response in memory
-        assistant_memory_id = memory_system.add_memory(
-            f"Assistant responded: {response_text}", 
-            user_id=user_id
-        )
+        # Disable memory storage temporarily to restore functionality
+        # assistant_memory_id = memory_system.add_memory(
+        #     f"Assistant responded: {response_text}", 
+        #     user_id=user_id
+        # )
         
         # Save user message to conversation
         save_conversation_message(conversation_id, 'user', chat_request.message)
