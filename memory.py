@@ -506,15 +506,19 @@ class MemorySystem:
 
     
     def _process_memory_results(self, result, query_embedding: List[float]) -> List[MemoryNode]:
-        """Process Neo4j query results and calculate similarities"""
+        """Process Neo4j query results and calculate similarities with strict threshold"""
         candidates = []
+        similarity_threshold = 0.15  # Strict threshold to prevent irrelevant matches
+        
         for record in result:
             stored_embedding = record["embedding"]
             if stored_embedding and len(stored_embedding) == 1536:
                 similarity = self._calculate_cosine_similarity(query_embedding, stored_embedding)
-                candidates.append((record["id"], similarity, record["content"], record["confidence"], record["timestamp"]))
+                # Only include memories above similarity threshold
+                if similarity >= similarity_threshold:
+                    candidates.append((record["id"], similarity, record["content"], record["confidence"], record["timestamp"]))
         
-        # Sort by similarity
+        # Sort by similarity (highest first)
         candidates.sort(key=lambda x: x[1], reverse=True)
         
         memories = []
