@@ -1032,25 +1032,51 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if chat_request.message.startswith('/'):
             return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
         
-        # Retrieve relevant memories for context
-        retrieve_request = RetrieveMemoryRequest(
-            query=chat_request.message,
-            context=None,
-            depth=5
-        )
-        
-        # Get memory system instance
+        # Initialize conversation cache and memory system
+        import time
+        from conversation_cache import ConversationCache
+        conv_cache = ConversationCache()
         memory_system = MemorySystem()
-        relevant_memories = memory_system.retrieve_memories(
-            query=chat_request.message,
-            context="",
-            depth=5,
-            user_id=user_id
-        )
         
-        # Debug logging
+        # Ensure we have a conversation_id for caching
+        conversation_id = chat_request.conversation_id
+        if not conversation_id:
+            conversation_id = create_conversation(user_id)
+        
+        # Tiered memory retrieval with conversation caching
+        relevant_memories = []
+        cache_start_time = time.time()
+        
+        # Level 1: Check conversation cache first (target: <10ms)
+        cached_memories = conv_cache.get_cached_memories(conversation_id)
+        if cached_memories and len(cached_memories) >= 3:
+            relevant_memories = cached_memories[:5]
+            print(f"DEBUG: Cache hit - retrieved {len(relevant_memories)} memories from conversation cache")
+        else:
+            # Level 2: Full memory search with cache population (target: <200ms)
+            relevant_memories = memory_system.retrieve_memories(
+                query=chat_request.message,
+                context="",
+                depth=5,
+                user_id=user_id
+            )
+            
+            # Promote top memories to conversation cache
+            if relevant_memories:
+                conv_cache.update_conversation_context(
+                    conversation_id, 
+                    "system", 
+                    f"Context query: {chat_request.message}",
+                    relevant_memories[:3]  # Promote top 3 memories
+                )
+        
+        cache_end_time = time.time()
+        cache_time_ms = (cache_end_time - cache_start_time) * 1000
+        
+        # Debug logging with performance metrics
         print(f"DEBUG: Query: {chat_request.message}")
         print(f"DEBUG: User ID: {user_id}")
+        print(f"DEBUG: Memory retrieval time: {cache_time_ms:.1f}ms")
         print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
         if relevant_memories:
             for i, mem in enumerate(relevant_memories[:3]):
@@ -1143,17 +1169,13 @@ Key instructions:
         # Store assistant response in memory
         assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}", user_id=user_id)
         
-        # Handle conversation management
-        conversation_id = chat_request.conversation_id
-        if not conversation_id:
-            # Create new conversation if none specified
-            conversation_id = create_conversation(user_id)
-        
-        # Save user message to conversation
+        # Save user message to conversation and update cache
         save_conversation_message(conversation_id, 'user', chat_request.message)
+        conv_cache.update_conversation_context(conversation_id, 'user', chat_request.message)
         
-        # Save assistant response to conversation
+        # Save assistant response to conversation and update cache
         save_conversation_message(conversation_id, 'assistant', response_text)
+        conv_cache.update_conversation_context(conversation_id, 'assistant', response_text)
         
         return ChatResponse(
             response=response_text,
@@ -1520,6 +1542,20 @@ async def get_available_models():
 async def health_check():
     """System health check"""
     return {"status": "healthy", "service": "NeuroLM Memory System"}
+
+@app.get("/api/cache/stats")
+async def get_cache_stats():
+    """Get conversation cache performance statistics"""
+    try:
+        from conversation_cache import ConversationCache
+        cache = ConversationCache()
+        stats = cache.get_cache_stats()
+        return {
+            "cache_statistics": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cache stats error: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
