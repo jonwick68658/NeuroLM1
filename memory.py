@@ -293,8 +293,50 @@ class MemorySystem:
                 if memories:
                     return memories
             
-            # Fallback to regular embedding-based search
+            # Use native Neo4j vector search for optimal performance
             query_embedding = self._generate_embedding(query)
+            if not query_embedding or len(query_embedding) != 1536:
+                return []
+            
+            try:
+                # Native vector search using the existing memory_embeddings index
+                vector_result = session.run(
+                    """
+                    CALL db.index.vector.queryNodes('memory_embeddings', $search_limit, $query_embedding) 
+                    YIELD node, score
+                    WITH node, score
+                    WHERE (node)<-[:HAS_MEMORY]-(u:User {id: $user_id})
+                    RETURN node.id AS id, node.content AS content, node.confidence AS confidence,
+                           node.timestamp AS timestamp, score
+                    ORDER BY score DESC
+                    LIMIT $depth
+                    """,
+                    {"user_id": user_id, "depth": depth, "search_limit": depth * 3, "query_embedding": query_embedding}
+                )
+                
+                memories = []
+                for record in vector_result:
+                    memory_node = MemoryNode(
+                        content=record["content"],
+                        confidence=record["confidence"],
+                        timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
+                    )
+                    memory_node.id = record["id"]
+                    memories.append(memory_node)
+                
+                return memories
+                
+            except Exception as e:
+                print(f"Vector search failed, falling back to legacy method: {e}")
+                # Fallback to the original method if vector search fails
+                return self._retrieve_memories_fallback(query, user_id, depth)
+    
+    def _retrieve_memories_fallback(self, query: str, user_id: str, depth: int) -> List[MemoryNode]:
+        """Fallback method using the original Python-based similarity calculation"""
+        with self.driver.session() as session:
+            query_embedding = self._generate_embedding(query)
+            if not query_embedding:
+                return []
             
             # Get ALL user memories for similarity calculation
             result = session.run(
