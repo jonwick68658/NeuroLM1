@@ -1456,7 +1456,7 @@ async def get_user_files(request: Request, search: str = None):
         if search:
             cursor.execute("""
                 SELECT id, filename, file_type, uploaded_at, 
-                       LEFT(content, 100) as content_preview
+                       SUBSTRING(content FROM 1 FOR 100) as content_preview
                 FROM user_files 
                 WHERE user_id = %s AND filename ILIKE %s
                 ORDER BY uploaded_at DESC
@@ -1464,7 +1464,7 @@ async def get_user_files(request: Request, search: str = None):
         else:
             cursor.execute("""
                 SELECT id, filename, file_type, uploaded_at,
-                       LEFT(content, 100) as content_preview
+                       SUBSTRING(content FROM 1 FOR 100) as content_preview
                 FROM user_files 
                 WHERE user_id = %s
                 ORDER BY uploaded_at DESC
