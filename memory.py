@@ -422,12 +422,12 @@ class MemorySystem:
             return []
     
     def _search_subtopic_graph(self, session, query_embedding: List[float], user_id: str, topic: str, sub_topic: str, limit: int) -> List[MemoryNode]:
-        """Search memories linked to specific subtopic via graph relationships"""
+        """Search memories linked to specific subtopic via graph relationships with strict topic enforcement"""
         try:
             result = session.run(
                 """
-                MATCH (u:User {id: $user_id})-[:HAS_SUBTOPIC]->(st:SubTopic {name: $sub_topic})
-                MATCH (t:Topic {name: $topic, user_id: $user_id})-[:HAS_SUBTOPIC]->(st)
+                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic {name: $topic, user_id: $user_id})
+                MATCH (t)-[:HAS_SUBTOPIC]->(st:SubTopic {name: $sub_topic, user_id: $user_id})
                 MATCH (m:MemoryNode)-[:BELONGS_TO]->(st)
                 WHERE m.embedding IS NOT NULL
                 RETURN m.id AS id, m.embedding AS embedding, m.content AS content,
@@ -452,7 +452,7 @@ class MemorySystem:
         try:
             result = session.run(
                 """
-                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic {name: $topic})
+                MATCH (u:User {id: $user_id})-[:HAS_TOPIC]->(t:Topic {name: $topic, user_id: $user_id})
                 MATCH (m:MemoryNode)-[:BELONGS_TO]->(t)
                 WHERE m.embedding IS NOT NULL
                 RETURN m.id AS id, m.embedding AS embedding, m.content AS content,
