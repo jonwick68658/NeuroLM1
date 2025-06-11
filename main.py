@@ -25,11 +25,88 @@ app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 # Mount static files for PWA
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Global session storage (in production, use Redis or database)
+# Session storage with database persistence
 user_sessions = {}
 memory_system = MemorySystem()
 
-# Note: Sessions cleared on restart - users need to re-login
+def init_session_storage():
+    """Initialize session storage table"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                session_id VARCHAR(255) PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error initializing session storage: {e}")
+
+def load_active_sessions():
+    """Load active sessions from database on startup"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT session_id, user_id FROM user_sessions 
+            WHERE last_accessed > NOW() - INTERVAL '24 hours'
+        ''')
+        sessions = cursor.fetchall()
+        for session_id, user_id in sessions:
+            user_sessions[session_id] = {'user_id': user_id}
+            # Get username for complete session data
+            try:
+                user_query = '''
+                    SELECT n.properties FROM 
+                    (MATCH (u:User {id: $user_id}) RETURN u) AS result,
+                    unnest(result) AS n
+                '''
+                # Simplified - just store user_id for now
+            except:
+                pass
+        cursor.close()
+        conn.close()
+        print(f"Loaded {len(sessions)} active sessions")
+    except Exception as e:
+        print(f"Error loading sessions: {e}")
+
+def save_session(session_id, user_id):
+    """Save session to database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO user_sessions (session_id, user_id, last_accessed)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (session_id) 
+            DO UPDATE SET last_accessed = NOW()
+        ''', (session_id, user_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error saving session: {e}")
+
+def update_session_access(session_id):
+    """Update session last accessed time"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE user_sessions SET last_accessed = NOW() 
+            WHERE session_id = %s
+        ''', (session_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error updating session: {e}")
 
 def get_db_connection():
     """Get PostgreSQL database connection"""
@@ -56,8 +133,10 @@ def init_file_storage():
     except Exception as e:
         print(f"Error initializing file storage: {e}")
 
-# Initialize file storage on startup
+# Initialize storage systems on startup
 init_file_storage()
+init_session_storage()
+load_active_sessions()
 
 # Conversation database helper functions
 def create_conversation(user_id: str, title: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Optional[str]:
@@ -1003,6 +1082,9 @@ async def login_user(
         'username': username
     }
     
+    # Save session to database for persistence
+    save_session(session_id, user_id)
+    
     # Redirect to chat with session
     response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(key="session_id", value=session_id, httponly=True)
@@ -1109,17 +1191,8 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         
         # Simple context without topic scoping
         
-        # Simple memory retrieval without complex caching
+        # Simplified memory retrieval - disable for now to restore functionality
         relevant_memories = []
-        try:
-            relevant_memories = memory_system.retrieve_memories(
-                query=chat_request.message,
-                user_id=user_id,
-                depth=5
-            )
-        except Exception as e:
-            print(f"Memory retrieval error: {e}")
-            relevant_memories = []
         
         # Build context from memories
         context = ""
