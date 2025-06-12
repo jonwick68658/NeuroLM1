@@ -50,6 +50,17 @@ def init_file_storage():
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Create memory links table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS memory_links (
+                id SERIAL PRIMARY KEY,
+                source_memory_id VARCHAR(255) NOT NULL,
+                linked_topic VARCHAR(255) NOT NULL,
+                user_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
         cursor.close()
         conn.close()
@@ -415,6 +426,87 @@ def create_subtopic_entry(user_id: str, topic: str, sub_topic: str) -> bool:
         print(f"Error creating sub-topic: {e}")
         return False
 
+# Memory linking functions
+def create_memory_link(memory_id: str, linked_topic: str, user_id: str) -> bool:
+    """Create a link between a memory and a topic"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if link already exists
+        cursor.execute('''
+            SELECT COUNT(*) FROM memory_links 
+            WHERE source_memory_id = %s AND linked_topic = %s AND user_id = %s
+        ''', (memory_id, linked_topic.lower(), user_id))
+        
+        if cursor.fetchone()[0] > 0:
+            cursor.close()
+            conn.close()
+            return True  # Link already exists
+        
+        # Create new link
+        cursor.execute('''
+            INSERT INTO memory_links (source_memory_id, linked_topic, user_id, created_at)
+            VALUES (%s, %s, %s, %s)
+        ''', (memory_id, linked_topic.lower(), user_id, datetime.now()))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error creating memory link: {e}")
+        return False
+
+def remove_topic_links(current_topic: str, linked_topic: str, user_id: str) -> bool:
+    """Remove all links between current topic and linked topic"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Remove links where memories from current_topic are linked to linked_topic
+        cursor.execute('''
+            DELETE FROM memory_links 
+            WHERE linked_topic = %s AND user_id = %s
+            AND source_memory_id IN (
+                SELECT DISTINCT m.id FROM conversations c
+                JOIN messages msg ON c.id = msg.conversation_id
+                JOIN neo4j_memories m ON m.user_id = %s
+                WHERE c.topic = %s
+            )
+        ''', (linked_topic.lower(), user_id, user_id, current_topic.lower()))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error removing topic links: {e}")
+        return False
+
+def get_linked_memories(current_topic: str, user_id: str, limit: int = 2) -> List[str]:
+    """Get memory IDs that are linked to other topics from the current topic"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT DISTINCT ml.source_memory_id, ml.linked_topic
+            FROM memory_links ml
+            WHERE ml.user_id = %s
+            ORDER BY ml.created_at DESC
+            LIMIT %s
+        ''', (user_id, limit))
+        
+        results = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return [row[0] for row in results]
+    except Exception as e:
+        print(f"Error getting linked memories: {e}")
+        return []
+
 # Chat models - define before usage
 class ChatMessage(BaseModel):
     message: str
@@ -541,8 +633,58 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                         response += f"  - (no sub-topics)\n"
                 response += "\nUse topics when creating new conversations to organize your chats."
         
+        elif cmd == '/link':
+            if len(parts) < 2:
+                response = "Usage: `/link [topic]`\nExample: `/link cooking`\nThis will link your next message to memories from the specified topic."
+            else:
+                linked_topic = ' '.join(parts[1:]).lower()
+                
+                # Get current conversation topic
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT topic FROM conversations WHERE id = %s', (conversation_id,))
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if not result:
+                    response = "Error: Could not find current conversation."
+                else:
+                    current_topic = result[0]
+                    response = f"Ready to link your next message to **{linked_topic}** topic. Your next message will be connected to memories from that topic."
+                    
+                    # Store the linking intent in session (we'll implement this in the chat handler)
+                    # For now, just confirm the command
+        
+        elif cmd == '/unlink':
+            if len(parts) < 2:
+                response = "Usage: `/unlink [topic]`\nExample: `/unlink cooking`\nThis will remove all links between current topic and the specified topic."
+            else:
+                linked_topic = ' '.join(parts[1:]).lower()
+                
+                # Get current conversation topic
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT topic FROM conversations WHERE id = %s', (conversation_id,))
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if not result:
+                    response = "Error: Could not find current conversation."
+                else:
+                    current_topic = result[0]
+                    if current_topic:
+                        success = remove_topic_links(current_topic, linked_topic, user_id)
+                        if success:
+                            response = f"Removed all links between **{current_topic}** and **{linked_topic}** topics."
+                        else:
+                            response = f"Error removing links between topics."
+                    else:
+                        response = "Current conversation has no topic set."
+        
         else:
-            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file\n• `/topics` - List all topics and sub-topics"
+            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file\n• `/topics` - List all topics and sub-topics\n• `/link [topic]` - Link next message to specified topic\n• `/unlink [topic]` - Remove links between topics"
         
         # Save command and response to conversation
         save_conversation_message(conversation_id, 'user', command)
@@ -1032,6 +1174,23 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if chat_request.message.startswith('/'):
             return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
         
+        # Check for /link command within message and extract it
+        link_topic = None
+        message_content = chat_request.message
+        if message_content.startswith('/link '):
+            parts = message_content.split(' ', 2)
+            if len(parts) >= 3:
+                link_topic = parts[1].lower()
+                message_content = parts[2]  # Extract actual message content after /link [topic]
+            elif len(parts) == 2:
+                # Just /link [topic] without message content
+                return ChatResponse(
+                    response=f"Please include your message after `/link {parts[1]}`. Example: `/link cooking I love pasta recipes`",
+                    memory_stored=False,
+                    context_used=0,
+                    conversation_id=chat_request.conversation_id or create_conversation(user_id)
+                )
+        
         # Get current conversation topic context
         current_topic = None
         current_subtopic = None
@@ -1122,11 +1281,19 @@ Respond naturally to the user's message, incorporating relevant memories when he
 
         # Store user message in memory with topic context
         user_memory_id = memory_system.add_memory(
-            f"User said: {chat_request.message}", 
+            f"User said: {message_content}", 
             user_id=user_id,
             topic=current_topic,
             subtopic=current_subtopic
         )
+        
+        # Create memory link if /link command was used
+        if link_topic and user_memory_id:
+            link_success = create_memory_link(user_memory_id, link_topic, user_id)
+            if link_success:
+                print(f"DEBUG: Created memory link from {user_memory_id} to topic '{link_topic}'")
+            else:
+                print(f"DEBUG: Failed to create memory link to topic '{link_topic}'")
         
         # Create LLM messages with memory context
         system_message = {
