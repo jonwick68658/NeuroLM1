@@ -1032,12 +1032,27 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         if chat_request.message.startswith('/'):
             return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
         
-        # Retrieve relevant memories for context
-        retrieve_request = RetrieveMemoryRequest(
-            query=chat_request.message,
-            context=None,
-            depth=5
-        )
+        # Get current conversation topic context
+        current_topic = None
+        current_subtopic = None
+        search_scope = "conversation"  # Default for new conversations
+        
+        if chat_request.conversation_id:
+            # Get conversation details to extract topic context
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT topic, sub_topic FROM conversations WHERE id = %s', (chat_request.conversation_id,))
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if result:
+                    current_topic = result[0]
+                    current_subtopic = result[1]
+                    search_scope = "topic" if current_topic else "conversation"
+            except Exception as e:
+                print(f"Error getting conversation topic: {e}")
         
         # Get memory system instance
         memory_system = MemorySystem()
@@ -1045,7 +1060,10 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             query=chat_request.message,
             context="",
             depth=5,
-            user_id=user_id
+            user_id=user_id,
+            current_topic=current_topic,
+            current_subtopic=current_subtopic,
+            search_scope=search_scope
         )
         
         # Debug logging

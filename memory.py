@@ -152,7 +152,8 @@ class MemorySystem:
         """Helper method for executing Cypher queries"""
         return tx.run(query, parameters or {})
         
-    def add_memory(self, content: str, confidence: float = 0.8, user_id: Optional[str] = None) -> str:
+    def add_memory(self, content: str, confidence: float = 0.8, user_id: Optional[str] = None, 
+                   topic: Optional[str] = None, subtopic: Optional[str] = None) -> str:
         """Add a new memory to the system and return its ID"""
         # Create memory node
         memory_node = MemoryNode(content, confidence)
@@ -173,7 +174,9 @@ class MemorySystem:
                         confidence: $confidence,
                         category: $category,
                         timestamp: datetime($timestamp),
-                        embedding: $embedding
+                        embedding: $embedding,
+                        topic: $topic,
+                        subtopic: $subtopic
                     })
                     CREATE (u)-[:HAS_MEMORY]->(m)
                     """,
@@ -184,7 +187,9 @@ class MemorySystem:
                         "confidence": memory_node.confidence,
                         "category": memory_node.category,
                         "timestamp": memory_node.timestamp.isoformat(),
-                        "embedding": embedding
+                        "embedding": embedding,
+                        "topic": topic.lower() if topic else None,
+                        "subtopic": subtopic.lower() if subtopic else None
                     }
                 )
             else:
@@ -252,62 +257,70 @@ class MemorySystem:
                         }
                     )
         
-    def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None) -> List[MemoryNode]:
-        """Retrieve relevant memories based on query and context using Neo4j vector search"""
+    def retrieve_memories(self, query: str, context: Optional[str] = None, depth: int = 5, user_id: Optional[str] = None, 
+                         current_topic: Optional[str] = None, current_subtopic: Optional[str] = None, 
+                         search_scope: str = "topic") -> List[MemoryNode]:
+        """Retrieve relevant memories based on query with topic-scoped search
+        
+        Args:
+            search_scope: "conversation", "topic", "related", "user", "explicit_all"
+        """
         
         with self.driver.session() as session:
             if not user_id:
                 return []
             
-            # Special handling for name queries - prioritize memories containing actual names
-            name_keywords = ["name", "called", "Ryan", "I am", "my name is"]
-            is_name_query = any(keyword.lower() in query.lower() for keyword in name_keywords)
-            
-            if is_name_query:
-                # First, look for memories containing names or introductions
-                name_result = session.run(
-                    """
-                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
-                    WHERE m.content CONTAINS 'Ryan' OR 
-                          m.content CONTAINS 'name is' OR 
-                          m.content CONTAINS 'I am' OR
-                          m.content CONTAINS 'called'
-                    RETURN m.id AS id, m.content AS content, m.confidence AS confidence,
-                           m.timestamp AS timestamp
-                    ORDER BY m.timestamp DESC
-                    LIMIT $depth
-                    """,
-                    {"user_id": user_id, "depth": depth}
-                )
-                
-                memories = []
-                for record in name_result:
-                    memory_node = MemoryNode(
-                        content=record["content"],
-                        confidence=record["confidence"],
-                        timestamp=record["timestamp"].to_native() if hasattr(record["timestamp"], 'to_native') else record["timestamp"]
-                    )
-                    memory_node.id = record["id"]
-                    memories.append(memory_node)
-                
-                if memories:
-                    return memories
-            
-            # Fallback to regular embedding-based search
+            # Topic-scoped search implementation
             query_embedding = self._generate_embedding(query)
             
-            # Get ALL user memories for similarity calculation
-            result = session.run(
+            # Determine search query based on scope
+            if search_scope == "topic" and current_topic:
+                # Search current topic and subtopic first
+                search_query = """
+                MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                WHERE m.embedding IS NOT NULL AND m.topic = $current_topic
                 """
+                params = {"user_id": user_id, "current_topic": current_topic.lower()}
+                
+                if current_subtopic:
+                    search_query += " AND m.subtopic = $current_subtopic"
+                    params["current_subtopic"] = current_subtopic.lower()
+                    
+            elif search_scope == "conversation":
+                # For new conversations, return empty (no memories expected)
+                return []
+                
+            elif search_scope == "explicit_all":
+                # Only when user explicitly requests full search
+                search_query = """
                 MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
                 WHERE m.embedding IS NOT NULL
-                RETURN m.id AS id, m.embedding AS embedding,
-                       m.content AS content, m.confidence AS confidence,
-                       m.timestamp AS timestamp
-                ORDER BY m.timestamp DESC
-                """,
-                {"user_id": user_id}
-            )
+                """
+                params = {"user_id": user_id}
+                
+            else:
+                # Default to topic scope, fallback to user scope if no topic
+                if current_topic:
+                    search_query = """
+                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                    WHERE m.embedding IS NOT NULL AND m.topic = $current_topic
+                    """
+                    params = {"user_id": user_id, "current_topic": current_topic.lower()}
+                else:
+                    search_query = """
+                    MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryNode)
+                    WHERE m.embedding IS NOT NULL
+                    """
+                    params = {"user_id": user_id}
+            
+            search_query += """
+            RETURN m.id AS id, m.embedding AS embedding,
+                   m.content AS content, m.confidence AS confidence,
+                   m.timestamp AS timestamp
+            ORDER BY m.timestamp DESC
+            """
+            
+            result = session.run(search_query, params)
             
             # Calculate similarity scores with recency boost
             candidates = []
