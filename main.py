@@ -684,7 +684,7 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                         response = "Current conversation has no topic set."
         
         else:
-            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file\n• `/topics` - List all topics and sub-topics\n• `/link [topic]` - Link next message to specified topic\n• `/unlink [topic]` - Remove links between topics"
+            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file\n• `/topics` - List all topics and sub-topics\n• `/link [topic]` - Link current message to specified topic\n• `/unlink [topic]` - Remove links between topics"
         
         # Save command and response to conversation
         save_conversation_message(conversation_id, 'user', command)
