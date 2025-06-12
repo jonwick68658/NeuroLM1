@@ -379,7 +379,7 @@ class MemorySystem:
             
             # Get memories that are linked to the current topic
             cursor.execute('''
-                SELECT DISTINCT ml.source_memory_id
+                SELECT DISTINCT ml.source_memory_id, ml.created_at
                 FROM memory_links ml
                 WHERE ml.linked_topic = %s AND ml.user_id = %s
                 ORDER BY ml.created_at DESC
@@ -390,7 +390,7 @@ class MemorySystem:
             cursor.close()
             conn.close()
             
-            return [row[0] for row in results]
+            return [row[0] for row in results]  # Still return just the memory IDs
         except Exception as e:
             print(f"Error getting linked memories: {e}")
             return []
