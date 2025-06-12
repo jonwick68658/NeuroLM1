@@ -2,9 +2,8 @@ from fastapi import FastAPI, HTTPException, Form, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
-
+from memory_api import *
 from pydantic import BaseModel
-from memory import MemorySystem
 import uvicorn
 import os
 import httpx
@@ -20,93 +19,17 @@ app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
 # Add session middleware
 app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 
-# Memory API routes are now directly defined in this file
+# Include memory API routes
+app.include_router(router, prefix="/api")
 
 # Mount static files for PWA
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Session storage with database persistence
+# Global session storage (in production, use Redis or database)
 user_sessions = {}
 memory_system = MemorySystem()
 
-def init_session_storage():
-    """Initialize session storage table"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                session_id VARCHAR(255) PRIMARY KEY,
-                user_id VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Error initializing session storage: {e}")
-
-def load_active_sessions():
-    """Load active sessions from database on startup"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT session_id, user_id FROM user_sessions 
-            WHERE last_accessed > NOW() - INTERVAL '24 hours'
-        ''')
-        sessions = cursor.fetchall()
-        for session_id, user_id in sessions:
-            user_sessions[session_id] = {'user_id': user_id}
-            # Get username for complete session data
-            try:
-                user_query = '''
-                    SELECT n.properties FROM 
-                    (MATCH (u:User {id: $user_id}) RETURN u) AS result,
-                    unnest(result) AS n
-                '''
-                # Simplified - just store user_id for now
-            except:
-                pass
-        cursor.close()
-        conn.close()
-        print(f"Loaded {len(sessions)} active sessions")
-    except Exception as e:
-        print(f"Error loading sessions: {e}")
-
-def save_session(session_id, user_id):
-    """Save session to database"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO user_sessions (session_id, user_id, last_accessed)
-            VALUES (%s, %s, NOW())
-            ON CONFLICT (session_id) 
-            DO UPDATE SET last_accessed = NOW()
-        ''', (session_id, user_id))
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Error saving session: {e}")
-
-def update_session_access(session_id):
-    """Update session last accessed time"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE user_sessions SET last_accessed = NOW() 
-            WHERE session_id = %s
-        ''', (session_id,))
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Error updating session: {e}")
+# Note: Sessions cleared on restart - users need to re-login
 
 def get_db_connection():
     """Get PostgreSQL database connection"""
@@ -133,10 +56,8 @@ def init_file_storage():
     except Exception as e:
         print(f"Error initializing file storage: {e}")
 
-# Initialize storage systems on startup
+# Initialize file storage on startup
 init_file_storage()
-init_session_storage()
-load_active_sessions()
 
 # Conversation database helper functions
 def create_conversation(user_id: str, title: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Optional[str]:
@@ -373,63 +294,6 @@ def get_conversation_messages_all(conversation_id: str) -> List[Dict]:
     except Exception as e:
         print(f"Error getting messages: {e}")
         return []
-
-def get_recent_conversation_context(conversation_id: str, limit: int = 10) -> List[Dict]:
-    """Get recent messages from a conversation for cache warming"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT message_type, content, created_at
-            FROM conversation_messages
-            WHERE conversation_id = %s
-            ORDER BY created_at DESC
-            LIMIT %s
-        ''', (conversation_id, limit))
-        
-        # Reverse to get chronological order
-        rows = list(reversed(cursor.fetchall()))
-        
-        messages = []
-        for row in rows:
-            messages.append({
-                'role': row[0],
-                'content': row[1],
-                'timestamp': row[2].isoformat()
-            })
-        
-        cursor.close()
-        conn.close()
-        return messages
-    except Exception as e:
-        print(f"Error getting recent conversation context: {e}")
-        return []
-
-def get_conversation_topic_context(conversation_id: str) -> Dict[str, Optional[str]]:
-    """Get topic and subtopic for a conversation"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT topic, sub_topic
-            FROM conversations
-            WHERE id = %s
-        ''', (conversation_id,))
-        
-        result = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        if result:
-            return {
-                'topic': result[0],
-                'sub_topic': result[1]
-            }
-        return {'topic': None, 'sub_topic': None}
-    except Exception as e:
-        print(f"Error getting conversation topic context: {e}")
-        return {'topic': None, 'sub_topic': None}
 
 # Topic management functions
 def get_all_topics(user_id: str) -> Dict:
@@ -1082,9 +946,6 @@ async def login_user(
         'username': username
     }
     
-    # Save session to database for persistence
-    save_session(session_id, user_id)
-    
     # Redirect to chat with session
     response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(key="session_id", value=session_id, httponly=True)
@@ -1169,30 +1030,31 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         
         # Check for slash commands
         if chat_request.message.startswith('/'):
-            slash_conversation_id = chat_request.conversation_id
-            if not slash_conversation_id:
-                slash_conversation_id = create_conversation(user_id)
-            if not slash_conversation_id:
-                raise HTTPException(status_code=500, detail="Failed to create conversation for slash command")
-            # At this point, slash_conversation_id is guaranteed to be a string
-            return await handle_slash_command(chat_request.message, user_id, slash_conversation_id)
+            return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
         
-        # Initialize memory system
+        # Retrieve relevant memories for context
+        retrieve_request = RetrieveMemoryRequest(
+            query=chat_request.message,
+            context=None,
+            depth=5
+        )
+        
+        # Get memory system instance
         memory_system = MemorySystem()
+        relevant_memories = memory_system.retrieve_memories(
+            query=chat_request.message,
+            context="",
+            depth=5,
+            user_id=user_id
+        )
         
-        # Ensure we have a conversation_id for caching
-        conversation_id = chat_request.conversation_id
-        if not conversation_id:
-            conversation_id = create_conversation(user_id)
-        
-        # Validate conversation_id before proceeding
-        if not conversation_id:
-            raise HTTPException(status_code=500, detail="Failed to create or retrieve conversation")
-        
-        # Simple context without topic scoping
-        
-        # Simplified memory retrieval - disable for now to restore functionality
-        relevant_memories = []
+        # Debug logging
+        print(f"DEBUG: Query: {chat_request.message}")
+        print(f"DEBUG: User ID: {user_id}")
+        print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
+        if relevant_memories:
+            for i, mem in enumerate(relevant_memories[:3]):
+                print(f"DEBUG: Memory {i+1}: {mem.content[:100]}...")
         
         # Build context from memories
         context = ""
@@ -1201,7 +1063,7 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             print(f"DEBUG: Built context: {context[:200]}...")
         
         # Check if user is asking about files and add file content to context
-        file_query_keywords = ["file", "document", "upload"]
+        file_query_keywords = ["file", "main.py", "analyze", "code", "script", "upload"]
         is_file_query = any(keyword in chat_request.message.lower() for keyword in file_query_keywords)
         
         if is_file_query:
@@ -1237,11 +1099,8 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
-        # Disable memory storage temporarily to restore functionality
-        # user_memory_id = memory_system.add_memory(
-        #     f"User said: {chat_request.message}", 
-        #     user_id=user_id
-        # )
+        # Store user message in memory
+        user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}", user_id=user_id)
         
         # Create LLM messages with memory context
         system_message = {
@@ -1252,10 +1111,10 @@ IMPORTANT: Read and use these memories from your previous conversations:
 {context}
 
 Key instructions:
+- If you've met this user before, acknowledge them by name from your memories
 - Reference specific details from past conversations when relevant
 - Be conversational, warm, and helpful
-- Use your memories to maintain conversation continuity naturally
-- Respond directly to the user's current message without unnecessary greetings"""
+- Always check your memories for the user's name and past interactions"""
         }
         
         user_message = {
@@ -1281,11 +1140,14 @@ Key instructions:
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Disable memory storage temporarily to restore functionality
-        # assistant_memory_id = memory_system.add_memory(
-        #     f"Assistant responded: {response_text}", 
-        #     user_id=user_id
-        # )
+        # Store assistant response in memory
+        assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}", user_id=user_id)
+        
+        # Handle conversation management
+        conversation_id = chat_request.conversation_id
+        if not conversation_id:
+            # Create new conversation if none specified
+            conversation_id = create_conversation(user_id)
         
         # Save user message to conversation
         save_conversation_message(conversation_id, 'user', chat_request.message)
@@ -1658,20 +1520,6 @@ async def get_available_models():
 async def health_check():
     """System health check"""
     return {"status": "healthy", "service": "NeuroLM Memory System"}
-
-@app.get("/api/cache/stats")
-async def get_cache_stats():
-    """Get conversation cache performance statistics"""
-    try:
-        from conversation_cache import ConversationCache
-        cache = ConversationCache()
-        stats = cache.get_cache_stats()
-        return {
-            "cache_statistics": stats,
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cache stats error: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)

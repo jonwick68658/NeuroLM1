@@ -68,7 +68,7 @@
                     <select id="quickTopicSelect" onchange="onQuickTopicChange()">
                         <option value="">Select topic...</option>
                     </select>
-                    <select id="quickSubtopicSelect" onchange="onQuickSubtopicChange()">
+                    <select id="quickSubtopicSelect">
                         <option value="">Select sub-topic...</option>
                     </select>
                 </div>
@@ -206,81 +206,25 @@
                         quickTopicSelect.appendChild(option);
                     });
                 }
-                
-                // Add create new topic option
-                const newOption = document.createElement('option');
-                newOption.value = '__new__';
-                newOption.textContent = '+ Create New Topic';
-                quickTopicSelect.appendChild(newOption);
-                
             } catch (error) {
                 console.error('Error loading quick topics:', error);
             }
         }
 
-        async function onQuickTopicChange() {
+        function onQuickTopicChange() {
             const quickTopicSelect = document.getElementById('quickTopicSelect');
             const quickSubtopicSelect = document.getElementById('quickSubtopicSelect');
-            let selectedTopic = quickTopicSelect.value;
+            const selectedTopic = quickTopicSelect.value;
             
             quickSubtopicSelect.innerHTML = '<option value="">Select sub-topic...</option>';
             
-            if (selectedTopic === '__new__') {
-                const newTopic = prompt('Enter new topic name:');
-                if (newTopic && newTopic.trim()) {
-                    const success = await createTopicNow(newTopic.trim());
-                    if (success) {
-                        selectedTopic = newTopic.toLowerCase().trim();
-                        quickTopicSelect.value = selectedTopic;
-                    } else {
-                        alert('Failed to create topic. Please try again.');
-                        selectedTopic = '';
-                        quickTopicSelect.value = '';
-                    }
-                } else {
-                    selectedTopic = '';
-                    quickTopicSelect.value = '';
-                }
-            }
-            
-            if (selectedTopic && selectedTopic !== '__new__') {
-                await loadQuickSubtopics(selectedTopic);
+            if (selectedTopic) {
+                loadQuickSubtopics(selectedTopic);
                 // Also update sidebar selections
                 const sidebarTopicSelect = document.getElementById('topicSelect');
                 if (sidebarTopicSelect) {
                     sidebarTopicSelect.value = selectedTopic;
                     onTopicChange();
-                }
-            }
-        }
-
-        async function onQuickSubtopicChange() {
-            const quickTopicSelect = document.getElementById('quickTopicSelect');
-            const quickSubtopicSelect = document.getElementById('quickSubtopicSelect');
-            const selectedTopic = quickTopicSelect.value;
-            let selectedSubtopic = quickSubtopicSelect.value;
-            
-            if (selectedSubtopic === '__new__') {
-                const newSubtopic = prompt('Enter new sub-topic name:');
-                if (newSubtopic && newSubtopic.trim() && selectedTopic) {
-                    const success = await createSubtopicNow(selectedTopic, newSubtopic.trim());
-                    if (success) {
-                        selectedSubtopic = newSubtopic.toLowerCase().trim();
-                        quickSubtopicSelect.value = selectedSubtopic;
-                        
-                        // Also update sidebar subtopic selection
-                        const sidebarSubtopicSelect = document.getElementById('subtopicSelect');
-                        if (sidebarSubtopicSelect) {
-                            sidebarSubtopicSelect.value = selectedSubtopic;
-                        }
-                    } else {
-                        alert('Failed to create sub-topic. Please try again.');
-                        selectedSubtopic = '';
-                        quickSubtopicSelect.value = '';
-                    }
-                } else {
-                    selectedSubtopic = '';
-                    quickSubtopicSelect.value = '';
                 }
             }
         }
@@ -301,69 +245,10 @@
                             option.textContent = subtopic;
                             quickSubtopicSelect.appendChild(option);
                         });
-                        
-                        // Add create new subtopic option if under limit
-                        if (topicData.subtopics.length < 5) {
-                            const newOption = document.createElement('option');
-                            newOption.value = '__new__';
-                            newOption.textContent = '+ Create New Sub-topic';
-                            quickSubtopicSelect.appendChild(newOption);
-                        }
-                    } else {
-                        // No subtopics yet, add create option
-                        const newOption = document.createElement('option');
-                        newOption.value = '__new__';
-                        newOption.textContent = '+ Create New Sub-topic';
-                        quickSubtopicSelect.appendChild(newOption);
                     }
                 }
             } catch (error) {
                 console.error('Error loading quick subtopics:', error);
-            }
-        }
-
-        // Topic creation functions
-        async function createTopicNow(topicName) {
-            try {
-                const response = await fetch('/api/topics', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: topicName })
-                });
-                
-                if (response.ok) {
-                    await loadQuickTopics();
-                    await loadTopics(); // Sync with sidebar
-                    return true;
-                } else {
-                    console.error('Failed to create topic');
-                    return false;
-                }
-            } catch (error) {
-                console.error('Error creating topic:', error);
-                return false;
-            }
-        }
-
-        async function createSubtopicNow(topicName, subtopicName) {
-            try {
-                const response = await fetch(`/api/topics/${encodeURIComponent(topicName)}/subtopics`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: subtopicName })
-                });
-                
-                if (response.ok) {
-                    await loadQuickSubtopics(topicName);
-                    await loadSubtopics(topicName); // Sync with sidebar
-                    return true;
-                } else {
-                    console.error('Failed to create subtopic');
-                    return false;
-                }
-            } catch (error) {
-                console.error('Error creating subtopic:', error);
-                return false;
             }
         }
 
