@@ -1066,9 +1066,12 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             search_scope=search_scope
         )
         
-        # Debug logging
+        # Debug logging with topic context
         print(f"DEBUG: Query: {chat_request.message}")
         print(f"DEBUG: User ID: {user_id}")
+        print(f"DEBUG: Current Topic: {current_topic}")
+        print(f"DEBUG: Current Subtopic: {current_subtopic}")
+        print(f"DEBUG: Search Scope: {search_scope}")
         print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
         if relevant_memories:
             for i, mem in enumerate(relevant_memories[:3]):
@@ -1117,8 +1120,13 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
-        # Store user message in memory
-        user_memory_id = memory_system.add_memory(f"User said: {chat_request.message}", user_id=user_id)
+        # Store user message in memory with topic context
+        user_memory_id = memory_system.add_memory(
+            f"User said: {chat_request.message}", 
+            user_id=user_id,
+            topic=current_topic,
+            subtopic=current_subtopic
+        )
         
         # Create LLM messages with memory context
         system_message = {
@@ -1158,8 +1166,13 @@ Key instructions:
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Store assistant response in memory
-        assistant_memory_id = memory_system.add_memory(f"Assistant responded: {response_text}", user_id=user_id)
+        # Store assistant response in memory with topic context
+        assistant_memory_id = memory_system.add_memory(
+            f"Assistant responded: {response_text}", 
+            user_id=user_id,
+            topic=current_topic,
+            subtopic=current_subtopic
+        )
         
         # Handle conversation management
         conversation_id = chat_request.conversation_id
