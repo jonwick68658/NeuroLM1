@@ -355,8 +355,45 @@ class MemorySystem:
                 memory_node = self.get_memory_node(memory_id)
                 if memory_node:
                     memories.append(memory_node)
-                    
+            
+            # Add linked memories as supplemental context (lower priority)
+            if search_scope == "topic" and current_topic and user_id:
+                linked_memory_ids = self._get_linked_memories_for_topic(current_topic, user_id, limit=2)
+                for memory_id in linked_memory_ids:
+                    if memory_id not in top_ids:  # Avoid duplicates
+                        memory_node = self.get_memory_node(memory_id)
+                        if memory_node:
+                            memories.append(memory_node)
+                            print(f"DEBUG: Added linked memory: {memory_node.content[:50]}...")
+                            
             return memories
+    
+    def _get_linked_memories_for_topic(self, current_topic: str, user_id: str, limit: int = 2) -> List[str]:
+        """Get memory IDs that are linked from other topics to the current topic"""
+        try:
+            import psycopg2
+            from main import get_db_connection
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Get memories that are linked to the current topic
+            cursor.execute('''
+                SELECT DISTINCT ml.source_memory_id
+                FROM memory_links ml
+                WHERE ml.linked_topic = %s AND ml.user_id = %s
+                ORDER BY ml.created_at DESC
+                LIMIT %s
+            ''', (current_topic.lower(), user_id, limit))
+            
+            results = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            
+            return [row[0] for row in results]
+        except Exception as e:
+            print(f"Error getting linked memories: {e}")
+            return []
         
     def _calculate_relevance_score(self, memory_node: MemoryNode, query: str) -> float:
         """Calculate a relevance score based on semantic similarity"""
