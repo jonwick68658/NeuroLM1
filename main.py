@@ -520,9 +520,6 @@ class ChatResponse(BaseModel):
     conversation_id: str
 
 # Slash command handler
-
-
-
 async def handle_slash_command(command: str, user_id: str, conversation_id: str) -> ChatResponse:
     """Handle slash commands for file management"""
     parts = command.strip().split()
@@ -1282,15 +1279,13 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
-        # Store user message in memory with topic context (but filter out noise)
-        user_memory_id = None
-        if len(message_content.strip()) > 10:  # Only store substantial messages
-            user_memory_id = memory_system.add_memory(
-                message_content, 
-                user_id=user_id,
-                topic=current_topic,
-                subtopic=current_subtopic
-            )
+        # Store user message in memory with topic context
+        user_memory_id = memory_system.add_memory(
+            f"User said: {message_content}", 
+            user_id=user_id,
+            topic=current_topic,
+            subtopic=current_subtopic
+        )
         
         # Create memory link if /link command was used
         if link_topic and user_memory_id:
@@ -1301,21 +1296,18 @@ Respond naturally to the user's message, incorporating relevant memories when he
                 print(f"DEBUG: Failed to create memory link to topic '{link_topic}'")
         
         # Create LLM messages with memory context
-        if relevant_memories and context.strip():
-            system_content = f"""You are NeuroLM, an AI with access to your memory system. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
-
-IMPORTANT: Here are relevant memories from your previous conversations:
-{context}
-
-Use these memories to provide contextual responses. Reference specific details when relevant."""
-        else:
-            system_content = """You are NeuroLM, an AI assistant. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
-
-This appears to be our first interaction or I don't have relevant memories for this conversation. Respond naturally to the user's message."""
-        
         system_message = {
             "role": "system",
-            "content": system_content
+            "content": f"""You are NeuroLM, an AI with access to your memory system. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
+
+IMPORTANT: Read and use these memories from your previous conversations:
+{context}
+
+Key instructions:
+- If you've met this user before, acknowledge them by name from your memories
+- Reference specific details from past conversations when relevant
+- Be conversational, warm, and helpful
+- Always check your memories for the user's name and past interactions"""
         }
         
         user_message = {
@@ -1341,17 +1333,19 @@ This appears to be our first interaction or I don't have relevant memories for t
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Don't store assistant responses as memories - they create confusion loops
+        # Store assistant response in memory with topic context
+        assistant_memory_id = memory_system.add_memory(
+            f"Assistant responded: {response_text}", 
+            user_id=user_id,
+            topic=current_topic,
+            subtopic=current_subtopic
+        )
         
         # Handle conversation management
         conversation_id = chat_request.conversation_id
         if not conversation_id:
             # Create new conversation if none specified
             conversation_id = create_conversation(user_id)
-        
-        # Ensure conversation_id is not None
-        if not conversation_id:
-            raise HTTPException(status_code=500, detail="Failed to create conversation")
         
         # Save user message to conversation
         save_conversation_message(conversation_id, 'user', chat_request.message)
