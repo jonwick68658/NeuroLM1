@@ -25,11 +25,7 @@ app.include_router(router, prefix="/api")
 # Mount static files for PWA
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Global session storage (in production, use Redis or database)
-user_sessions = {}
 memory_system = MemorySystem()
-
-# Note: Sessions cleared on restart - users need to re-login
 
 def get_db_connection():
     """Get PostgreSQL database connection"""
@@ -1068,6 +1064,7 @@ async def login_page():
 
 @app.post("/login")
 async def login_user(
+    request: Request,
     username: str = Form(...),
     password: str = Form(...)
 ):
@@ -1082,25 +1079,22 @@ async def login_user(
         </script>
         """)
     
-    # Create session
-    session_id = str(uuid.uuid4())
-    user_sessions[session_id] = {
-        'user_id': user_id,
-        'username': username
-    }
-    
-    # Redirect to chat with session
+    # Create secure session with encrypted user_id
     response = RedirectResponse(url="/", status_code=302)
-    response.set_cookie(key="session_id", value=session_id, httponly=True)
+    
+    # Set session data using SessionMiddleware
+    request.session["user_id"] = user_id
+    request.session["username"] = username
+    
     return response
 
 # Serve the chat interface as the main page
 @app.get("/")
 async def serve_chat(request: Request):
     """Serve the chat interface"""
-    # Check if user is logged in
-    session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in user_sessions:
+    # Check if user is logged in via session
+    user_id = request.session.get("user_id")
+    if not user_id:
         return RedirectResponse(url="/login")
     
     return FileResponse("chat.html")
@@ -1108,9 +1102,9 @@ async def serve_chat(request: Request):
 @app.get("/mobile")
 async def serve_mobile(request: Request):
     """Serve the mobile PWA interface"""
-    # Check if user is logged in
-    session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in user_sessions:
+    # Check if user is logged in via session
+    user_id = request.session.get("user_id")
+    if not user_id:
         return RedirectResponse(url="/login")
     
     return FileResponse("mobile.html")
@@ -1166,10 +1160,9 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
     """
     try:
         # Extract user_id from session
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_id = request.session.get("user_id")
+        if not user_id:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
         
         # Check for slash commands
         if chat_request.message.startswith('/'):
@@ -1375,11 +1368,9 @@ class ConversationListResponse(BaseModel):
 async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
     """Get paginated conversations for the current user"""
     try:
-        session_id = request.cookies.get("session_id")
-        print(f"Session ID: {session_id}, Available sessions: {len(user_sessions)}")
-        if not session_id or session_id not in user_sessions:
+        user_id = request.session.get("user_id")
+        if not user_id:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
         
         result = get_user_conversations(user_id, limit, offset)
         return result
