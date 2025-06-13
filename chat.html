@@ -1995,32 +1995,13 @@
         // User management functions
         async function loadUserName() {
             try {
-                // Check localStorage first for immediate display
-                const storedName = localStorage.getItem('userName');
-                if (storedName) {
-                    userName = storedName;
-                }
-
                 const response = await fetch('/api/user/name');
                 if (response.ok) {
                     const data = await response.json();
                     userName = data.first_name || '';
-                    // Store in localStorage for next time
-                    if (userName) {
-                        localStorage.setItem('userName', userName);
-                    }
-                } else if (response.status === 401) {
-                    // Clear stored name and redirect to login
-                    localStorage.removeItem('userName');
-                    userName = '';
-                    window.location.href = '/login';
-                    return;
                 }
             } catch (error) {
                 console.error('Error loading user name:', error);
-                // Clear stored name on any error
-                localStorage.removeItem('userName');
-                userName = '';
             }
         }
 

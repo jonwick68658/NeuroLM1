@@ -70,7 +70,6 @@ def init_file_storage():
 # Initialize file storage on startup
 init_file_storage()
 
-
 # Conversation database helper functions
 def create_conversation(user_id: str, title: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Optional[str]:
     """Create a new conversation and return its ID"""
@@ -1376,6 +1375,7 @@ async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
     """Get paginated conversations for the current user"""
     try:
         session_id = request.cookies.get("session_id")
+        print(f"Session ID: {session_id}, Available sessions: {len(user_sessions)}")
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_sessions[session_id]['user_id']
@@ -1427,7 +1427,6 @@ async def get_conversation_messages_endpoint(conversation_id: str, request: Requ
         session_id = request.cookies.get("session_id")
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
         
         result = get_conversation_messages(conversation_id, limit, before_id)
         return result
@@ -1441,7 +1440,6 @@ async def get_conversation_messages_all_endpoint(conversation_id: str, request: 
         session_id = request.cookies.get("session_id")
         if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
         
         messages = get_conversation_messages_all(conversation_id)
         return messages
