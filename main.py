@@ -31,13 +31,6 @@ memory_system = MemorySystem()
 
 # Note: Sessions cleared on restart - users need to re-login
 
-def get_user_from_session(request: Request) -> str:
-    """Get user_id from session - initially using cookies, will switch to session middleware"""
-    session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in user_sessions:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return user_sessions[session_id]['user_id']
-
 def get_db_connection():
     """Get PostgreSQL database connection"""
     return psycopg2.connect(os.getenv("DATABASE_URL"))
@@ -1173,7 +1166,10 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
     """
     try:
         # Extract user_id from session
-        user_id = get_user_from_session(request)
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         # Check for slash commands
         if chat_request.message.startswith('/'):
@@ -1379,7 +1375,10 @@ class ConversationListResponse(BaseModel):
 async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
     """Get paginated conversations for the current user"""
     try:
-        user_id = get_user_from_session(request)
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         result = get_user_conversations(user_id, limit, offset)
         return result
@@ -1395,7 +1394,10 @@ async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
 async def create_new_conversation(request: Request, conversation_data: ConversationCreate):
     """Create a new conversation"""
     try:
-        user_id = get_user_from_session(request)
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         # Validate sub-topic limit if provided
         if conversation_data.topic and conversation_data.sub_topic:
@@ -1422,7 +1424,10 @@ async def create_new_conversation(request: Request, conversation_data: Conversat
 async def get_conversation_messages_endpoint(conversation_id: str, request: Request, limit: int = 30, before_id: str = None):
     """Get paginated messages for a specific conversation"""
     try:
-        user_id = get_user_from_session(request)
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         result = get_conversation_messages(conversation_id, limit, before_id)
         return result
@@ -1433,7 +1438,10 @@ async def get_conversation_messages_endpoint(conversation_id: str, request: Requ
 async def get_conversation_messages_all_endpoint(conversation_id: str, request: Request):
     """Get all messages for a specific conversation (legacy endpoint)"""
     try:
-        user_id = get_user_from_session(request)
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         messages = get_conversation_messages_all(conversation_id)
         return messages
@@ -1444,7 +1452,10 @@ async def get_conversation_messages_all_endpoint(conversation_id: str, request: 
 async def get_topics_endpoint(request: Request):
     """Get all topics and sub-topics for the current user"""
     try:
-        user_id = get_user_from_session(request)
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         topics = get_all_topics(user_id)
         return topics
@@ -1455,7 +1466,10 @@ async def get_topics_endpoint(request: Request):
 async def get_user_name_endpoint(request: Request):
     """Get the current user's first name"""
     try:
-        user_id = get_user_from_session(request)
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         first_name = get_user_first_name(user_id)
         return {"first_name": first_name}
