@@ -31,6 +31,13 @@ memory_system = MemorySystem()
 
 # Note: Sessions cleared on restart - users need to re-login
 
+def get_user_from_session(request: Request) -> str:
+    """Get user_id from session - initially using cookies, will switch to session middleware"""
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in user_sessions:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user_sessions[session_id]['user_id']
+
 def get_db_connection():
     """Get PostgreSQL database connection"""
     return psycopg2.connect(os.getenv("DATABASE_URL"))
@@ -1166,10 +1173,7 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
     """
     try:
         # Extract user_id from session
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = get_user_from_session(request)
         
         # Check for slash commands
         if chat_request.message.startswith('/'):
