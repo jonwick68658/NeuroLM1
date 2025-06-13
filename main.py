@@ -11,7 +11,7 @@ import hashlib
 import uuid
 import psycopg2
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Create FastAPI application
 app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
@@ -25,11 +25,7 @@ app.include_router(router, prefix="/api")
 # Mount static files for PWA
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Global session storage (in production, use Redis or database)
-user_sessions = {}
 memory_system = MemorySystem()
-
-# Note: Sessions cleared on restart - users need to re-login
 
 def get_db_connection():
     """Get PostgreSQL database connection"""
@@ -61,6 +57,17 @@ def init_file_storage():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Create user sessions table for persistent session storage
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                session_id VARCHAR(255) PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL,
+                last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
         cursor.close()
         conn.close()
@@ -69,6 +76,81 @@ def init_file_storage():
 
 # Initialize file storage on startup
 init_file_storage()
+
+# Session management functions
+def create_session(user_id: str) -> str:
+    """Create a new session and return session ID"""
+    session_id = str(uuid.uuid4())
+    expires_at = datetime.now() + timedelta(days=30)  # 30-day session
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO user_sessions (session_id, user_id, created_at, expires_at, last_accessed)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (session_id, user_id, datetime.now(), expires_at, datetime.now()))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return session_id
+    except Exception as e:
+        print(f"Error creating session: {e}")
+        return None
+
+def validate_session(session_id: str) -> Optional[str]:
+    """Validate session and return user_id if valid"""
+    if not session_id:
+        return None
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if session exists and is not expired
+        cursor.execute('''
+            SELECT user_id FROM user_sessions 
+            WHERE session_id = %s AND expires_at > %s
+        ''', (session_id, datetime.now()))
+        
+        result = cursor.fetchone()
+        
+        if result:
+            user_id = result[0]
+            
+            # Update last_accessed timestamp
+            cursor.execute('''
+                UPDATE user_sessions 
+                SET last_accessed = %s 
+                WHERE session_id = %s
+            ''', (datetime.now(), session_id))
+            conn.commit()
+            
+            cursor.close()
+            conn.close()
+            return user_id
+        else:
+            cursor.close()
+            conn.close()
+            return None
+            
+    except Exception as e:
+        print(f"Error validating session: {e}")
+        return None
+
+def cleanup_expired_sessions():
+    """Remove expired sessions from database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM user_sessions WHERE expires_at < %s', (datetime.now(),))
+        deleted_count = cursor.rowcount
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"Cleaned up {deleted_count} expired sessions")
+    except Exception as e:
+        print(f"Error cleaning up sessions: {e}")
 
 # Conversation database helper functions
 def create_conversation(user_id: str, title: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Optional[str]:
@@ -1081,12 +1163,16 @@ async def login_user(
         </script>
         """)
     
-    # Create session
-    session_id = str(uuid.uuid4())
-    user_sessions[session_id] = {
-        'user_id': user_id,
-        'username': username
-    }
+    # Create persistent session
+    session_id = create_session(user_id)
+    
+    if not session_id:
+        return HTMLResponse("""
+        <script>
+            alert('Failed to create session. Please try again.');
+            window.location.href = '/login';
+        </script>
+        """)
     
     # Redirect to chat with session
     response = RedirectResponse(url="/", status_code=302)
@@ -1099,7 +1185,8 @@ async def serve_chat(request: Request):
     """Serve the chat interface"""
     # Check if user is logged in
     session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in user_sessions:
+    user_id = validate_session(session_id)
+    if not user_id:
         return RedirectResponse(url="/login")
     
     return FileResponse("chat.html")
@@ -1109,7 +1196,8 @@ async def serve_mobile(request: Request):
     """Serve the mobile PWA interface"""
     # Check if user is logged in
     session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in user_sessions:
+    user_id = validate_session(session_id)
+    if not user_id:
         return RedirectResponse(url="/login")
     
     return FileResponse("mobile.html")
