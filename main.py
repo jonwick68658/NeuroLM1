@@ -98,7 +98,7 @@ def create_session(user_id: str) -> str:
         print(f"Error creating session: {e}")
         return None
 
-def validate_session(session_id: str) -> Optional[str]:
+def validate_session(session_id: Optional[str]) -> Optional[str]:
     """Validate session and return user_id if valid"""
     if not session_id:
         return None
