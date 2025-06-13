@@ -1488,7 +1488,10 @@ class SubtopicCreate(BaseModel):
 async def create_topic_endpoint(request: Request, topic_data: TopicCreate):
     """Create a new topic"""
     try:
-        user_id = get_user_from_session(request)
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         if not topic_data.name or not topic_data.name.strip():
             raise HTTPException(status_code=400, detail="Topic name cannot be empty")
