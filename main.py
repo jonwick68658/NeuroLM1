@@ -1301,18 +1301,21 @@ Respond naturally to the user's message, incorporating relevant memories when he
                 print(f"DEBUG: Failed to create memory link to topic '{link_topic}'")
         
         # Create LLM messages with memory context
-        system_message = {
-            "role": "system",
-            "content": f"""You are NeuroLM, an AI with access to your memory system. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
+        if relevant_memories and context.strip():
+            system_content = f"""You are NeuroLM, an AI with access to your memory system. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
 
-IMPORTANT: Read and use these memories from your previous conversations:
+IMPORTANT: Here are relevant memories from your previous conversations:
 {context}
 
-Key instructions:
-- If you've met this user before, acknowledge them by name from your memories
-- Reference specific details from past conversations when relevant
-- Be conversational, warm, and helpful
-- Always check your memories for the user's name and past interactions"""
+Use these memories to provide contextual responses. Reference specific details when relevant."""
+        else:
+            system_content = """You are NeuroLM, an AI assistant. You function as a thoughtful, supportive friend who speaks honestly and maintains engaging conversations.
+
+This appears to be our first interaction or I don't have relevant memories for this conversation. Respond naturally to the user's message."""
+        
+        system_message = {
+            "role": "system",
+            "content": system_content
         }
         
         user_message = {
