@@ -1,33 +1,41 @@
 # NeuroLM - Advanced AI Memory System
 
-An intelligent AI chat system with integrated memory, topic organization, and personalized user management. Features progressive loading, conversation management, and dynamic topic assignment for optimal performance and organization.
+An intelligent AI chat system with topic-scoped memory search, conversation organization, and user-controlled memory linking. Features efficient memory retrieval, topic isolation, and cross-topic connection capabilities for optimal performance and context management.
 
 ## 🚀 DEPLOYMENT STATUS: READY
 Container optimized from 8+ GiB to deployment-ready size through strategic exclusions while preserving complete Neo4j memory functionality.
 
 ## Features
 
+### Core Chat Interface
 - **Interactive Chat Interface**: Clean, professional web interface with markdown rendering and unlimited input capacity
-- **User-Isolated Memory System**: Neo4j graph database with complete user authentication and memory isolation
-- **Semantic Memory Relationships**: Automatic creation of RELATES_TO connections between similar memories
-- **Complete Model Selection**: Searchable dropdown with all 323+ OpenRouter AI models
-- **Memory-Informed Responses**: AI responses use relevant memories from previous conversations within user scope
+- **Topic-Scoped Conversations**: Organize conversations by topics and sub-topics for better memory isolation
+- **Complete Model Selection**: Searchable dropdown with all 323+ OpenRouter AI models including Cerebras, GPT, Claude, and Gemini
 - **Rich Text Formatting**: Full markdown support with syntax highlighting and copy buttons
-- **Real-time Learning**: Every conversation builds semantic memory networks and strengthens relationships
-- **User Authentication**: Secure registration and login system with session management
-- **Memory Management**: Visual memory graph interface for exploring stored knowledge networks
-- **File Upload System**: Direct file upload with paperclip button, PostgreSQL storage, and AI file access integration
+- **Mobile PWA Support**: Responsive design with Progressive Web App capabilities
+
+### Advanced Memory System
+- **Topic-Scoped Memory Search**: Memories are isolated by topic, eliminating inefficient full-system searches
+- **User-Controlled Memory Linking**: `/link [topic]` command to create connections between topic memories
+- **Hierarchical Search Strategy**: Conversation → Topic → Related Topics → Explicit Full Search
+- **Memory Reinforcement**: Linked memories receive decay protection to preserve important connections
+- **User-Isolated Storage**: Neo4j graph database with complete user authentication and memory isolation
+
+### File Management & Slash Commands
+- **File Upload System**: Direct file upload with paperclip button, PostgreSQL storage, and AI file access
+- **Slash Command System**: `/files`, `/view`, `/delete`, `/search`, `/topics`, `/link`, `/unlink` commands
+- **Topic Management**: Create and organize topics and sub-topics for better conversation structure
 
 ## Technology Stack
 
-- **Frontend**: Custom HTML/CSS with JavaScript, Marked.js for markdown rendering
-- **Backend**: FastAPI with cookie-based authentication for secure user sessions
-- **Database**: Neo4j graph database with vector storage and relationship mapping + PostgreSQL for file storage
-- **AI Models**: OpenRouter API with 323+ models (GPT, Claude, Gemini, Llama, Mistral, etc.)
-- **Embeddings**: OpenAI text-embedding-3-small for semantic similarity and relationship detection
-- **Memory Architecture**: User-isolated Neo4j system with HAS_MEMORY and RELATES_TO relationships
-- **File System**: PostgreSQL storage with direct AI access for uploaded documents
-- **UI Features**: Unlimited input capacity, searchable model selector, markdown rendering with copy functionality
+- **Frontend**: Custom HTML/CSS with JavaScript, Marked.js for markdown rendering, PWA support
+- **Backend**: FastAPI with cookie-based authentication and topic-scoped memory retrieval
+- **Database**: Neo4j graph database with topic-scoped vector storage + PostgreSQL for conversations and file storage
+- **AI Models**: OpenRouter API with 323+ models (Cerebras, GPT, Claude, Gemini, Llama, Mistral, etc.)
+- **Embeddings**: OpenAI text-embedding-3-small for semantic similarity within topic boundaries
+- **Memory Architecture**: Topic-isolated Neo4j system with user-controlled linking and memory reinforcement
+- **File System**: PostgreSQL storage with slash command interface for file management
+- **Search Strategy**: Hierarchical memory search (conversation → topic → linked → explicit full)
 
 ## Quick Start
 
@@ -50,44 +58,64 @@ Container optimized from 8+ GiB to deployment-ready size through strategic exclu
 
 ## Usage
 
-### Chat Interface
-- Start conversations that build persistent memory over time
-- Search and select from 323+ AI models using the autocomplete dropdown
-- Multi-line text input with Shift+Enter support for complex messages
-- Rich markdown formatting in AI responses with copy functionality
-- View memory context information with each response
-- Upload files using the paperclip button for AI analysis and discussion
+### Topic-Scoped Conversations
+- **Create Topics**: Organize conversations by topics (e.g., "Programming", "Cooking", "Personal")
+- **Add Sub-topics**: Further categorize with sub-topics for precise organization
+- **Memory Isolation**: Each topic maintains its own memory scope, preventing cross-contamination
+- **Search Efficiency**: Memories are searched within current topic only, eliminating full-system searches
 
-### Memory System
-- Automatically stores all conversations in Neo4j
-- Retrieves relevant memories to inform AI responses
-- Builds semantic connections between related topics
-- Maintains conversation history across sessions
+### Memory Linking System
+- **Link Memories**: Use `/link [topic]` to connect current message to another topic's memories
+- **Unlink Topics**: Use `/unlink [topic]` to remove connections between topics
+- **Supplemental Context**: Linked memories provide gentle cross-topic awareness without flooding
+- **Decay Protection**: Linked memories receive reinforcement to prevent loss over time
+
+### Chat Interface Features
+- **Smart Memory Retrieval**: Hierarchical search (conversation → topic → linked → explicit full)
+- **Model Selection**: Search and select from 323+ AI models with autocomplete dropdown
+- **Rich Formatting**: Multi-line input with Shift+Enter, markdown responses with copy functionality
+- **Slash Commands**: `/files`, `/view`, `/delete`, `/search`, `/topics`, `/link`, `/unlink`
+- **File Management**: Upload and analyze files with integrated AI access
 
 ## API Endpoints
 
-- `POST /api/chat` - Send messages and receive AI responses
-- `POST /api/upload-file` - Upload files for AI analysis and storage
-- `POST /api/memorize/` - Store new memories
-- `POST /api/retrieve/` - Retrieve relevant memories
-- `PUT /api/enhance/{memory_id}` - Enhance memory importance
-- `PUT /api/forget/{memory_id}` - Remove specific memories
+### Chat & Memory
+- `POST /api/chat` - Send messages with topic-scoped memory retrieval
+- `POST /api/conversations/new` - Create new conversation with topic assignment
+- `GET /api/conversations/{id}/messages` - Retrieve conversation messages with pagination
+- `PUT /api/conversations/{id}/topic` - Update conversation topic and sub-topic
+
+### Memory Management
+- `POST /api/memorize/` - Store memories with topic context
+- `POST /api/retrieve/` - Retrieve memories with hierarchical search
+- `PUT /api/enhance/{memory_id}` - Reinforce memory importance
+- `DELETE /api/forget/{memory_id}` - Remove specific memories
 - `POST /api/clear-memory` - Clear all stored memories
+
+### File & Topic Management
+- `POST /api/upload-file` - Upload files with PostgreSQL storage
+- `GET /api/user-files` - List user files with search capability
+- `GET /api/download/{filename}` - Download user files
+- `GET /api/topics` - Retrieve all user topics and sub-topics
+- `POST /api/topics` - Create new topic
+- `POST /api/topics/{topic}/subtopics` - Create sub-topic under existing topic
 
 ## Architecture
 
-### Memory System Core
-- **Neo4j Integration**: Single database for both graph relationships and vector storage
-- **Semantic Search**: OpenAI embeddings stored as node properties
-- **Context Retrieval**: Relevant memories included in AI conversations
-- **Automatic Learning**: Every interaction strengthens the memory network
+### Topic-Scoped Memory System
+- **Hierarchical Search**: Conversation → Topic → Linked → Explicit Full search strategy
+- **Memory Isolation**: Topics maintain separate memory boundaries to prevent cross-contamination
+- **User-Controlled Linking**: `/link [topic]` creates connections between topic memories
+- **Neo4j Integration**: Graph database stores memories with topic context and user isolation
+- **PostgreSQL Storage**: Conversations, files, and memory links stored in relational database
 
-### Chat Flow
-1. User sends message
-2. System retrieves relevant memories from Neo4j
-3. Memories provide context to AI model
-4. AI generates informed response
-5. Both user message and response stored as new memories
+### Enhanced Chat Flow
+1. User sends message in topic-scoped conversation
+2. System retrieves memories from current topic scope
+3. Linked memories added as supplemental context (if any)
+4. AI generates response using topic-relevant context
+5. Both user message and response stored with topic metadata
+6. Memory links created if `/link [topic]` command used
 
 ## Deployment Optimizations Applied
 
@@ -97,28 +125,28 @@ Container optimized from 8+ GiB to deployment-ready size through strategic exclu
 - **Dependency Cleanup**: Removed unused psycopg2-pool dependency
 - **Development File Exclusion**: Git history, build artifacts, and attached assets excluded
 
-### Memory System Enhancements
-- **Hybrid Retrieval**: Keyword-based search for name queries + semantic embeddings
-- **User ID Debugging**: Proper user isolation with comprehensive logging
-- **Context Preservation**: Neo4j memory system completely preserved and enhanced
+### Topic-Scoped Memory Enhancements
+- **Efficient Search**: Topic boundaries eliminate inefficient full-system memory searches
+- **User-Controlled Linking**: Cross-topic connections only when explicitly requested by users
+- **Memory Reinforcement**: Linked memories receive decay protection to preserve important connections
+- **Hierarchical Strategy**: Smart search progression from conversation to topic to linked memories
 
 ## Development
 
-Key components:
-- `main.py` - FastAPI server and chat endpoints (36KB)
-- `memory.py` - Core memory system with Neo4j integration (28KB)
-- `memory_api.py` - Memory management API endpoints
-- `model_service.py` - OpenRouter AI model integration
-- `chat.html` - Chat interface frontend (embedded)
-- `icon.svg` - Optimized application icon (560 bytes)
-- `.dockerignore` - Container optimization configuration
+### Key Components
+- `main.py` - FastAPI server with topic-scoped chat endpoints and memory linking
+- `memory.py` - Topic-aware memory system with hierarchical search and linking support
+- `memory_api.py` - Memory management API with topic context
+- `model_service.py` - OpenRouter AI model integration with 323+ models
+- `chat.html` - Enhanced chat interface with slash commands and topic management
+- `mobile.html` - Progressive Web App interface for mobile devices
+- Database schema includes `memory_links` table for cross-topic connections
 
-## Memory Management
+### Memory Management Features
+- **Topic Isolation**: Memories automatically scoped to conversation topics
+- **Smart Linking**: `/link [topic]` and `/unlink [topic]` commands for user-controlled connections
+- **Decay Protection**: Linked memories reinforced to prevent important information loss
+- **Slash Commands**: Comprehensive file and memory management through chat interface
+- **Search Efficiency**: Eliminates full-system searches while maintaining context awareness
 
-The system provides both automatic and manual memory management:
-- **Automatic**: All conversations stored and retrieved seamlessly
-- **Manual**: Memory enhancement, decay, and deletion through API
-- **Visualization**: Graph interface to explore memory connections
-- **Categories**: Automatic categorization of different memory types
-
-This creates an AI that truly learns and remembers, becoming more helpful over time through accumulated conversational experience.
+This creates an AI that learns within organized topic boundaries while allowing users to create meaningful connections between different areas of knowledge, resulting in both efficient performance and rich contextual understanding.
