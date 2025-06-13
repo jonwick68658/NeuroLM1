@@ -520,6 +520,9 @@ class ChatResponse(BaseModel):
     conversation_id: str
 
 # Slash command handler
+
+
+
 async def handle_slash_command(command: str, user_id: str, conversation_id: str) -> ChatResponse:
     """Handle slash commands for file management"""
     parts = command.strip().split()
@@ -1279,13 +1282,15 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
-        # Store user message in memory with topic context
-        user_memory_id = memory_system.add_memory(
-            f"User said: {message_content}", 
-            user_id=user_id,
-            topic=current_topic,
-            subtopic=current_subtopic
-        )
+        # Store user message in memory with topic context (but filter out noise)
+        user_memory_id = None
+        if len(message_content.strip()) > 10:  # Only store substantial messages
+            user_memory_id = memory_system.add_memory(
+                message_content, 
+                user_id=user_id,
+                topic=current_topic,
+                subtopic=current_subtopic
+            )
         
         # Create memory link if /link command was used
         if link_topic and user_memory_id:
@@ -1340,6 +1345,10 @@ Key instructions:
         if not conversation_id:
             # Create new conversation if none specified
             conversation_id = create_conversation(user_id)
+        
+        # Ensure conversation_id is not None
+        if not conversation_id:
+            raise HTTPException(status_code=500, detail="Failed to create conversation")
         
         # Save user message to conversation
         save_conversation_message(conversation_id, 'user', chat_request.message)
