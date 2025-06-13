@@ -1379,10 +1379,7 @@ class ConversationListResponse(BaseModel):
 async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
     """Get paginated conversations for the current user"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = get_user_from_session(request)
         
         result = get_user_conversations(user_id, limit, offset)
         return result
@@ -1398,10 +1395,7 @@ async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
 async def create_new_conversation(request: Request, conversation_data: ConversationCreate):
     """Create a new conversation"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = get_user_from_session(request)
         
         # Validate sub-topic limit if provided
         if conversation_data.topic and conversation_data.sub_topic:
@@ -1428,9 +1422,7 @@ async def create_new_conversation(request: Request, conversation_data: Conversat
 async def get_conversation_messages_endpoint(conversation_id: str, request: Request, limit: int = 30, before_id: str = None):
     """Get paginated messages for a specific conversation"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
-            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = get_user_from_session(request)
         
         result = get_conversation_messages(conversation_id, limit, before_id)
         return result
@@ -1441,9 +1433,7 @@ async def get_conversation_messages_endpoint(conversation_id: str, request: Requ
 async def get_conversation_messages_all_endpoint(conversation_id: str, request: Request):
     """Get all messages for a specific conversation (legacy endpoint)"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
-            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = get_user_from_session(request)
         
         messages = get_conversation_messages_all(conversation_id)
         return messages
@@ -1454,10 +1444,7 @@ async def get_conversation_messages_all_endpoint(conversation_id: str, request: 
 async def get_topics_endpoint(request: Request):
     """Get all topics and sub-topics for the current user"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = get_user_from_session(request)
         
         topics = get_all_topics(user_id)
         return topics
@@ -1468,10 +1455,7 @@ async def get_topics_endpoint(request: Request):
 async def get_user_name_endpoint(request: Request):
     """Get the current user's first name"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = get_user_from_session(request)
         
         first_name = get_user_first_name(user_id)
         return {"first_name": first_name}
@@ -1490,10 +1474,7 @@ class SubtopicCreate(BaseModel):
 async def create_topic_endpoint(request: Request, topic_data: TopicCreate):
     """Create a new topic"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = get_user_from_session(request)
         
         if not topic_data.name or not topic_data.name.strip():
             raise HTTPException(status_code=400, detail="Topic name cannot be empty")
