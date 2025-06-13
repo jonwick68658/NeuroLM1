@@ -1333,13 +1333,7 @@ Key instructions:
                 response_text += f"This connects to {len(relevant_memories)} memories I have. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Store assistant response in memory with topic context
-        assistant_memory_id = memory_system.add_memory(
-            f"Assistant responded: {response_text}", 
-            user_id=user_id,
-            topic=current_topic,
-            subtopic=current_subtopic
-        )
+        # Don't store assistant responses as memories - they create confusion loops
         
         # Handle conversation management
         conversation_id = chat_request.conversation_id
