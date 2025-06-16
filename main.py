@@ -755,35 +755,44 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 def create_user_in_db(first_name: str, username: str, email: str, password_hash: str) -> bool:
-    """Create user in Neo4j database"""
+    """Create user in both PostgreSQL and Neo4j databases"""
+    user_id = str(uuid.uuid4())
+    
     try:
-        with memory_system.driver.session() as session:
-            # Check if username already exists
-            result = session.run(
-                "MATCH (u:User {username: $username}) RETURN u",
-                username=username
-            )
-            if result.single():
-                return False  # Username already exists
-            
-            # Check if email already exists
-            result = session.run(
-                "MATCH (u:User {email: $email}) RETURN u",
-                email=email
-            )
-            if result.single():
-                return False  # Email already exists
-            
-            # Create new user
-            session.run(
-                "CREATE (u:User {id: $id, first_name: $first_name, username: $username, email: $email, password_hash: $password_hash, created_at: datetime()})",
-                id=str(uuid.uuid4()),
-                first_name=first_name,
-                username=username,
-                email=email,
-                password_hash=password_hash
-            )
-            return True
+        # First, check if user exists in PostgreSQL
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", (username, email))
+        if cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return False  # User already exists
+        
+        # Create user in PostgreSQL
+        cursor.execute(
+            "INSERT INTO users (id, first_name, username, email, password_hash) VALUES (%s, %s, %s, %s, %s)",
+            (user_id, first_name, username, email, password_hash)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # Create user in Neo4j
+        try:
+            with memory_system.driver.session() as session:
+                session.run(
+                    "CREATE (u:User {id: $id, first_name: $first_name, username: $username, email: $email, password_hash: $password_hash, created_at: datetime()})",
+                    id=user_id,
+                    first_name=first_name,
+                    username=username,
+                    email=email,
+                    password_hash=password_hash
+                )
+        except Exception as neo4j_error:
+            print(f"Neo4j user creation failed (non-critical): {neo4j_error}")
+        
+        return True
+        
     except Exception as e:
         print(f"Error creating user: {e}")
         return False
@@ -791,15 +800,17 @@ def create_user_in_db(first_name: str, username: str, email: str, password_hash:
 def verify_user_login(username: str, password: str) -> Optional[str]:
     """Verify user login and return user ID if successful"""
     try:
-        with memory_system.driver.session() as session:
-            password_hash = hash_password(password)
-            result = session.run(
-                "MATCH (u:User {username: $username, password_hash: $password_hash}) RETURN u.id as user_id",
-                username=username,
-                password_hash=password_hash
-            )
-            record = result.single()
-            return record["user_id"] if record else None
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        password_hash = hash_password(password)
+        cursor.execute(
+            "SELECT id FROM users WHERE username = %s AND password_hash = %s",
+            (username, password_hash)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result else None
     except Exception as e:
         print(f"Error verifying login: {e}")
         return None
@@ -807,13 +818,13 @@ def verify_user_login(username: str, password: str) -> Optional[str]:
 def get_user_first_name(user_id: str) -> Optional[str]:
     """Get user's first name by user ID"""
     try:
-        with memory_system.driver.session() as session:
-            result = session.run(
-                "MATCH (u:User {id: $user_id}) RETURN u.first_name as first_name",
-                user_id=user_id
-            )
-            record = result.single()
-            return record["first_name"] if record else None
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT first_name FROM users WHERE id = %s", (user_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result else None
     except Exception as e:
         print(f"Error getting user first name: {e}")
         return None
