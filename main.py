@@ -1247,17 +1247,23 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
                     conversation_id=chat_request.conversation_id or create_conversation(user_id)
                 )
         
+        # Handle conversation management first to ensure we have topic context
+        conversation_id = chat_request.conversation_id
+        if not conversation_id:
+            # Create new conversation if none specified
+            conversation_id = create_conversation(user_id)
+        
         # Get current conversation topic context
         current_topic = None
         current_subtopic = None
         search_scope = "conversation"  # Default for new conversations
         
-        if chat_request.conversation_id:
+        if conversation_id:
             # Get conversation details to extract topic context
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute('SELECT topic, sub_topic FROM conversations WHERE id = %s', (chat_request.conversation_id,))
+                cursor.execute('SELECT topic, sub_topic FROM conversations WHERE id = %s', (conversation_id,))
                 result = cursor.fetchone()
                 cursor.close()
                 conn.close()
@@ -1413,12 +1419,6 @@ Key instructions:
                 )
         except Exception as e:
             print(f"Error storing assistant response in memory: {e}")
-        
-        # Handle conversation management
-        conversation_id = chat_request.conversation_id
-        if not conversation_id:
-            # Create new conversation if none specified
-            conversation_id = create_conversation(user_id)
         
         # Ensure conversation_id is not None before saving messages
         if conversation_id:
