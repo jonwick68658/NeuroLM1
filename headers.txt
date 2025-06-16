@@ -1,0 +1,7 @@
+HTTP/1.1 302 Found
+date: Mon, 16 Jun 2025 17:18:57 GMT
+server: uvicorn
+content-length: 0
+location: /
+set-cookie: session_id=01c1a9e5-45c8-4e03-9ce2-218744e04dce; HttpOnly; Path=/; SameSite=lax
+

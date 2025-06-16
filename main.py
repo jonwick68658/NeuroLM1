@@ -1258,17 +1258,22 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             except Exception as e:
                 print(f"Error getting conversation topic: {e}")
         
-        # Get memory system instance
-        memory_system = MemorySystem()
-        relevant_memories = memory_system.retrieve_memories(
-            query=chat_request.message,
-            context="",
-            depth=5,
-            user_id=user_id,
-            current_topic=current_topic,
-            current_subtopic=current_subtopic,
-            search_scope=search_scope
-        )
+        # Get memory system instance with error handling
+        relevant_memories = []
+        try:
+            memory_system = MemorySystem()
+            relevant_memories = memory_system.retrieve_memories(
+                query=chat_request.message,
+                context="",
+                depth=5,
+                user_id=user_id,
+                current_topic=current_topic,
+                current_subtopic=current_subtopic,
+                search_scope=search_scope
+            )
+        except Exception as e:
+            print(f"Memory system error (continuing without memory): {e}")
+            relevant_memories = []
         
         # Debug logging with topic context
         print(f"DEBUG: Query: {chat_request.message}")
@@ -1325,20 +1330,28 @@ Relevant memories:
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
         # Store user message in memory with topic context
-        user_memory_id = memory_system.add_memory(
-            f"User said: {message_content}", 
-            user_id=user_id,
-            topic=current_topic,
-            subtopic=current_subtopic
-        )
+        user_memory_id = None
+        try:
+            if 'memory_system' in locals():
+                user_memory_id = memory_system.add_memory(
+                    f"User said: {message_content}", 
+                    user_id=user_id,
+                    topic=current_topic,
+                    subtopic=current_subtopic
+                )
+        except Exception as e:
+            print(f"Error storing user message in memory: {e}")
         
         # Create memory link if /link command was used
         if link_topic and user_memory_id:
-            link_success = create_memory_link(user_memory_id, link_topic, user_id)
-            if link_success:
-                print(f"DEBUG: Created memory link from {user_memory_id} to topic '{link_topic}'")
-            else:
-                print(f"DEBUG: Failed to create memory link to topic '{link_topic}'")
+            try:
+                link_success = create_memory_link(user_memory_id, link_topic, user_id)
+                if link_success:
+                    print(f"DEBUG: Created memory link from {user_memory_id} to topic '{link_topic}'")
+                else:
+                    print(f"DEBUG: Failed to create memory link to topic '{link_topic}'")
+            except Exception as e:
+                print(f"Error creating memory link: {e}")
         
         # Create LLM messages with memory context
         system_message = {
@@ -1379,12 +1392,16 @@ Key instructions:
             response_text += "I'm having trouble generating a full response right now."
         
         # Store assistant response in memory with topic context
-        assistant_memory_id = memory_system.add_memory(
-            f"Assistant responded: {response_text}", 
-            user_id=user_id,
-            topic=current_topic,
-            subtopic=current_subtopic
-        )
+        try:
+            if 'memory_system' in locals():
+                assistant_memory_id = memory_system.add_memory(
+                    f"Assistant responded: {response_text}", 
+                    user_id=user_id,
+                    topic=current_topic,
+                    subtopic=current_subtopic
+                )
+        except Exception as e:
+            print(f"Error storing assistant response in memory: {e}")
         
         # Handle conversation management
         conversation_id = chat_request.conversation_id
@@ -1392,11 +1409,18 @@ Key instructions:
             # Create new conversation if none specified
             conversation_id = create_conversation(user_id)
         
-        # Save user message to conversation
-        save_conversation_message(conversation_id, 'user', chat_request.message)
-        
-        # Save assistant response to conversation
-        save_conversation_message(conversation_id, 'assistant', response_text)
+        # Ensure conversation_id is not None before saving messages
+        if conversation_id:
+            try:
+                # Save user message to conversation
+                save_conversation_message(conversation_id, 'user', chat_request.message)
+                
+                # Save assistant response to conversation
+                save_conversation_message(conversation_id, 'assistant', response_text)
+            except Exception as e:
+                print(f"Error saving conversation messages: {e}")
+        else:
+            print("Warning: Could not create conversation, messages not saved")
         
         return ChatResponse(
             response=response_text,
