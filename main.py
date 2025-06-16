@@ -36,10 +36,51 @@ def get_db_connection():
     return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 def init_file_storage():
-    """Initialize file storage table"""
+    """Initialize all database tables"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Create users table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id VARCHAR(255) PRIMARY KEY,
+                first_name VARCHAR(255) NOT NULL,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create conversations table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS conversations (
+                id VARCHAR(255) PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                topic VARCHAR(255),
+                sub_topic VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                message_count INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Create conversation messages table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+                id SERIAL PRIMARY KEY,
+                conversation_id VARCHAR(255) NOT NULL,
+                message_type VARCHAR(50) NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Create user files table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS user_files (
                 id SERIAL PRIMARY KEY,
@@ -47,7 +88,8 @@ def init_file_storage():
                 filename VARCHAR(255) NOT NULL,
                 content TEXT NOT NULL,
                 file_type VARCHAR(50),
-                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
         
@@ -58,14 +100,17 @@ def init_file_storage():
                 source_memory_id VARCHAR(255) NOT NULL,
                 linked_topic VARCHAR(255) NOT NULL,
                 user_id VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
+        
         conn.commit()
         cursor.close()
         conn.close()
+        print("✓ All database tables initialized successfully")
     except Exception as e:
-        print(f"Error initializing file storage: {e}")
+        print(f"Error initializing database: {e}")
 
 # Initialize file storage on startup
 init_file_storage()
