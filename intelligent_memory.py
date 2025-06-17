@@ -30,11 +30,14 @@ class MemoryRouter:
         self.patterns = {
             MemoryIntent.RECALL_PERSONAL: [
                 r'\b(what did i tell you|do you remember|you know that i|i mentioned|we discussed)\b',
-                r'\b(remember when|you said|i told you|as i said)\b'
+                r'\b(remember when|you said|i told you|as i said)\b',
+                r'\b(what do you know about my|tell me about my|what about my)\b',
+                r'\b(about my|my.*\?|know.*about.*me)\b'
             ],
             MemoryIntent.RECALL_FACTUAL: [
                 r'\b(what\'s my|my email|my phone|my address|my birthday)\b',
-                r'\b(my name is|i am|i work at|i live in)\b'
+                r'\b(where do i|what are my|who is my)\b',
+                r'\b(my.*languages|my.*hobbies|my.*interests)\b'
             ],
             MemoryIntent.CONTEXTUAL: [
                 r'\b(how does this relate|like we talked about|similar to what)\b',
@@ -210,37 +213,16 @@ class IntelligentMemorySystem:
         
         try:
             with self.driver.session() as session:
-                # Hybrid retrieval: semantic similarity + recent conversation
+                # Simplified semantic similarity search
                 result = session.run("""
-                    // Semantic similarity search
                     CALL db.index.vector.queryNodes('memory_embedding_index', $limit, $query_embedding)
-                    YIELD node AS semantic_memory, score
-                    WHERE semantic_memory.user_id = $user_id
-                    RETURN semantic_memory.content AS content, 
-                           semantic_memory.importance AS importance,
-                           score,
-                           semantic_memory.timestamp AS timestamp,
-                           'semantic' AS type
-                    
-                    UNION
-                    
-                    // Recent conversation window
-                    MATCH (recent:IntelligentMemory)
-                    WHERE recent.user_id = $user_id 
-                    AND recent.conversation_id = $conversation_id
-                    AND recent.timestamp > datetime() - duration('PT30M')
-                    RETURN recent.content AS content,
-                           recent.importance AS importance, 
-                           0.5 AS score,
-                           recent.timestamp AS timestamp,
-                           'recent' AS type
-                    
-                    ORDER BY importance DESC, score DESC, timestamp DESC
-                    LIMIT $limit
+                    YIELD node, score
+                    WHERE node.user_id = $user_id AND score > 0.7
+                    RETURN node.content AS content, score
+                    ORDER BY score DESC
                 """, {
                     'query_embedding': query_embedding,
                     'user_id': user_id,
-                    'conversation_id': conversation_id or "",
                     'limit': limit
                 })
                 
@@ -248,6 +230,24 @@ class IntelligentMemorySystem:
                 for record in result:
                     content = record['content']
                     memories.append(f"- {content}")
+                
+                # Also get recent conversation context if no semantic matches
+                if not memories and conversation_id:
+                    recent_result = session.run("""
+                        MATCH (m:IntelligentMemory)
+                        WHERE m.user_id = $user_id 
+                        AND m.conversation_id = $conversation_id
+                        AND m.timestamp > datetime() - duration('PT1H')
+                        RETURN m.content AS content
+                        ORDER BY m.timestamp DESC
+                        LIMIT 3
+                    """, {
+                        'user_id': user_id,
+                        'conversation_id': conversation_id
+                    })
+                    
+                    for record in recent_result:
+                        memories.append(f"- {record['content']}")
                 
                 return "\n".join(memories) if memories else ""
                 
