@@ -1317,72 +1317,40 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         except Exception as e:
             print(f"Error storing user message in intelligent memory: {e}")
         
-        # Always ensure we have the user's name
-        if not user_first_name:
-            user_first_name = "User"
+        # Generate response using LLM with memory context
+        from model_service import ModelService
+        model_service = ModelService()
         
-        print(f"DEBUG: User name: '{user_first_name}', Context length: {len(context)} chars")
+        # Create system message with user context and memories
+        system_content = f"""You are a helpful AI assistant with access to conversation history.
+
+User Information:
+- Name: {user_first_name or "User"}
+
+Previous conversation memories:
+{context if context else "No previous conversation history available."}
+
+Instructions:
+- Be natural and conversational
+- Address the user by name when appropriate
+- Reference relevant information from previous conversations when helpful
+- Answer questions directly and thoroughly
+- If no previous context exists, respond normally as you would to any user"""
+
+        messages = [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": chat_request.message}
+        ]
         
-        # Generate response that always uses the user's name and memory
-        user_message_lower = chat_request.message.lower()
-        
-        # Create response that directly incorporates memory
-        if any(word in user_message_lower for word in ['hello', 'hi', 'hey']):
-            response_text = f"Hello {user_first_name}! "
-            if context:
-                response_text += "I remember our previous conversations. "
-                if 'testing' in context.lower():
-                    response_text += "You've been testing the memory system. "
-                if 'memory' in context.lower():
-                    response_text += "We've discussed memory functionality. "
-            else:
-                response_text += "Great to meet you! "
-            response_text += "How can I help you today?"
-            
-        elif 'name' in user_message_lower:
-            response_text = f"Your name is {user_first_name}."
-            if context and 'name' in context.lower():
-                response_text += " I have this stored from our previous conversations."
-                
-        elif any(word in user_message_lower for word in ['remember', 'recall', 'memory', 'conversations']):
-            response_text = f"Yes {user_first_name}, "
-            if context and len(context) > 20:
-                # Extract specific details from memory
-                context_snippets = [line.strip('- ') for line in context.split('\n')[:3] if line.strip()]
-                if context_snippets:
-                    response_text += f"I can recall our conversations. For example: {context_snippets[0][:150]}..."
-                else:
-                    response_text += "I have access to our conversation history but it's not retrieving properly right now."
-            else:
-                response_text += "the memory system should be working but I'm not seeing previous context."
-                
-        else:
-            # For other queries, force the LLM to use the name and context
-            from model_service import ModelService
-            model_service = ModelService()
-            
-            enforced_prompt = f"""You MUST start your response with "Hi {user_first_name}!" or "{user_first_name},"
-
-Retrieved conversation history:
-{context}
-
-Respond to: {chat_request.message}
-
-Remember to use the user's name and reference relevant history."""
-
-            try:
-                response_text = await model_service.chat_completion(
-                    messages=[{"role": "user", "content": enforced_prompt}],
-                    model=chat_request.model or "openai/gpt-4o-mini"
-                )
-                
-                # Force name injection if LLM ignored it
-                if user_first_name not in response_text:
-                    response_text = f"{user_first_name}, " + response_text
-                    
-            except Exception as e:
-                print(f"LLM error: {e}")
-                response_text = f"{user_first_name}, I understand your message but I'm having technical difficulties right now."
+        try:
+            response_text = await model_service.chat_completion(
+                messages=messages,
+                model=chat_request.model or "openai/gpt-4o-mini"
+            )
+            print(f"DEBUG: Generated response: {response_text[:100]}...")
+        except Exception as e:
+            print(f"LLM error: {e}")
+            response_text = "I apologize, but I'm experiencing technical difficulties processing your request right now."
         
         # Store assistant response using intelligent memory system
         try:
@@ -1629,8 +1597,8 @@ async def update_conversation_topic_endpoint(conversation_id: str, request: Requ
 async def clear_memory_database():
     """Clear all data from Neo4j database"""
     try:
-        memory_system = MemorySystem()
-        with memory_system.driver.session() as session:
+        from intelligent_memory import intelligent_memory
+        with intelligent_memory.driver.session() as session:
             # Delete all nodes and relationships
             session.run("MATCH (n) DETACH DELETE n")
             

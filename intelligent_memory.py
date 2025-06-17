@@ -12,7 +12,19 @@ from datetime import datetime, timedelta
 from neo4j import GraphDatabase
 import openai
 import os
-from utils import generate_embedding
+# Embedding generation function
+def generate_embedding(text: str) -> List[float]:
+    """Generate embeddings using OpenAI API"""
+    try:
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text
+        )
+        return response.data[0].embedding
+    except Exception as e:
+        print(f"Embedding generation error: {e}")
+        return []
 
 class MemoryIntent(Enum):
     """Classification of user query intent for memory routing"""
@@ -57,25 +69,20 @@ class MemoryRouter:
     def classify_intent(self, text: str) -> MemoryIntent:
         """Classify user intent for memory routing"""
         text_lower = text.lower()
-        print(f"DEBUG: Classifying query: '{text_lower}'")
         
         # Check each intent pattern
         for intent, patterns in self.patterns.items():
             for pattern in patterns:
                 if re.search(pattern, text_lower):
-                    print(f"DEBUG: Matched pattern '{pattern}' for intent {intent.value}")
                     return intent
         
-        # Default to general knowledge if no memory patterns found
-        print(f"DEBUG: No patterns matched, defaulting to GENERAL_KNOWLEDGE")
-        return MemoryIntent.GENERAL_KNOWLEDGE
+        # Default to contextual for most queries - let memory system decide
+        return MemoryIntent.CONTEXTUAL
     
     def should_use_memory(self, intent: MemoryIntent) -> bool:
         """Determine if memory retrieval is needed"""
-        # Be much more inclusive - only skip obvious general knowledge queries
-        should_use = intent != MemoryIntent.GENERAL_KNOWLEDGE
-        print(f"DEBUG: Intent={intent.value}, Using memory={should_use}")
-        return should_use
+        # Use memory for most queries - only skip obvious general knowledge
+        return intent != MemoryIntent.GENERAL_KNOWLEDGE
 
 class ImportanceScorer:
     """Score the importance of content for memory storage"""
@@ -166,7 +173,7 @@ class IntelligentMemorySystem:
             return None
         
         # Generate embedding
-        embedding = generate_embedding(content)
+        embedding = self.generate_embedding(content)
         if not embedding:
             return None
         
