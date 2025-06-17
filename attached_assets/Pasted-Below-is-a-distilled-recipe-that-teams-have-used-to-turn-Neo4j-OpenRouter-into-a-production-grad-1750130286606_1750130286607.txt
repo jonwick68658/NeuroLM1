@@ -1,0 +1,167 @@
+Below is a distilled “recipe” that teams have used to turn Neo4j + OpenRouter into a production-grade, fast, non-forgetful chat system.  Feel free to copy / fork; swap in different libs or languages as you wish.
+
+────────────────────────────────────────
+1.  The Core Idea
+────────────────────────────────────────
+•  Store every user utterance, bot reply, extracted entity and long-term fact as a GRAPH.  
+•  Give each node its own text embedding so Neo4j can do instant vector + graph queries in one hop.  
+•  On every new message you:  
+   1. embed the user text,  
+   2. ask Neo4j for “Things most related to this + what this user talked about before”,  
+   3. feed only that small, trusted slice into the LLM through OpenRouter.  
+Result: the model always reasons over the right context and nothing else → fewer hallucinations, better recall, lower latency.
+
+────────────────────────────────────────
+2.  Graph Schema (minimal but battle-tested)
+────────────────────────────────────────
+(:Person {id})                                          – one per user  
+(:Conversation {id, startedAt})                         – one per session  
+(:Message {id, text, ts, role, embedding:Vector(1536)}) – every line (user or bot)  
+(:Entity  {name, type, embedding})                      – extracted nouns, people, orgs, dates …  
+(:Topic   {name, embedding})                            – optional higher-level “semantic memory”  
+
+RELATIONSHIPS  
+(Person)-[:PARTICIPATED_IN]->(Conversation)  
+(Conversation)-[:HAS_MESSAGE]->(Message)  
+(Message)-[:REFERS_TO]->(Entity)  
+(Entity)  -[:INSTANCE_OF]->(Topic)
+
+Add whatever else you need (tasks, files, calendar events, etc.).  
+Create a vector index on Message.embedding (and optionally Entity.embedding).
+
+────────────────────────────────────────
+3.  Ingestion / Write Path
+────────────────────────────────────────
+Pseudocode (TypeScript, but the flow is language-agnostic):
+
+```ts
+async function storeUserMessage(userId: string, text: string) {
+  const emb = await embed(text);                                // 1. OpenAI, Cohere, etc.
+  const ents = await nerAndChunk(text);                         // 2. SpaCy, transformers
+  await session.writeTransaction(tx => {
+    tx.run(`
+      MATCH (p:Person {id:$uid})-[:PARTICIPATED_IN]->(c:Conversation {id:$cid})
+      CREATE (m:Message {id: randomUUID(), text:$t, ts: timestamp(),
+                         role:'user', embedding:$e})
+      MERGE (c)-[:HAS_MESSAGE]->(m)
+      WITH m
+      UNWIND $entities AS ent
+        MERGE (e:Entity {name: ent.name, type: ent.type})
+        MERGE (m)-[:REFERS_TO]->(e)`,
+    {uid: userId, cid: activeConversation(userId), t: text, e: emb, entities: ents});
+  });
+}
+```
+
+────────────────────────────────────────
+4.  Retrieval / Read Path
+────────────────────────────────────────
+Cypher to grab the “working memory” in ~15 ms:
+
+```cypher
+// 1. Messages semantically similar to the new query
+CALL db.index.vector.queryNodes(
+  'messageEmbedding', 5, $queryEmbedding
+) YIELD node AS m1, score
+// 2. plus the last N messages in the current conversation
+MATCH (c:Conversation {id:$cid})-[:HAS_MESSAGE]->(m2:Message)
+WHERE m2.ts > timestamp() - $cutoffMs
+WITH collect(m1) + collect(m2) AS msgs
+UNWIND msgs AS m
+RETURN m.text ORDER BY m.ts LIMIT 20
+```
+
+Stream those 20 snippets into your prompt template:
+
+```
+System:
+You are MemoryBot.  Only use the facts in <memory></memory>.  
+<memory>
+{joined_messages}
+</memory>
+User: {current_user_msg}
+```
+
+────────────────────────────────────────
+5.  Chat Completion via OpenRouter
+────────────────────────────────────────
+Example request (Node fetch):
+
+```js
+const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer " + process.env.OPENROUTER_KEY,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "openai/gpt-4o-mini",          // or any other router-exposed model
+    stream: true,
+    messages: promptMessages,             // array of {role, content}
+    temperature: 0.2                      // keep it factual
+  })
+});
+```
+
+────────────────────────────────────────
+6.  Speed & Scale Tips
+────────────────────────────────────────
+1. Use Neo4j ≥ 5.12 with the built-in vector index (or the Neo4j/Helios plugin).  
+2. Keep embeddings at 384-768 dims if you need millisecond HNSW queries.  
+3. Batch-write embeddings; reuse the same embedding model for query + storage.  
+4. Run the LLM endpoint and Neo4j in the same region; network latency dominates once your queries drop below 20 ms.  
+5. For high QPS:  
+   •  Neo4j → 12 G RAM ≈ 10 M message nodes in memory.  
+   •  Put a 5–10 s Redis/LRU cache in front of identical RAG results.
+
+────────────────────────────────────────
+7.  Reducing Hallucinations Further
+────────────────────────────────────────
+•  Temperature ≤ 0.3, top_p ≤ 0.9.  
+•  Constrain the completion with: “If unsure, say ‘I don’t know based on the memory provided.’ ”  
+•  Add a second LLM pass that validates every factual triple (“quote + citation”) against the graph.  
+•  Log instances where the bot used external knowledge so you can insert missing facts into the graph later.
+
+────────────────────────────────────────
+8.  Human-Style Remembering (“Episodic vs. Semantic”)
+────────────────────────────────────────
+Episodic: raw conversational turns.  
+Semantic: distilled summaries (“Dana likes kayaking”).  
+Every night (or every 100 messages) run:
+
+```cypher
+MATCH (p:Person)-[:PARTICIPATED_IN]->(:Conversation)-[:HAS_MESSAGE]->(m:Message)
+WITH p, collect(m.text) AS texts
+CALL llm.summary(texts) YIELD summary
+MERGE (t:Topic {name: summary})
+MERGE (p)-[:INTEREST_IN]->(t)
+```
+
+Delete or archive older Message nodes → cheap “forgetting” that keeps the graph small and the bot’s personality stable.
+
+────────────────────────────────────────
+9.  Putting It All Together (Full Flow)
+────────────────────────────────────────
+1. User sends text → /chat.  
+2. You embed it, store it, tag entities.  
+3. Pull back: (k nearest messages + recent window + relevant semantic facts).  
+4. Compose prompt → OpenRouter → stream reply.  
+5. Embed the assistant reply, store it in the same graph.  
+6. Nightly cron does summarization / cleanup / re-index.  
+
+Latency budget in prod:
+•  5 ms  Neo4j retrieval  
+•  50-300 ms  LLM (depends on model)  
+•  sub-400 ms total round-trip for most chats
+
+────────────────────────────────────────
+10.  Next Steps & References
+────────────────────────────────────────
+•  Neo4j Docs: Vector indexing & GDS - neo4j.com/docs/operations-manual/5/indexes/vector  
+•  OpenRouter API: openrouter.ai/docs  
+•  LangChain-Neo4j: one-liner wrappers for embedding & Cypher  
+•  Memory architectures:  
+   – “Episodic Memory in Large Language Models” (Google, 2023)  
+   – “Generative Agents” (Park et al., 2023)
+
+With this blueprint you should be able to stand up a fast, context-aware, minimally-hallucinating chat system in a weekend and harden it over time.  Happy building!
