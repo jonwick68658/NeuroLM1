@@ -27,6 +27,16 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Global session storage (in production, use Redis or database)
 user_sessions = {}
 
+# Initialize intelligent memory system globally
+intelligent_memory_system = None
+try:
+    from intelligent_memory import IntelligentMemorySystem
+    intelligent_memory_system = IntelligentMemorySystem()
+    print("✅ Intelligent memory system initialized")
+except Exception as e:
+    print(f"❌ Failed to initialize intelligent memory: {e}")
+    intelligent_memory_system = None
+
 # Note: Sessions cleared on restart - users need to re-login
 
 def get_db_connection():
@@ -1263,20 +1273,19 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         
         # Use intelligent memory system for fast, smart retrieval
         context = ""
-        try:
-            from intelligent_memory import IntelligentMemorySystem
-            intelligent_memory = IntelligentMemorySystem()
-            context = await intelligent_memory.retrieve_memory(
-                query=chat_request.message,
-                user_id=user_id,
-                conversation_id=conversation_id
-            )
-            print(f"DEBUG: Intelligent memory retrieved: {len(context)} chars")
-            if context:
-                print(f"DEBUG: Memory context preview: {context[:200]}...")
-        except Exception as e:
-            print(f"Intelligent memory error (continuing without memory): {e}")
-            context = ""
+        if intelligent_memory_system:
+            try:
+                context = await intelligent_memory_system.retrieve_memory(
+                    query=chat_request.message,
+                    user_id=user_id,
+                    conversation_id=conversation_id
+                )
+                print(f"DEBUG: Intelligent memory retrieved: {len(context)} chars")
+                if context:
+                    print(f"DEBUG: Memory context preview: {context[:200]}...")
+            except Exception as e:
+                print(f"Intelligent memory error (continuing without memory): {e}")
+                context = ""
         
         # Check if user is asking about files and add file content to context
         file_query_keywords = ["file", "main.py", "analyze", "code", "script", "upload"]
@@ -1306,9 +1315,9 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         
         # Store user message using intelligent memory system
         user_memory_id = None
-        try:
-            if 'intelligent_memory' in locals():
-                user_memory_id = await intelligent_memory.store_memory(
+        if intelligent_memory_system:
+            try:
+                user_memory_id = await intelligent_memory_system.store_memory(
                     content=message_content,
                     user_id=user_id,
                     conversation_id=conversation_id,
@@ -1316,8 +1325,8 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
                 )
                 if user_memory_id:
                     print(f"DEBUG: Stored user message with ID: {user_memory_id}")
-        except Exception as e:
-            print(f"Error storing user message in intelligent memory: {e}")
+            except Exception as e:
+                print(f"Error storing user message in intelligent memory: {e}")
         
         # Generate response using LLM with memory context
         from model_service import ModelService
@@ -1355,9 +1364,9 @@ Instructions:
             response_text = "I apologize, but I'm experiencing technical difficulties processing your request right now."
         
         # Store assistant response using intelligent memory system
-        try:
-            if 'intelligent_memory' in locals():
-                assistant_memory_id = await intelligent_memory.store_memory(
+        if intelligent_memory_system:
+            try:
+                assistant_memory_id = await intelligent_memory_system.store_memory(
                     content=response_text,
                     user_id=user_id,
                     conversation_id=conversation_id,
@@ -1365,8 +1374,8 @@ Instructions:
                 )
                 if assistant_memory_id:
                     print(f"DEBUG: Stored assistant response with ID: {assistant_memory_id}")
-        except Exception as e:
-            print(f"Error storing assistant response in intelligent memory: {e}")
+            except Exception as e:
+                print(f"Error storing assistant response in intelligent memory: {e}")
         
         # Ensure conversation_id is not None before saving messages
         if conversation_id:
