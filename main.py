@@ -1264,7 +1264,8 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         # Use intelligent memory system for fast, smart retrieval
         context = ""
         try:
-            from intelligent_memory import intelligent_memory
+            from intelligent_memory import IntelligentMemorySystem
+            intelligent_memory = IntelligentMemorySystem()
             context = await intelligent_memory.retrieve_memory(
                 query=chat_request.message,
                 user_id=user_id,
@@ -1306,14 +1307,15 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         # Store user message using intelligent memory system
         user_memory_id = None
         try:
-            user_memory_id = await intelligent_memory.store_memory(
-                content=message_content,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                message_type="user"
-            )
-            if user_memory_id:
-                print(f"DEBUG: Stored user message with ID: {user_memory_id}")
+            if 'intelligent_memory' in locals():
+                user_memory_id = await intelligent_memory.store_memory(
+                    content=message_content,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    message_type="user"
+                )
+                if user_memory_id:
+                    print(f"DEBUG: Stored user message with ID: {user_memory_id}")
         except Exception as e:
             print(f"Error storing user message in intelligent memory: {e}")
         
@@ -1354,14 +1356,15 @@ Instructions:
         
         # Store assistant response using intelligent memory system
         try:
-            assistant_memory_id = await intelligent_memory.store_memory(
-                content=response_text,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                message_type="assistant"
-            )
-            if assistant_memory_id:
-                print(f"DEBUG: Stored assistant response with ID: {assistant_memory_id}")
+            if 'intelligent_memory' in locals():
+                assistant_memory_id = await intelligent_memory.store_memory(
+                    content=response_text,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    message_type="assistant"
+                )
+                if assistant_memory_id:
+                    print(f"DEBUG: Stored assistant response with ID: {assistant_memory_id}")
         except Exception as e:
             print(f"Error storing assistant response in intelligent memory: {e}")
         

@@ -144,6 +144,19 @@ class IntelligentMemorySystem:
         
         self._setup_vector_index()
     
+    def generate_embedding(self, text: str) -> List[float]:
+        """Generate embeddings using OpenAI API"""
+        try:
+            client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=text
+            )
+            return response.data[0].embedding
+        except Exception as e:
+            print(f"Embedding generation error: {e}")
+            return []
+    
     def _setup_vector_index(self):
         """Setup Neo4j vector index for fast semantic search"""
         try:
@@ -223,7 +236,7 @@ class IntelligentMemorySystem:
             return ""
         
         # Generate query embedding
-        query_embedding = generate_embedding(query)
+        query_embedding = self.generate_embedding(query)
         if not query_embedding:
             return ""
         
