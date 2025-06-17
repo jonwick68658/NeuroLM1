@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Form, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
-from memory_api import *
+# Memory API removed - using intelligent_memory directly
 from pydantic import BaseModel
 import uvicorn
 import os
@@ -19,15 +19,13 @@ app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
 # Add session middleware
 app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 
-# Include memory API routes
-app.include_router(router, prefix="/api")
+# Router removed - simplified API structure
 
 # Mount static files for PWA
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Global session storage (in production, use Redis or database)
 user_sessions = {}
-memory_system = MemorySystem()
 
 # Note: Sessions cleared on restart - users need to re-login
 
@@ -777,19 +775,7 @@ def create_user_in_db(first_name: str, username: str, email: str, password_hash:
         cursor.close()
         conn.close()
         
-        # Create user in Neo4j
-        try:
-            with memory_system.driver.session() as session:
-                session.run(
-                    "CREATE (u:User {id: $id, first_name: $first_name, username: $username, email: $email, password_hash: $password_hash, created_at: datetime()})",
-                    id=user_id,
-                    first_name=first_name,
-                    username=username,
-                    email=email,
-                    password_hash=password_hash
-                )
-        except Exception as neo4j_error:
-            print(f"Neo4j user creation failed (non-critical): {neo4j_error}")
+        # Neo4j user creation removed - handled by intelligent_memory when needed
         
         return True
         
