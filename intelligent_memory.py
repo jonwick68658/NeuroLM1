@@ -34,7 +34,9 @@ class MemoryRouter:
                 r'\b(what do you know about my|tell me about my|what about my)\b',
                 r'\b(about my|my.*\?|know.*about.*me)\b',
                 r'\b(who am i|what is my name|my name)\b',
-                r'\b(tell me about myself|about me|know me)\b'
+                r'\b(tell me about myself|about me|know me)\b',
+                r'\b(can.*remember|memory|recall|information|conversations|talked)\b',
+                r'\b(answer.*from.*earlier|previous.*conversations|what.*testing)\b'
             ],
             MemoryIntent.RECALL_FACTUAL: [
                 r'\b(what\'s my|my email|my phone|my address|my birthday)\b',
@@ -55,23 +57,25 @@ class MemoryRouter:
     def classify_intent(self, text: str) -> MemoryIntent:
         """Classify user intent for memory routing"""
         text_lower = text.lower()
+        print(f"DEBUG: Classifying query: '{text_lower}'")
         
         # Check each intent pattern
         for intent, patterns in self.patterns.items():
             for pattern in patterns:
                 if re.search(pattern, text_lower):
+                    print(f"DEBUG: Matched pattern '{pattern}' for intent {intent.value}")
                     return intent
         
         # Default to general knowledge if no memory patterns found
+        print(f"DEBUG: No patterns matched, defaulting to GENERAL_KNOWLEDGE")
         return MemoryIntent.GENERAL_KNOWLEDGE
     
     def should_use_memory(self, intent: MemoryIntent) -> bool:
         """Determine if memory retrieval is needed"""
-        return intent in [
-            MemoryIntent.RECALL_PERSONAL,
-            MemoryIntent.RECALL_FACTUAL,
-            MemoryIntent.CONTEXTUAL
-        ]
+        # Be much more inclusive - only skip obvious general knowledge queries
+        should_use = intent != MemoryIntent.GENERAL_KNOWLEDGE
+        print(f"DEBUG: Intent={intent.value}, Using memory={should_use}")
+        return should_use
 
 class ImportanceScorer:
     """Score the importance of content for memory storage"""
