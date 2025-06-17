@@ -1409,8 +1409,8 @@ Key instructions:
         return ChatResponse(
             response=response_text,
             memory_stored=True,
-            context_used=len(relevant_memories) if relevant_memories else 0,
-            conversation_id=conversation_id
+            context_used=1 if context else 0,
+            conversation_id=conversation_id or ""
         )
         
     except Exception as e:

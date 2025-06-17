@@ -144,7 +144,7 @@ class IntelligentMemorySystem:
         except Exception as e:
             print(f"❌ Vector index setup failed: {e}")
     
-    async def store_memory(self, content: str, user_id: str, conversation_id: str, 
+    async def store_memory(self, content: str, user_id: str, conversation_id: Optional[str], 
                           message_type: str = "user") -> Optional[str]:
         """Store memory with intelligent importance scoring"""
         
@@ -179,7 +179,7 @@ class IntelligentMemorySystem:
                 """, {
                     'content': content,
                     'user_id': user_id,
-                    'conversation_id': conversation_id,
+                    'conversation_id': conversation_id or "",
                     'message_type': message_type,
                     'importance': importance,
                     'embedding': embedding
@@ -192,7 +192,7 @@ class IntelligentMemorySystem:
             print(f"Error storing memory: {e}")
             return None
     
-    async def retrieve_memory(self, query: str, user_id: str, conversation_id: str, 
+    async def retrieve_memory(self, query: str, user_id: str, conversation_id: Optional[str], 
                             limit: int = 5) -> str:
         """Intelligent memory retrieval using hybrid approach"""
         
@@ -216,44 +216,38 @@ class IntelligentMemorySystem:
                     CALL db.index.vector.queryNodes('memory_embedding_index', $limit, $query_embedding)
                     YIELD node AS semantic_memory, score
                     WHERE semantic_memory.user_id = $user_id
+                    RETURN semantic_memory.content AS content, 
+                           semantic_memory.importance AS importance,
+                           score,
+                           semantic_memory.timestamp AS timestamp,
+                           'semantic' AS type
+                    
+                    UNION
                     
                     // Recent conversation window
-                    WITH collect({
-                        content: semantic_memory.content,
-                        importance: semantic_memory.importance,
-                        score: score,
-                        timestamp: semantic_memory.timestamp,
-                        type: 'semantic'
-                    }) AS semantic_results
-                    
                     MATCH (recent:IntelligentMemory)
                     WHERE recent.user_id = $user_id 
                     AND recent.conversation_id = $conversation_id
                     AND recent.timestamp > datetime() - duration('PT30M')
+                    RETURN recent.content AS content,
+                           recent.importance AS importance, 
+                           0.5 AS score,
+                           recent.timestamp AS timestamp,
+                           'recent' AS type
                     
-                    WITH semantic_results + collect({
-                        content: recent.content,
-                        importance: recent.importance,
-                        score: 0.5,
-                        timestamp: recent.timestamp,
-                        type: 'recent'
-                    }) AS all_memories
-                    
-                    UNWIND all_memories AS memory
-                    RETURN memory
-                    ORDER BY memory.importance DESC, memory.score DESC, memory.timestamp DESC
+                    ORDER BY importance DESC, score DESC, timestamp DESC
                     LIMIT $limit
                 """, {
                     'query_embedding': query_embedding,
                     'user_id': user_id,
-                    'conversation_id': conversation_id,
+                    'conversation_id': conversation_id or "",
                     'limit': limit
                 })
                 
                 memories = []
                 for record in result:
-                    memory = record['memory']
-                    memories.append(f"- {memory['content']}")
+                    content = record['content']
+                    memories.append(f"- {content}")
                 
                 return "\n".join(memories) if memories else ""
                 
