@@ -32,7 +32,9 @@ class MemoryRouter:
                 r'\b(what did i tell you|do you remember|you know that i|i mentioned|we discussed)\b',
                 r'\b(remember when|you said|i told you|as i said)\b',
                 r'\b(what do you know about my|tell me about my|what about my)\b',
-                r'\b(about my|my.*\?|know.*about.*me)\b'
+                r'\b(about my|my.*\?|know.*about.*me)\b',
+                r'\b(who am i|what is my name|my name)\b',
+                r'\b(tell me about myself|about me|know me)\b'
             ],
             MemoryIntent.RECALL_FACTUAL: [
                 r'\b(what\'s my|my email|my phone|my address|my birthday)\b',
@@ -41,7 +43,8 @@ class MemoryRouter:
             ],
             MemoryIntent.CONTEXTUAL: [
                 r'\b(how does this relate|like we talked about|similar to what)\b',
-                r'\b(based on what|given what we discussed)\b'
+                r'\b(based on what|given what we discussed)\b',
+                r'\b(hello|hi|hey)\b'
             ],
             MemoryIntent.STORE_FACT: [
                 r'\b(my .* is|i am|i work|i live|i like|i don\'t like)\b',
@@ -217,7 +220,7 @@ class IntelligentMemorySystem:
                 result = session.run("""
                     CALL db.index.vector.queryNodes('memory_embedding_index', $limit, $query_embedding)
                     YIELD node, score
-                    WHERE node.user_id = $user_id AND score > 0.7
+                    WHERE node.user_id = $user_id AND score > 0.3
                     RETURN node.content AS content, score
                     ORDER BY score DESC
                 """, {
