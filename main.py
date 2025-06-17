@@ -1275,39 +1275,21 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
             except Exception as e:
                 print(f"Error getting conversation topic: {e}")
         
-        # Get memory system instance with error handling
-        relevant_memories = []
-        try:
-            memory_system = MemorySystem()
-            relevant_memories = memory_system.retrieve_memories(
-                query=chat_request.message,
-                context="",
-                depth=5,
-                user_id=user_id,
-                current_topic=current_topic,
-                current_subtopic=current_subtopic,
-                search_scope=search_scope
-            )
-        except Exception as e:
-            print(f"Memory system error (continuing without memory): {e}")
-            relevant_memories = []
-        
-        # Debug logging with topic context
-        print(f"DEBUG: Query: {chat_request.message}")
-        print(f"DEBUG: User ID: {user_id}")
-        print(f"DEBUG: Current Topic: {current_topic}")
-        print(f"DEBUG: Current Subtopic: {current_subtopic}")
-        print(f"DEBUG: Search Scope: {search_scope}")
-        print(f"DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
-        if relevant_memories:
-            for i, mem in enumerate(relevant_memories[:3]):
-                print(f"DEBUG: Memory {i+1}: {mem.content[:100]}...")
-        
-        # Build context from memories
+        # Use intelligent memory system for fast, smart retrieval
         context = ""
-        if relevant_memories:
-            context = "\n".join([f"- {mem.content}" for mem in relevant_memories[:5]])
-            print(f"DEBUG: Built context: {context[:200]}...")
+        try:
+            from intelligent_memory import intelligent_memory
+            context = await intelligent_memory.retrieve_memory(
+                query=chat_request.message,
+                user_id=user_id,
+                conversation_id=conversation_id
+            )
+            print(f"DEBUG: Intelligent memory retrieved: {len(context)} chars")
+            if context:
+                print(f"DEBUG: Memory context preview: {context[:200]}...")
+        except Exception as e:
+            print(f"Intelligent memory error (continuing without memory): {e}")
+            context = ""
         
         # Check if user is asking about files and add file content to context
         file_query_keywords = ["file", "main.py", "analyze", "code", "script", "upload"]
@@ -1346,29 +1328,19 @@ Relevant memories:
 
 Respond naturally to the user's message, incorporating relevant memories when helpful. You can address the user by their name when appropriate."""
 
-        # Store user message in memory with topic context
+        # Store user message using intelligent memory system
         user_memory_id = None
         try:
-            if 'memory_system' in locals():
-                user_memory_id = memory_system.add_memory(
-                    f"User said: {message_content}", 
-                    user_id=user_id,
-                    topic=current_topic,
-                    subtopic=current_subtopic
-                )
+            user_memory_id = await intelligent_memory.store_memory(
+                content=message_content,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_type="user"
+            )
+            if user_memory_id:
+                print(f"DEBUG: Stored user message with ID: {user_memory_id}")
         except Exception as e:
-            print(f"Error storing user message in memory: {e}")
-        
-        # Create memory link if /link command was used
-        if link_topic and user_memory_id:
-            try:
-                link_success = create_memory_link(user_memory_id, link_topic, user_id)
-                if link_success:
-                    print(f"DEBUG: Created memory link from {user_memory_id} to topic '{link_topic}'")
-                else:
-                    print(f"DEBUG: Failed to create memory link to topic '{link_topic}'")
-            except Exception as e:
-                print(f"Error creating memory link: {e}")
+            print(f"Error storing user message in intelligent memory: {e}")
         
         # Create LLM messages with memory context
         system_message = {
@@ -1404,21 +1376,22 @@ Key instructions:
         except Exception as e:
             # Fallback response if LLM fails
             response_text = f"I understand your message about '{chat_request.message}'. "
-            if relevant_memories:
-                response_text += f"This connects to {len(relevant_memories)} memories I have. "
+            if context:
+                response_text += "This connects to your previous conversations. "
             response_text += "I'm having trouble generating a full response right now."
         
-        # Store assistant response in memory with topic context
+        # Store assistant response using intelligent memory system
         try:
-            if 'memory_system' in locals():
-                assistant_memory_id = memory_system.add_memory(
-                    f"Assistant responded: {response_text}", 
-                    user_id=user_id,
-                    topic=current_topic,
-                    subtopic=current_subtopic
-                )
+            assistant_memory_id = await intelligent_memory.store_memory(
+                content=response_text,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_type="assistant"
+            )
+            if assistant_memory_id:
+                print(f"DEBUG: Stored assistant response with ID: {assistant_memory_id}")
         except Exception as e:
-            print(f"Error storing assistant response in memory: {e}")
+            print(f"Error storing assistant response in intelligent memory: {e}")
         
         # Ensure conversation_id is not None before saving messages
         if conversation_id:
