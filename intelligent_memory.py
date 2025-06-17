@@ -196,6 +196,8 @@ class IntelligentMemorySystem:
                 
         except Exception as e:
             print(f"Error storing memory: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     async def retrieve_memory(self, query: str, user_id: str, conversation_id: Optional[str], 
