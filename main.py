@@ -1602,6 +1602,62 @@ async def update_conversation_topic_endpoint(conversation_id: str, request: Requ
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating conversation topic: {str(e)}")
 
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str, request: Request):
+    """Delete a conversation and all its memories"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        # Verify the conversation belongs to the user
+        conversations = get_user_conversations(user_id, limit=1000, offset=0)
+        conversation_exists = any(conv['id'] == conversation_id for conv in conversations['conversations'])
+        
+        if not conversation_exists:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        # Delete from Neo4j intelligent memory system
+        try:
+            if intelligent_memory_system:
+                with intelligent_memory_system.driver.session() as session:
+                    result = session.run("""
+                        MATCH (m:IntelligentMemory)
+                        WHERE m.conversation_id = $conversation_id AND m.user_id = $user_id
+                        DELETE m
+                        RETURN count(*) as deleted_count
+                    """, {
+                        'conversation_id': conversation_id,
+                        'user_id': user_id
+                    })
+                    deleted_memories = result.single()['deleted_count']
+                    print(f"Deleted {deleted_memories} memories from Neo4j")
+        except Exception as e:
+            print(f"Error deleting memories from Neo4j: {e}")
+            # Continue with PostgreSQL deletion even if Neo4j fails
+        
+        # Delete from PostgreSQL
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Delete conversation messages first (foreign key constraint)
+        cursor.execute("DELETE FROM conversation_messages WHERE conversation_id = %s", (conversation_id,))
+        
+        # Delete the conversation
+        cursor.execute("DELETE FROM conversations WHERE id = %s AND user_id = %s", (conversation_id, user_id))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {"success": True, "message": "Conversation and memories deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting conversation: {str(e)}")
+
 # Clear database endpoint
 @app.post("/api/clear-memory")
 async def clear_memory_database():

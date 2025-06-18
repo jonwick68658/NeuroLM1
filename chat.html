@@ -311,6 +311,10 @@
             cursor: pointer;
             transition: background 0.3s;
             border: 1px solid transparent;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .conversation-item:hover {
@@ -321,6 +325,158 @@
             background: var(--primary-color);
             color: white;
             border-color: var(--primary-color);
+        }
+
+        .conversation-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .conversation-menu {
+            position: relative;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .conversation-item:hover .conversation-menu {
+            opacity: 1;
+        }
+
+        .menu-button {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #666;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+
+        .menu-button:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .conversation-item.active .menu-button {
+            color: white;
+        }
+
+        .conversation-item.active .menu-button:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 150px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-size: 0.9rem;
+            color: var(--dark-text);
+            transition: background 0.3s;
+        }
+
+        .dropdown-item:hover {
+            background: var(--light-bg);
+        }
+
+        .dropdown-item.delete {
+            color: #dc3545;
+        }
+
+        .dropdown-item.delete:hover {
+            background: #ffeaea;
+        }
+
+        /* Confirmation Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal h3 {
+            margin: 0 0 1rem 0;
+            color: var(--dark-text);
+            font-size: 1.2rem;
+        }
+
+        .modal p {
+            margin: 0 0 1.5rem 0;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .modal-button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .modal-button.cancel {
+            background: #f8f9fa;
+            color: var(--dark-text);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-button.cancel:hover {
+            background: #e9ecef;
+        }
+
+        .modal-button.delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-button.delete:hover {
+            background: #c82333;
         }
 
         .conversation-title {
@@ -998,6 +1154,18 @@
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <h3>Delete Conversation</h3>
+            <p>Delete this conversation and all its memories? This cannot be undone.</p>
+            <div class="modal-buttons">
+                <button class="modal-button cancel" id="cancelDeleteBtn">Cancel</button>
+                <button class="modal-button delete" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
@@ -1024,6 +1192,12 @@
         const removeTopicBtn = document.getElementById('removeTopicBtn');
         const cancelTopicBtn = document.getElementById('cancelTopicBtn');
         const topicDisplayText = document.getElementById('topicDisplayText');
+        
+        // Delete modal elements
+        const deleteModal = document.getElementById('deleteModal');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        let conversationToDelete = null;
         
         let selectedModel = 'cerebras/llama-4-scout-17b-16e-instruct';
         let allModels = [];

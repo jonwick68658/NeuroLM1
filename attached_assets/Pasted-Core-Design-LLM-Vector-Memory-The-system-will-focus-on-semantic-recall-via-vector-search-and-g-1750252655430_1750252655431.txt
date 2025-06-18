@@ -1,0 +1,128 @@
+Core Design: LLM + Vector Memory
+The system will focus on semantic recall (via vector search) and grounded responses (using memories to constrain LLM output). Here’s the breakdown:
+
+1. Components
+Component	Tool/Service	Purpose
+LLM API	OpenRouter or OpenAI API	Generate embeddings, process queries, and generate responses.
+Vector Database	FAISS (local) or Pinecone (managed)	Store embeddings of memories for fast semantic search.
+Memory Storage	JSON/CSV (simple) or SQLite (optional)	Store raw memories (text, timestamp, metadata) for context.
+2. Workflow
+Step 1: Store Memories
+Input: User/assistant interactions (e.g., "I’m building a memory system with Neo4j").
+Process:
+Use the LLM API to generate an embedding for the memory (e.g., text-embedding-ada-002 from OpenAI).
+Store the embedding in the vector database (FAISS/Pinecone) with metadata (timestamp, raw text).
+Optionally, store the raw text in a simple database (SQLite/JSON) for context.
+Step 2: Recall Memories
+Input: User query (e.g., "What did I say about graph databases?").
+Process:
+Generate an embedding for the query using the same LLM API.
+Search the vector database for top-k similar embeddings (e.g., k=5) using cosine similarity.
+Retrieve the raw text of the top-k memories (from SQLite/JSON).
+Step 3: Generate Response
+Input: User query + retrieved memories.
+Process:
+Construct a prompt that includes the query and retrieved memories (e.g., "Use these memories to answer: [memory 1], [memory 2]...").
+Send the prompt to the LLM API to generate a response.
+Grounding: The LLM is forced to reference the retrieved memories, reducing hallucinations.
+3. Tools & Code (Simplified)
+Here’s a minimal Python example using OpenAI’s API and FAISS:
+
+Dependencies
+pip install openai faiss-cpu numpy  
+Copy
+Code
+import openai  
+import faiss  
+import numpy as np  
+import json  
+
+# Config  
+OPENAI_API_KEY = "your_openai_key"  
+OPENROUTER_API_KEY = "your_openrouter_key"  # Optional  
+EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's embedding model  
+LLM_MODEL = "gpt-3.5-turbo"  # Or OpenRouter model (e.g., "claude-2")  
+
+# Initialize vector DB (FAISS)  
+dim = 1536  # Embedding dimension for text-embedding-ada-002  
+index = faiss.IndexFlatL2(dim)  # L2 distance for cosine similarity (normalize vectors)  
+
+# Store memories (example)  
+memories = [  
+    {"text": "I’m building a memory system with Neo4j.", "timestamp": "2024-03-01"},  
+    {"text": "Graph databases handle relationships well.", "timestamp": "2024-03-02"},  
+    {"text": "Vector databases optimize for similarity searches.", "timestamp": "2024-03-03"}  
+]  
+
+# Embed and store memories  
+for memory in memories:  
+    response = openai.Embedding.create(  
+        input=memory["text"],  
+        model=EMBEDDING_MODEL  
+    )  
+    embedding = np.array(response["data"][0]["embedding"], dtype="float32")  
+    # Normalize for cosine similarity  
+    faiss.normalize_L2(embedding.reshape(1, -1))  
+    index.add(embedding.reshape(1, -1))  
+    # Store raw text (optional: use SQLite/JSON)  
+    with open("memories.json", "a") as f:  
+        f.write(json.dumps(memory) + "\n")  
+
+# Query function  
+def recall(query, k=5):  
+    # Generate query embedding  
+    response = openai.Embedding.create(  
+        input=query,  
+        model=EMBEDDING_MODEL  
+    )  
+    query_embedding = np.array(response["data"][0]["embedding"], dtype="float32")  
+    faiss.normalize_L2(query_embedding.reshape(1, -1))  
+
+    # Search vector DB  
+    distances, indices = index.search(query_embedding.reshape(1, -1), k)  
+
+    # Retrieve raw memories  
+    retrieved = []  
+    with open("memories.json", "r") as f:  
+        for line in f:  
+            memory = json.loads(line)  
+            retrieved.append(memory)  
+
+    # Return top-k memories  
+    return [retrieved[i] for i in indices[0]]  
+
+# Generate response  
+def generate_response(query, memories):  
+    # Build prompt  
+    prompt = f"""Use these memories to answer the query. Be concise and accurate.  
+
+Query: {query}  
+
+Memories:  
+{chr(10).join([f'- {m["text"]}' for m in memories])}  
+
+Answer:"""  
+
+    # Call LLM  
+    response = openai.ChatCompletion.create(  
+        model=LLM_MODEL,  
+        messages=[{"role": "user", "content": prompt}],  
+        api_key=OPENAI_API_KEY  
+    )  
+    return response["choices"][0]["message"]["content"]  
+
+# Example usage  
+query = "What did I say about graph databases?"  
+retrieved_memories = recall(query)  
+answer = generate_response(query, retrieved_memories)  
+print(answer)  
+Copy
+4. Key Features
+Fast Recall: Vector search (FAISS) is sub-millisecond for small datasets; scales to millions with Pinecone.
+No Hallucinations: Responses are grounded in retrieved memories (the LLM can’t ignore them).
+Simple: Uses off-the-shelf tools (OpenAI API, FAISS) with minimal code.
+Robust: Error handling (e.g., API retries) can be added, but the core is straightforward.
+5. Upgrades (If Needed)
+Graph DB: Add Neo4j if you need relational recall (e.g., "Find memories where Ryan mentioned Neo4j").
+Caching: Use Redis to cache frequent queries (e.g., recent conversations).
+Hybrid Search: Combine vector search (semantic) and keyword search (e.g., Elasticsearch) for better recall.
