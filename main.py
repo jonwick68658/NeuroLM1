@@ -1333,20 +1333,18 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         model_service = ModelService()
         
         # Create system message with user context and memories
-        system_content = f"""You are a helpful AI assistant with access to conversation history.
+        system_content = f"""You are a helpful AI assistant with access to conversation history with {user_first_name or "the user"}.
 
-User Information:
-- Name: {user_first_name or "User"}
+IMPORTANT: The following are actual previous conversations and messages from your chat history with this user. These are REAL memories, not hypothetical:
 
-Previous conversation memories:
 {context if context else "No previous conversation history available."}
 
 Instructions:
-- Be natural and conversational
-- Address the user by name when appropriate
-- Reference relevant information from previous conversations when helpful
-- Answer questions directly and thoroughly
-- If no previous context exists, respond normally as you would to any user"""
+- Use the conversation history above to maintain continuity
+- Reference specific details from previous conversations when relevant
+- Be consistent with what you remember from past interactions
+- If the user asks about previous conversations, refer to the actual content above
+- Do not contradict information from your previous responses shown above"""
 
         messages = [
             {"role": "system", "content": system_content},

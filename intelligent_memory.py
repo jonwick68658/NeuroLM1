@@ -258,7 +258,8 @@ class IntelligentMemorySystem:
                 memories = []
                 for record in result:
                     content = record['content']
-                    memories.append(f"- {content}")
+                    score = record['score']
+                    memories.append(f"Previous message: {content}")
                 
                 # Also get recent conversation context if no semantic matches
                 if not memories and conversation_id:
@@ -267,16 +268,21 @@ class IntelligentMemorySystem:
                         WHERE m.user_id = $user_id 
                         AND m.conversation_id = $conversation_id
                         AND m.timestamp > datetime() - duration('PT1H')
-                        RETURN m.content AS content
+                        RETURN m.content AS content, m.message_type AS type
                         ORDER BY m.timestamp DESC
-                        LIMIT 3
+                        LIMIT 5
                     """, {
                         'user_id': user_id,
                         'conversation_id': conversation_id
                     })
                     
                     for record in recent_result:
-                        memories.append(f"- {record['content']}")
+                        msg_type = record['type']
+                        content = record['content']
+                        if msg_type == 'user':
+                            memories.append(f"User previously said: {content}")
+                        else:
+                            memories.append(f"You previously responded: {content}")
                 
                 return "\n".join(memories) if memories else ""
                 
