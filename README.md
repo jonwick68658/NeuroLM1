@@ -1,33 +1,33 @@
 # NeuroLM - Advanced AI Memory System
 
-An intelligent AI chat system with integrated memory, topic organization, and personalized user management. Features progressive loading, conversation management, and dynamic topic assignment for optimal performance and organization.
+An intelligent AI chat system with integrated memory, topic organization, and personalized user management. Features semantic memory retrieval, conversation management, and intelligent context routing for optimal performance and organization.
 
 ## 🚀 DEPLOYMENT STATUS: READY
-Container optimized from 8+ GiB to deployment-ready size through strategic exclusions while preserving complete Neo4j memory functionality.
+Production-ready with intelligent memory routing, Google Gemini 1M+ context support, and streamlined OpenRouter-only architecture.
 
 ## Features
 
-- **Interactive Chat Interface**: Clean, professional web interface with markdown rendering and unlimited input capacity
-- **User-Isolated Memory System**: Neo4j graph database with complete user authentication and memory isolation
-- **Semantic Memory Relationships**: Automatic creation of RELATES_TO connections between similar memories
-- **Complete Model Selection**: Searchable dropdown with all 323+ OpenRouter AI models
-- **Memory-Informed Responses**: AI responses use relevant memories from previous conversations within user scope
+- **Interactive Chat Interface**: Clean, responsive web interface with markdown rendering and unlimited input capacity
+- **Intelligent Memory System**: Neo4j graph database with smart context retrieval and user isolation
+- **Semantic Memory Routing**: AI-powered intent classification for optimal memory retrieval
+- **Large Context Models**: Google Gemini models with 1M+ token context windows via OpenRouter
+- **Memory-Informed Responses**: AI responses enhanced with relevant context from previous conversations
 - **Rich Text Formatting**: Full markdown support with syntax highlighting and copy buttons
-- **Real-time Learning**: Every conversation builds semantic memory networks and strengthens relationships
+- **Real-time Learning**: Automatic importance scoring and fact extraction from conversations
 - **User Authentication**: Secure registration and login system with session management
-- **Memory Management**: Visual memory graph interface for exploring stored knowledge networks
-- **File Upload System**: Direct file upload with paperclip button, PostgreSQL storage, and AI file access integration
+- **Conversation Management**: Topic organization, conversation deletion, and history browsing
+- **File Upload System**: Direct file upload with AI integration and PostgreSQL storage
 
 ## Technology Stack
 
-- **Frontend**: Custom HTML/CSS with JavaScript, Marked.js for markdown rendering
-- **Backend**: FastAPI with cookie-based authentication for secure user sessions
-- **Database**: Neo4j graph database with vector storage and relationship mapping + PostgreSQL for file storage
-- **AI Models**: OpenRouter API with 323+ models (GPT, Claude, Gemini, Llama, Mistral, etc.)
-- **Embeddings**: OpenAI text-embedding-3-small for semantic similarity and relationship detection
-- **Memory Architecture**: User-isolated Neo4j system with HAS_MEMORY and RELATES_TO relationships
-- **File System**: PostgreSQL storage with direct AI access for uploaded documents
-- **UI Features**: Unlimited input capacity, searchable model selector, markdown rendering with copy functionality
+- **Frontend**: Custom HTML/CSS with JavaScript, responsive design, PWA support
+- **Backend**: FastAPI with cookie-based authentication and async processing
+- **Memory Database**: Neo4j graph database with vector embeddings and semantic search
+- **User Database**: PostgreSQL for user data, conversations, and file storage
+- **AI Integration**: OpenRouter API (Google Gemini, GPT-4o, Claude, Llama, etc.)
+- **Embeddings**: OpenAI text-embedding-3-small for semantic similarity
+- **Memory Architecture**: Intelligent routing with importance scoring and fact extraction
+- **UI Features**: Progressive loading, mobile PWA, searchable model selector
 
 ## Quick Start
 
@@ -35,9 +35,11 @@ Container optimized from 8+ GiB to deployment-ready size through strategic exclu
    Set these environment variables:
    ```
    OPENROUTER_API_KEY=your_openrouter_key
+   OPENAI_API_KEY=your_openai_key
    NEO4J_URI=your_neo4j_uri  
-   NEO4J_USERNAME=your_username
-   NEO4J_PASSWORD=your_password
+   NEO4J_USER=your_neo4j_username
+   NEO4J_PASSWORD=your_neo4j_password
+   DATABASE_URL=your_postgresql_url
    ```
 
 2. **Run the Application**:
@@ -47,78 +49,103 @@ Container optimized from 8+ GiB to deployment-ready size through strategic exclu
 
 3. **Access the Interface**:
    - Chat Interface: `http://localhost:5000`
+   - Register a new account or login to start chatting
 
 ## Usage
 
 ### Chat Interface
 - Start conversations that build persistent memory over time
-- Search and select from 323+ AI models using the autocomplete dropdown
+- Select from Google Gemini (1M+ context), GPT-4o, Claude, and other models
 - Multi-line text input with Shift+Enter support for complex messages
 - Rich markdown formatting in AI responses with copy functionality
-- View memory context information with each response
+- View intelligent memory context with each response
 - Upload files using the paperclip button for AI analysis and discussion
+- Organize conversations by topics and subtopics
+- Delete conversations with confirmation modal
 
-### Memory System
-- Automatically stores all conversations in Neo4j
-- Retrieves relevant memories to inform AI responses
-- Builds semantic connections between related topics
-- Maintains conversation history across sessions
+### Intelligent Memory System
+- AI-powered intent classification routes queries optimally
+- Automatic importance scoring determines what to remember
+- Semantic similarity search finds relevant context
+- Fact extraction from conversations builds knowledge base
+- User-isolated memory ensures privacy and personalization
 
 ## API Endpoints
 
-- `POST /api/chat` - Send messages and receive AI responses
+### Chat & Memory
+- `POST /api/chat` - Send messages and receive AI responses with memory context
+- `GET /api/models` - Get available AI models from OpenRouter
 - `POST /api/upload-file` - Upload files for AI analysis and storage
-- `POST /api/memorize/` - Store new memories
-- `POST /api/retrieve/` - Retrieve relevant memories
-- `PUT /api/enhance/{memory_id}` - Enhance memory importance
-- `PUT /api/forget/{memory_id}` - Remove specific memories
-- `POST /api/clear-memory` - Clear all stored memories
+- `GET /api/user-files` - Get user's uploaded files
+
+### Conversations
+- `GET /api/conversations` - Get paginated conversation list
+- `POST /api/conversations` - Create new conversation
+- `GET /api/conversations/{id}/messages` - Get conversation messages
+- `PUT /api/conversations/{id}/topic` - Update conversation topic
+- `DELETE /api/conversations/{id}` - Delete conversation and memories
+
+### Topics & Organization
+- `GET /api/topics` - Get user's topics and subtopics
+- `POST /api/topics` - Create new topic
+- `POST /api/topics/{topic}/subtopics` - Create subtopic
+
+### User Management
+- `POST /register` - User registration
+- `POST /login` - User authentication
+- `GET /api/user/name` - Get current user's name
 
 ## Architecture
 
-### Memory System Core
-- **Neo4j Integration**: Single database for both graph relationships and vector storage
-- **Semantic Search**: OpenAI embeddings stored as node properties
-- **Context Retrieval**: Relevant memories included in AI conversations
-- **Automatic Learning**: Every interaction strengthens the memory network
+### Intelligent Memory System
+The core innovation is the intelligent memory routing system that combines:
 
-### Chat Flow
-1. User sends message
-2. System retrieves relevant memories from Neo4j
-3. Memories provide context to AI model
-4. AI generates informed response
-5. Both user message and response stored as new memories
+1. **Intent Classification**: AI determines whether queries need memory retrieval
+2. **Importance Scoring**: Multi-factor analysis decides what information to store
+3. **Semantic Retrieval**: Vector embeddings find contextually relevant memories
+4. **Fact Extraction**: Structured information extraction from conversations
 
-## Deployment Optimizations Applied
+### Memory Flow
+1. User sends message to chat interface
+2. Intent classifier determines if memory retrieval needed
+3. If needed, semantic search finds relevant context from Neo4j
+4. Context enhances AI model prompt for informed response
+5. Importance scorer evaluates response for storage
+6. Facts extracted and stored with embeddings in Neo4j
 
-### Container Size Reduction (8+ GiB → <2 GiB)
-- **Cache Exclusion**: .dockerignore prevents inclusion of .cache, .uvm, __pycache__ directories
-- **Asset Optimization**: 535KB PNG icon replaced with 560-byte SVG (99.9% reduction)  
-- **Dependency Cleanup**: Removed unused psycopg2-pool dependency
-- **Development File Exclusion**: Git history, build artifacts, and attached assets excluded
-
-### Memory System Enhancements
-- **Hybrid Retrieval**: Keyword-based search for name queries + semantic embeddings
-- **User ID Debugging**: Proper user isolation with comprehensive logging
-- **Context Preservation**: Neo4j memory system completely preserved and enhanced
+### Database Architecture
+- **Neo4j Graph Database**: Stores memories with vector embeddings as node properties
+- **PostgreSQL**: User accounts, conversations, file uploads, session management
+- **Dual Storage**: Leverages strengths of both graph and relational databases
 
 ## Development
 
-Key components:
-- `main.py` - FastAPI server and chat endpoints (36KB)
-- `memory.py` - Core memory system with Neo4j integration (28KB)
-- `memory_api.py` - Memory management API endpoints
-- `model_service.py` - OpenRouter AI model integration
-- `chat.html` - Chat interface frontend (embedded)
-- `icon.svg` - Optimized application icon (560 bytes)
-- `.dockerignore` - Container optimization configuration
+### Key Components
+- `main.py` - FastAPI server with authentication and chat endpoints
+- `intelligent_memory.py` - Core memory system with AI-powered routing
+- `model_service.py` - OpenRouter API integration (Google Gemini, GPT-4o, etc.)
+- `chat.html` - Responsive chat interface with PWA support
+- `mobile.html` - Mobile-optimized progressive web app
 
-## Memory Management
+### Memory Classes
+- `MemoryRouter` - Intent classification for efficient routing
+- `ImportanceScorer` - Multi-factor importance evaluation
+- `IntelligentMemorySystem` - Main memory orchestration
+- Vector index setup and semantic search integration
 
-The system provides both automatic and manual memory management:
-- **Automatic**: All conversations stored and retrieved seamlessly
-- **Manual**: Memory enhancement, decay, and deletion through API
-- **Visualization**: Graph interface to explore memory connections
-- **Categories**: Automatic categorization of different memory types
+### Recent Improvements
+- Removed Cerebras dependency for streamlined OpenRouter-only architecture
+- Enhanced context formatting for better AI understanding
+- Added conversation deletion with database cleanup
+- Implemented Google Gemini support with 1M+ token context windows
 
-This creates an AI that truly learns and remembers, becoming more helpful over time through accumulated conversational experience.
+## Deployment
+
+The system is production-ready with:
+- User authentication and session management
+- Database migrations and setup automation
+- Error handling and logging
+- Mobile PWA support with offline capabilities
+- Optimized container deployment
+
+This creates an AI assistant that intelligently manages memory, learns from conversations, and provides contextually relevant responses while maintaining user privacy and data isolation.
