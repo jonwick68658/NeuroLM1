@@ -954,22 +954,69 @@
             opacity: 0.8;
         }
 
-        .copy-button {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 0.3rem 0.8rem;
+        .message-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .action-button {
+            background: transparent;
+            border: 1px solid #ddd;
+            padding: 0.4rem 0.6rem;
             border-radius: 4px;
             font-size: 0.8rem;
             cursor: pointer;
-            margin-top: 0.5rem;
-            margin-left: 0.5rem;
-            transition: background 0.3s ease;
-            float: right;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
         }
 
-        .copy-button:hover {
-            background: #e56b3f;
+        .action-button:hover {
+            background: #f8f9fa;
+            border-color: #bbb;
+        }
+
+        .action-button.copy {
+            color: var(--accent-color);
+        }
+
+        .action-button.copy:hover {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .action-button.like {
+            color: #28a745;
+        }
+
+        .action-button.like:hover,
+        .action-button.like.active {
+            background: #28a745;
+            color: white;
+        }
+
+        .action-button.dislike {
+            color: #dc3545;
+        }
+
+        .action-button.dislike:hover,
+        .action-button.dislike.active {
+            background: #dc3545;
+            color: white;
+        }
+
+        .action-button.delete {
+            color: #6c757d;
+        }
+
+        .action-button.delete:hover {
+            background: #6c757d;
+            color: white;
         }
 
         .code-container {
@@ -1417,8 +1464,25 @@
                 const renderedContent = marked.parse(content);
                 messageHTML = `<div>${renderedContent}</div>`;
                 if (info) {
-                    messageHTML += `<div class="message-info">${info}<button class="copy-button" onclick="copyToClipboard('${messageId}', this)">Copy</button></div>`;
+                    messageHTML += `<div class="message-info">${info}</div>`;
                 }
+                // Add action buttons for assistant messages
+                messageHTML += `
+                    <div class="message-actions">
+                        <button class="action-button copy" onclick="copyToClipboard('${messageId}', this)">
+                            📋 Copy
+                        </button>
+                        <button class="action-button like" onclick="setFeedback('${messageId}', 'liked', this)">
+                            👍 Like
+                        </button>
+                        <button class="action-button dislike" onclick="setFeedback('${messageId}', 'disliked', this)">
+                            👎 Dislike
+                        </button>
+                        <button class="action-button delete" onclick="deleteMessage('${messageId}', this)">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                `;
             } else {
                 messageHTML = `<div>${content}</div>`;
                 if (info) {

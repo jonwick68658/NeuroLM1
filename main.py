@@ -1848,14 +1848,15 @@ async def set_message_feedback(message_id: int, feedback: MessageFeedback, reque
         
         # Update feedback in Neo4j memory system
         try:
-            memory_content = f"User: {message[2]}" if message[3] == "user" else f"Assistant: {message[2]}"
-            
-            with intelligent_memory_system.driver.session() as session:
-                session.run("""
-                    MATCH (m:Memory {user_id: $user_id})
-                    WHERE m.content CONTAINS $content
-                    SET m.feedback_type = $feedback_type
-                """, user_id=user_id, content=message[2][:100], feedback_type=feedback.feedback_type)
+            if intelligent_memory_system and hasattr(intelligent_memory_system, 'driver'):
+                memory_content = f"User: {message[2]}" if message[3] == "user" else f"Assistant: {message[2]}"
+                
+                with intelligent_memory_system.driver.session() as session:
+                    session.run("""
+                        MATCH (m:IntelligentMemory {user_id: $user_id})
+                        WHERE m.content CONTAINS $content
+                        SET m.feedback_type = $feedback_type
+                    """, user_id=user_id, content=message[2][:100], feedback_type=feedback.feedback_type)
         except Exception as e:
             print(f"Warning: Could not update Neo4j feedback: {e}")
         
@@ -1911,12 +1912,13 @@ async def delete_message(message_id: int, request: Request):
         
         # Remove from Neo4j memory system
         try:
-            with memory_system.driver.session() as session:
-                session.run("""
-                    MATCH (m:Memory {user_id: $user_id})
-                    WHERE m.content CONTAINS $content
-                    DETACH DELETE m
-                """, user_id=user_id, content=message[2][:100])
+            if intelligent_memory_system and hasattr(intelligent_memory_system, 'driver'):
+                with intelligent_memory_system.driver.session() as session:
+                    session.run("""
+                        MATCH (m:IntelligentMemory {user_id: $user_id})
+                        WHERE m.content CONTAINS $content
+                        DETACH DELETE m
+                    """, user_id=user_id, content=message[2][:100])
         except Exception as e:
             print(f"Warning: Could not delete from Neo4j: {e}")
         
