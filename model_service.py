@@ -72,7 +72,8 @@ class ModelService:
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": 0.7
+            "temperature": 0.7,
+            "transforms": ["middle-out"]
         }
         
         try:

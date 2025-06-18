@@ -83,6 +83,8 @@ def init_file_storage():
                 conversation_id VARCHAR(255) NOT NULL,
                 message_type VARCHAR(50) NOT NULL,
                 content TEXT NOT NULL,
+                feedback_type VARCHAR(20) DEFAULT 'neutral',
+                is_deleted BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
             )
@@ -1803,6 +1805,126 @@ async def get_available_models():
             {"id": "google/gemini-2.0-flash-001", "name": "Gemini 2.0 Flash", "description": "Google's latest fast model"}
         ]
         return default_models
+
+# Message feedback endpoints
+class MessageFeedback(BaseModel):
+    feedback_type: str  # 'liked' or 'disliked'
+
+@app.post("/api/messages/{message_id}/feedback")
+async def set_message_feedback(message_id: int, feedback: MessageFeedback, request: Request):
+    """Set feedback for a message"""
+    user_id = request.cookies.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verify message belongs to user
+        cursor.execute('''
+            SELECT cm.id, cm.conversation_id, cm.content, cm.message_type
+            FROM conversation_messages cm
+            JOIN conversations c ON cm.conversation_id = c.id
+            WHERE cm.id = %s AND c.user_id = %s AND cm.is_deleted = FALSE
+        ''', (message_id, user_id))
+        
+        message = cursor.fetchone()
+        if not message:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        # Update feedback in PostgreSQL
+        cursor.execute('''
+            UPDATE conversation_messages 
+            SET feedback_type = %s 
+            WHERE id = %s
+        ''', (feedback.feedback_type, message_id))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # Update feedback in Neo4j memory system
+        try:
+            memory_content = f"User: {message[2]}" if message[3] == "user" else f"Assistant: {message[2]}"
+            
+            with intelligent_memory_system.driver.session() as session:
+                session.run("""
+                    MATCH (m:Memory {user_id: $user_id})
+                    WHERE m.content CONTAINS $content
+                    SET m.feedback_type = $feedback_type
+                """, user_id=user_id, content=message[2][:100], feedback_type=feedback.feedback_type)
+        except Exception as e:
+            print(f"Warning: Could not update Neo4j feedback: {e}")
+        
+        return {"success": True, "feedback_type": feedback.feedback_type}
+    
+    except Exception as e:
+        print(f"Error setting message feedback: {e}")
+        raise HTTPException(status_code=500, detail="Failed to set message feedback")
+
+@app.delete("/api/messages/{message_id}")
+async def delete_message(message_id: int, request: Request):
+    """Delete a message from conversation and memory"""
+    user_id = request.cookies.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verify message belongs to user
+        cursor.execute('''
+            SELECT cm.id, cm.conversation_id, cm.content, c.message_count
+            FROM conversation_messages cm
+            JOIN conversations c ON cm.conversation_id = c.id
+            WHERE cm.id = %s AND c.user_id = %s AND cm.is_deleted = FALSE
+        ''', (message_id, user_id))
+        
+        message = cursor.fetchone()
+        if not message:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        # Soft delete message in PostgreSQL
+        cursor.execute('''
+            UPDATE conversation_messages 
+            SET is_deleted = TRUE 
+            WHERE id = %s
+        ''', (message_id,))
+        
+        # Update conversation message count
+        cursor.execute('''
+            UPDATE conversations 
+            SET message_count = message_count - 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        ''', (message[1],))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # Remove from Neo4j memory system
+        try:
+            with memory_system.driver.session() as session:
+                session.run("""
+                    MATCH (m:Memory {user_id: $user_id})
+                    WHERE m.content CONTAINS $content
+                    DETACH DELETE m
+                """, user_id=user_id, content=message[2][:100])
+        except Exception as e:
+            print(f"Warning: Could not delete from Neo4j: {e}")
+        
+        return {"success": True, "message": "Message deleted"}
+    
+    except Exception as e:
+        print(f"Error deleting message: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete message")
 
 # Health check endpoint
 @app.get("/health")
