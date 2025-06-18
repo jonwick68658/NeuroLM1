@@ -1633,13 +1633,23 @@
                 }
                 
                 conversationDiv.innerHTML = `
-                    <div class="conversation-title">${conversation.title}</div>
-                    ${topicInfo}
-                    ${messagePreview}
-                    <div class="conversation-meta">${date} • ${conversation.message_count} messages</div>
+                    <div class="conversation-content">
+                        <div class="conversation-title">${conversation.title}</div>
+                        ${topicInfo}
+                        ${messagePreview}
+                        <div class="conversation-meta">${date} • ${conversation.message_count} messages</div>
+                    </div>
+                    <div class="conversation-menu">
+                        <button class="menu-button" onclick="toggleConversationMenu(event, '${conversation.id}')">⋮</button>
+                        <div class="dropdown-menu" id="menu-${conversation.id}">
+                            <button class="dropdown-item delete" onclick="showDeleteConfirmation('${conversation.id}')">Delete Conversation</button>
+                        </div>
+                    </div>
                 `;
                 
-                conversationDiv.addEventListener('click', () => loadConversation(conversation.id));
+                // Add click listener to conversation content only
+                const conversationContent = conversationDiv.querySelector('.conversation-content');
+                conversationContent.addEventListener('click', () => loadConversation(conversation.id));
                 conversationsList.appendChild(conversationDiv);
             });
             
@@ -2346,6 +2356,87 @@
             }
         }
 
+        // Conversation menu functions
+        function toggleConversationMenu(event, conversationId) {
+            event.stopPropagation();
+            
+            // Close all other menus
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                if (menu.id !== `menu-${conversationId}`) {
+                    menu.classList.remove('show');
+                }
+            });
+            
+            // Toggle current menu
+            const menu = document.getElementById(`menu-${conversationId}`);
+            menu.classList.toggle('show');
+        }
+
+        function showDeleteConfirmation(conversationId) {
+            conversationToDelete = conversationId;
+            deleteModal.classList.add('show');
+            
+            // Close dropdown menu
+            document.getElementById(`menu-${conversationId}`).classList.remove('show');
+        }
+
+        function hideDeleteModal() {
+            deleteModal.classList.remove('show');
+            conversationToDelete = null;
+        }
+
+        async function deleteConversation() {
+            if (!conversationToDelete) return;
+            
+            try {
+                confirmDeleteBtn.disabled = true;
+                confirmDeleteBtn.textContent = 'Deleting...';
+                
+                const response = await fetch(`/api/conversations/${conversationToDelete}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    // Remove from conversations array
+                    conversations = conversations.filter(conv => conv.id !== conversationToDelete);
+                    
+                    // If deleted conversation was current, clear chat
+                    if (currentConversationId === conversationToDelete) {
+                        currentConversationId = null;
+                        chatMessages.innerHTML = '';
+                        // Add welcome message back
+                        let greeting = userName ? `Hello, ${userName}!` : 'Hello!';
+                        let welcomeMessage = `${greeting} I'm NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?`;
+                        addMessage(welcomeMessage, 'assistant', 'Memory system active • Ready to learn');
+                        topicDisplayText.textContent = 'No topic assigned';
+                    }
+                    
+                    // Re-render conversations list
+                    renderConversations();
+                    
+                    hideDeleteModal();
+                } else {
+                    const error = await response.json();
+                    alert(`Failed to delete conversation: ${error.detail}`);
+                }
+            } catch (error) {
+                console.error('Error deleting conversation:', error);
+                alert('Failed to delete conversation. Please try again.');
+            } finally {
+                confirmDeleteBtn.disabled = false;
+                confirmDeleteBtn.textContent = 'Delete';
+            }
+        }
+
+        // Delete modal event listeners
+        cancelDeleteBtn.addEventListener('click', hideDeleteModal);
+        confirmDeleteBtn.addEventListener('click', deleteConversation);
+        deleteModal.addEventListener('click', (e) => {
+            if (e.target === deleteModal) {
+                hideDeleteModal();
+            }
+        });
+
         // File search event listeners
         fileSearch.addEventListener('click', () => {
             fileDropdown.style.display = fileDropdown.style.display === 'block' ? 'none' : 'block';
@@ -2357,6 +2448,11 @@
             }
             if (!e.target.closest('.chat-input-container')) {
                 hideSlashSuggestions();
+            }
+            if (!e.target.closest('.conversation-menu')) {
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    menu.classList.remove('show');
+                });
             }
         });
 
