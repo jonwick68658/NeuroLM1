@@ -1497,7 +1497,7 @@
         function copyToClipboard(messageId, button) {
             const messageElement = document.getElementById(messageId);
             if (messageElement) {
-                const messageContent = messageElement.querySelector('div').textContent;
+                const messageContent = messageElement.querySelector('div:first-child').textContent;
                 
                 navigator.clipboard.writeText(messageContent).then(() => {
                     const originalTitle = button.title;
