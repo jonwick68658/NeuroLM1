@@ -1403,8 +1403,8 @@
             sendButton.disabled = true;
             sendButton.textContent = 'Sending...';
 
-            // Add user message to chat
-            addMessage(message, 'user');
+            // Add user message to chat and store reference
+            const userMessageDiv = addMessage(message, 'user');
             chatInput.value = '';
 
             try {
@@ -1436,8 +1436,19 @@
                     loadConversations();
                 }
                 
-                // Add assistant response to chat
-                addMessage(data.response, 'assistant');
+                // Update user message with actual database ID
+                if (data.user_message_id && userMessageDiv) {
+                    userMessageDiv.id = data.user_message_id;
+                }
+                
+                // Add assistant response to chat with context info
+                const contextInfo = data.context_used > 0 ? `Memory context: ${data.context_used} memories used` : null;
+                const assistantMessageDiv = addMessage(data.response, 'assistant', contextInfo);
+                
+                // Update assistant message with actual database ID
+                if (data.assistant_message_id && assistantMessageDiv) {
+                    assistantMessageDiv.id = data.assistant_message_id;
+                }
 
             } catch (error) {
                 console.error('Chat error:', error);
@@ -1455,8 +1466,8 @@
         function addMessage(content, sender, info = null) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}-message`;
-            const messageId = 'msg_' + Date.now();
-            messageDiv.id = messageId;
+            const tempId = 'msg_' + Date.now();
+            messageDiv.id = tempId;
             
             let messageHTML = '';
             if (sender === 'assistant') {
@@ -1466,19 +1477,19 @@
                 if (info) {
                     messageHTML += `<div class="message-info">${info}</div>`;
                 }
-                // Add action buttons for assistant messages
+                // Add action buttons for assistant messages (will be updated with real ID later)
                 messageHTML += `
                     <div class="message-actions">
-                        <button class="action-button copy" onclick="copyToClipboard('${messageId}', this)">
+                        <button class="action-button copy" onclick="copyToClipboard(getMessageId(this), this)">
                             📋 Copy
                         </button>
-                        <button class="action-button like" onclick="setFeedback('${messageId}', 'liked', this)">
+                        <button class="action-button like" onclick="setFeedback(getMessageId(this), 'liked', this)">
                             👍 Like
                         </button>
-                        <button class="action-button dislike" onclick="setFeedback('${messageId}', 'disliked', this)">
+                        <button class="action-button dislike" onclick="setFeedback(getMessageId(this), 'disliked', this)">
                             👎 Dislike
                         </button>
-                        <button class="action-button delete" onclick="deleteMessage('${messageId}', this)">
+                        <button class="action-button delete" onclick="deleteMessage(getMessageId(this), this)">
                             🗑️ Delete
                         </button>
                     </div>
@@ -1500,6 +1511,9 @@
             
             // Scroll to bottom
             chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Return the message div for ID updates
+            return messageDiv;
         }
 
         function addCodeCopyButtons(container) {
@@ -1543,6 +1557,12 @@
                     console.error('Failed to copy: ', err);
                 });
             }
+        }
+
+        // Helper function to get message ID from button context
+        function getMessageId(button) {
+            const messageDiv = button.closest('.message');
+            return messageDiv ? messageDiv.id : null;
         }
 
         async function setFeedback(messageId, feedbackType, button) {
