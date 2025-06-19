@@ -1438,6 +1438,7 @@
                 
                 // Update user message with actual database ID
                 if (data.user_message_id && userMessageDiv) {
+                    console.log('Updating user message ID from', userMessageDiv.id, 'to', data.user_message_id);
                     userMessageDiv.id = data.user_message_id;
                 }
                 
@@ -1447,6 +1448,7 @@
                 
                 // Update assistant message with actual database ID
                 if (data.assistant_message_id && assistantMessageDiv) {
+                    console.log('Updating assistant message ID from', assistantMessageDiv.id, 'to', data.assistant_message_id);
                     assistantMessageDiv.id = data.assistant_message_id;
                 }
 
@@ -1562,10 +1564,15 @@
         // Helper function to get message ID from button context
         function getMessageId(button) {
             const messageDiv = button.closest('.message');
-            return messageDiv ? messageDiv.id : null;
+            if (!messageDiv || !messageDiv.id) return null;
+            
+            // Convert to integer if it's a database ID (numeric), keep as string if it's a temp ID
+            const id = messageDiv.id;
+            return /^\d+$/.test(id) ? parseInt(id) : id;
         }
 
         async function setFeedback(messageId, feedbackType, button) {
+            console.log('setFeedback called with messageId:', messageId, 'type:', typeof messageId);
             try {
                 const response = await fetch(`/api/messages/${messageId}/feedback`, {
                     method: 'POST',
