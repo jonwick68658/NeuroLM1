@@ -1,0 +1,176 @@
+Here's the complete implementation plan with all necessary file changes:
+1. HTML Changes (chat.html)
+Add buttons to assistant messages:
+<div class="message assistant-message" id="msg_{messageId}">
+    <div>${marked.parse(content)}</div>
+    <div class="message-info">
+        <button class="like-button" onclick="handleLike('msg_{messageId}')">👍</button>
+        <button class="dislike-button" onclick="handleDislike('msg_{messageId}')">👎</button>
+        <button class="delete-button" onclick="handleDelete('msg_{messageId}')">🗑️</button>
+        <button class="copy-button" onclick="copyToClipboard('msg_{messageId}', this)">Copy</button>
+    </div>
+</div>
+Copy
+2. JavaScript Additions (chat.html)
+Add these functions to the script section:
+async function handleLike(messageId) {
+    const messageElement = document.getElementById(messageId);
+    const messageContent = messageElement.querySelector('div').textContent;
+    
+    await fetch(`/api/like-response`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            messageId: messageId,
+            content: messageContent 
+        })
+    });
+    alert('Response liked!');
+}
+
+async function handleDislike(messageId) {
+    await fetch(`/api/dislike-response`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId })
+    });
+    // Remove from UI
+    document.getElementById(messageId).remove();
+}
+
+async function handleDelete(messageId) {
+    await fetch(`/api/delete-response`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId })
+    });
+    // Remove from UI
+    document.getElementById(messageId).remove();
+}
+Copy
+3. Backend API Changes (main.py)
+Add these endpoints:
+from fastapi import HTTPException
+
+@app.post("/api/like-response")
+async def like_response(request: Request, message_data: dict):
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in user_sessions:
+        raise HTTPException(status_code=401)
+    
+    user_id = user_sessions[session_id]['user_id']
+    message_id = message_data['messageId']
+    
+    # Update memory score in Neo4j
+    with intelligent_memory_system.driver.session() as session:
+        session.run("""
+            MATCH (m:IntelligentMemory {id: $message_id})
+            SET m.importance = m.importance + 0.2
+            RETURN m.id
+        """, {"message_id": message_id})
+    
+    return {"status": "success"}
+
+@app.delete("/api/dislike-response")
+async def dislike_response(request: Request, message_data: dict):
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in user_sessions:
+        raise HTTPException(status_code=401)
+    
+    user_id = user_sessions[session_id]['user_id']
+    message_id = message_data['messageId']
+    
+    # Remove from memory
+    with intelligent_memory_system.driver.session() as session:
+        session.run("""
+            MATCH (m:IntelligentMemory {id: $message_id})
+            DELETE m
+        """, {"message_id": message_id})
+    
+    return {"status": "success"}
+
+@app.delete("/api/delete-response")
+async def delete_response(request: Request, message_data: dict):
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in user_sessions:
+        raise HTTPException(status_code=401)
+    
+    user_id = user_sessions[session_id]['user_id']
+    message_id = message_data['messageId']
+    
+    # Remove from conversation and memory
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM conversation_messages WHERE id = %s", (message_id,))
+    conn.commit()
+    
+    # Also remove from Neo4j
+    with intelligent_memory_system.driver.session() as session:
+        session.run("""
+            MATCH (m:IntelligentMemory {id: $message_id})
+            DELETE m
+        """, {"message_id": message_id})
+    
+    return {"status": "success"}
+Copy
+4. Memory System Updates (intelligent_memory.py)
+Add these methods to IntelligentMemorySystem:
+async def update_memory_score(self, memory_id: str, delta: float):
+    """Update memory importance score"""
+    try:
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (m:IntelligentMemory {id: $memory_id})
+                SET m.importance = m.importance + $delta
+                RETURN m.id
+            """, {"memory_id": memory_id, "delta": delta})
+    except Exception as e:
+        print(f"Error updating memory score: {e}")
+
+async def remove_memory(self, memory_id: str):
+    """Remove memory from system"""
+    try:
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (m:IntelligentMemory {id: $memory_id})
+                DELETE m
+            """, {"memory_id": memory_id})
+    except Exception as e:
+        print(f"Error removing memory: {e}")
+Copy
+5. Additional File Changes
+Update chat.html's addMessage function to use backend message IDs:
+// Modify addMessage to accept messageId parameter
+function addMessage(content, sender, info = null, messageId = null) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}-message`;
+    messageDiv.id = messageId || 'msg_' + Date.now();
+    // ... rest of function
+}
+
+// Update the chat endpoint in main.py to return message ID
+@app.post("/api/chat")
+async def chat_with_memory(chat_request: ChatMessage, request: Request):
+    # ... existing code ...
+    # After saving assistant message:
+    message_id = result.fetchone()[0]  # Get the generated ID
+    return {
+        "response": response_text,
+        "messageId": message_id,
+        # ... other fields
+    }
+Copy
+6. Testing
+
+Unit Tests: Create tests for new endpoints using pytest
+UI Testing: Verify buttons appear and function correctly
+Memory Integration: Verify memory updates in Neo4j
+
+Required Files to Modify:
+
+chat.html (HTML + JavaScript)
+main.py (API endpoints)
+intelligent_memory.py (Memory methods)
+Add tests (optional but recommended)
+
+This plan provides a complete implementation path while maintaining compatibility with existing code. The key integration points are the message ID handling between frontend and backend, and the memory system updates.
