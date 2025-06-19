@@ -1658,6 +1658,62 @@ async def delete_conversation(conversation_id: str, request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting conversation: {str(e)}")
 
+class DeleteMessageRequest(BaseModel):
+    messageId: str
+
+@app.delete("/api/delete-message")
+async def delete_message(request: Request, delete_request: DeleteMessageRequest):
+    """Delete a specific message from conversation"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        # Extract the actual message ID from frontend ID format
+        message_id = delete_request.messageId
+        if message_id.startswith('msg_'):
+            # This is a frontend-generated ID, we need to handle this differently
+            # For now, return an error since we can't delete frontend-only messages
+            raise HTTPException(status_code=400, detail="Cannot delete unsaved message")
+        
+        # Delete from PostgreSQL
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # First verify the message belongs to the user by checking conversation ownership
+        cursor.execute("""
+            SELECT cm.conversation_id 
+            FROM conversation_messages cm
+            JOIN conversations c ON cm.conversation_id = c.id
+            WHERE cm.id = %s AND c.user_id = %s
+        """, (message_id, user_id))
+        
+        result = cursor.fetchone()
+        if not result:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        # Delete the message
+        cursor.execute("DELETE FROM conversation_messages WHERE id = %s", (message_id,))
+        
+        if cursor.rowcount == 0:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {"status": "success", "message": "Message deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting message: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete message")
+
 # Clear database endpoint
 @app.post("/api/clear-memory")
 async def clear_memory_database():
