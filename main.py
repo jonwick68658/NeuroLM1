@@ -229,16 +229,18 @@ def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0) -> Di
         return {'conversations': [], 'total_count': 0, 'has_more': False, 'next_offset': None}
 
 def save_conversation_message(conversation_id: str, message_type: str, content: str):
-    """Save a message to a conversation"""
+    """Save a message to a conversation and return the message ID"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Insert message
+        # Insert message and get the ID
         cursor.execute('''
             INSERT INTO conversation_messages (conversation_id, message_type, content, created_at)
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s) RETURNING id
         ''', (conversation_id, message_type, content, datetime.now()))
+        
+        message_id = cursor.fetchone()[0]
         
         # Update conversation message count and timestamp
         cursor.execute('''
@@ -258,8 +260,10 @@ def save_conversation_message(conversation_id: str, message_type: str, content: 
         conn.commit()
         cursor.close()
         conn.close()
+        return message_id
     except Exception as e:
         print(f"Error saving message: {e}")
+        return None
 
 def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: str = None) -> Dict:
     """Get paginated messages for a conversation"""
@@ -573,6 +577,8 @@ class ChatResponse(BaseModel):
     memory_stored: bool
     context_used: int
     conversation_id: str
+    user_message_id: Optional[int] = None
+    assistant_message_id: Optional[int] = None
 
 # Slash command handler
 async def handle_slash_command(command: str, user_id: str, conversation_id: str) -> ChatResponse:
@@ -1378,13 +1384,16 @@ Instructions:
                 print(f"Error storing assistant response in intelligent memory: {e}")
         
         # Ensure conversation_id is not None before saving messages
+        user_message_id = None
+        assistant_message_id = None
+        
         if conversation_id:
             try:
                 # Save user message to conversation
-                save_conversation_message(conversation_id, 'user', chat_request.message)
+                user_message_id = save_conversation_message(conversation_id, 'user', chat_request.message)
                 
                 # Save assistant response to conversation
-                save_conversation_message(conversation_id, 'assistant', response_text)
+                assistant_message_id = save_conversation_message(conversation_id, 'assistant', response_text)
             except Exception as e:
                 print(f"Error saving conversation messages: {e}")
         else:
@@ -1394,7 +1403,9 @@ Instructions:
             response=response_text,
             memory_stored=True,
             context_used=1 if context else 0,
-            conversation_id=conversation_id or ""
+            conversation_id=conversation_id or "",
+            user_message_id=user_message_id,
+            assistant_message_id=assistant_message_id
         )
         
     except Exception as e:
