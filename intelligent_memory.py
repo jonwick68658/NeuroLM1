@@ -242,12 +242,11 @@ class IntelligentMemorySystem:
         
         try:
             with self.driver.session() as session:
-                # Simplified semantic similarity search, excluding disliked memories
+                # Simplified semantic similarity search
                 result = session.run("""
                     CALL db.index.vector.queryNodes('memory_embedding_index', $limit, $query_embedding)
                     YIELD node, score
                     WHERE node.user_id = $user_id AND score > 0.3
-                    AND (NOT EXISTS(node.feedback_type) OR node.feedback_type <> 'disliked')
                     RETURN node.content AS content, score
                     ORDER BY score DESC
                 """, {
