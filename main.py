@@ -1010,20 +1010,6 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                         }
                     )
         
-        elif cmd == '/confirm-delete-topic':
-            if len(parts) < 2:
-                response = "Usage: `/confirm-delete-topic [topic_name]`\nThis confirms permanent deletion of the topic."
-            else:
-                topic_name = ' '.join(parts[1:]).lower()
-                
-                # Perform the deletion
-                success = delete_topic_and_data(user_id, topic_name)
-                
-                if success:
-                    response = f"✅ **Topic '{topic_name}' has been permanently deleted.**\n\nAll conversations, subtopics, messages, and memories associated with this topic have been removed from the system."
-                else:
-                    response = f"❌ **Error deleting topic '{topic_name}'.**\n\nThe topic may not exist or there was a system error. Use `/topics` to see available topics."
-        
         elif cmd == '/delete-subtopic':
             if len(parts) < 3:
                 response = "Usage: `/delete-subtopic [topic] [subtopic]`\nExample: `/delete-subtopic cooking recipes`\n⚠️ **Warning:** This will delete the subtopic and all its conversations and memories permanently."
@@ -1054,20 +1040,7 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                         }
                     )
         
-        elif cmd == '/confirm-delete-subtopic':
-            if len(parts) < 3:
-                response = "Usage: `/confirm-delete-subtopic [topic] [subtopic]`\nThis confirms permanent deletion of the subtopic."
-            else:
-                topic_name = parts[1].lower()
-                subtopic_name = ' '.join(parts[2:]).lower()
-                
-                # Perform the deletion
-                success = delete_subtopic_and_data(user_id, topic_name, subtopic_name)
-                
-                if success:
-                    response = f"✅ **Subtopic '{subtopic_name}' under topic '{topic_name}' has been permanently deleted.**\n\nAll conversations, messages, and memories associated with this subtopic have been removed from the system."
-                else:
-                    response = f"❌ **Error deleting subtopic '{subtopic_name}' under topic '{topic_name}'.**\n\nThe subtopic may not exist or there was a system error. Use `/topics` to see available topics and subtopics."
+
         
         else:
             response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file\n• `/topics` - List all topics and sub-topics\n• `/link [topic]` - Link current message to specified topic\n• `/unlink [topic]` - Remove links between topics\n• `/delete-topic [topic]` - Delete a topic and all its data\n• `/delete-subtopic [topic] [subtopic]` - Delete a subtopic and all its data"
