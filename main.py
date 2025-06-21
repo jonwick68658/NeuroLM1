@@ -10,7 +10,7 @@ import httpx
 import hashlib
 import uuid
 import psycopg2
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 # Create FastAPI application
@@ -815,6 +815,7 @@ class ChatResponse(BaseModel):
     memory_stored: bool
     context_used: int
     conversation_id: str
+    deletion_info: Optional[Dict] = None
 
 # Slash command handler
 async def handle_slash_command(command: str, user_id: str, conversation_id: str) -> ChatResponse:
@@ -992,21 +993,22 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                 if not info['exists']:
                     response = f"Topic '{topic_name}' not found. Use `/topics` to see available topics."
                 else:
-                    # Show confirmation details
-                    response = f"⚠️ **PERMANENT DELETION CONFIRMATION**\n\n"
-                    response += f"**Topic:** {info['topic']}\n"
-                    response += f"**Conversations:** {info['conversation_count']}\n"
-                    response += f"**Subtopics:** {info['subtopic_count']}\n"
-                    if info['subtopics']:
-                        response += f"**Subtopic names:** {', '.join(info['subtopics'])}\n"
-                    response += f"**Total messages:** {info['total_messages']}\n\n"
-                    response += f"**This action will permanently delete:**\n"
-                    response += f"• All {info['conversation_count']} conversations in this topic\n"
-                    response += f"• All {info['subtopic_count']} subtopics and their conversations\n"
-                    response += f"• All {info['total_messages']} messages and memories\n"
-                    response += f"• All associated data from the system\n\n"
-                    response += f"**To confirm deletion, type:** `/confirm-delete-topic {topic_name}`\n"
-                    response += f"**This action cannot be undone!**"
+                    # Return JSON for frontend popup
+                    return ChatResponse(
+                        response="DELETION_CONFIRM",
+                        memory_stored=False,
+                        context_used=0,
+                        conversation_id=conversation_id,
+                        deletion_info={
+                            "type": "topic",
+                            "topic": info['topic'],
+                            "subtopic": None,
+                            "conversation_count": info['conversation_count'],
+                            "subtopic_count": info['subtopic_count'],
+                            "subtopics": info['subtopics'],
+                            "total_messages": info['total_messages']
+                        }
+                    )
         
         elif cmd == '/confirm-delete-topic':
             if len(parts) < 2:
@@ -1035,18 +1037,22 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                 if not info['exists']:
                     response = f"Subtopic '{subtopic_name}' under topic '{topic_name}' not found. Use `/topics` to see available topics and subtopics."
                 else:
-                    # Show confirmation details
-                    response = f"⚠️ **PERMANENT DELETION CONFIRMATION**\n\n"
-                    response += f"**Topic:** {info['topic']}\n"
-                    response += f"**Subtopic:** {info['subtopic']}\n"
-                    response += f"**Conversations:** {info['conversation_count']}\n"
-                    response += f"**Total messages:** {info['total_messages']}\n\n"
-                    response += f"**This action will permanently delete:**\n"
-                    response += f"• All {info['conversation_count']} conversations in this subtopic\n"
-                    response += f"• All {info['total_messages']} messages and memories\n"
-                    response += f"• All associated data from the system\n\n"
-                    response += f"**To confirm deletion, type:** `/confirm-delete-subtopic {topic_name} {subtopic_name}`\n"
-                    response += f"**This action cannot be undone!**"
+                    # Return JSON for frontend popup
+                    return ChatResponse(
+                        response="DELETION_CONFIRM",
+                        memory_stored=False,
+                        context_used=0,
+                        conversation_id=conversation_id,
+                        deletion_info={
+                            "type": "subtopic",
+                            "topic": info['topic'],
+                            "subtopic": info['subtopic'],
+                            "conversation_count": info['conversation_count'],
+                            "subtopic_count": 0,
+                            "subtopics": [],
+                            "total_messages": info['total_messages']
+                        }
+                    )
         
         elif cmd == '/confirm-delete-subtopic':
             if len(parts) < 3:
@@ -2142,6 +2148,34 @@ async def get_available_models():
             {"id": "google/gemini-2.0-flash-001", "name": "Gemini 2.0 Flash", "description": "Google's latest fast model"}
         ]
         return default_models
+
+@app.delete("/api/topics/{topic_name}")
+async def delete_topic_endpoint(topic_name: str, request: Request):
+    """Delete a topic and all its data"""
+    user_id = request.session.get('user_id')
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    success = delete_topic_and_data(user_id, topic_name.lower())
+    
+    if success:
+        return {"success": True, "message": f"Topic '{topic_name}' has been permanently deleted."}
+    else:
+        raise HTTPException(status_code=400, detail=f"Error deleting topic '{topic_name}'. The topic may not exist or there was a system error.")
+
+@app.delete("/api/topics/{topic_name}/subtopics/{subtopic_name}")
+async def delete_subtopic_endpoint(topic_name: str, subtopic_name: str, request: Request):
+    """Delete a subtopic and all its data"""
+    user_id = request.session.get('user_id')
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    success = delete_subtopic_and_data(user_id, topic_name.lower(), subtopic_name.lower())
+    
+    if success:
+        return {"success": True, "message": f"Subtopic '{subtopic_name}' has been permanently deleted from topic '{topic_name}'."}
+    else:
+        raise HTTPException(status_code=400, detail=f"Error deleting subtopic '{subtopic_name}' from topic '{topic_name}'. It may not exist or there was a system error.")
 
 # Health check endpoint
 @app.get("/health")
