@@ -798,6 +798,62 @@
             position: fixed;
             bottom: 90px;
             left: 50%;
+        }
+
+        /* Typing indicator styles */
+        .typing-indicator {
+            background: var(--light-bg);
+            color: var(--dark-text);
+            border-left: 4px solid var(--secondary-color);
+            padding: 1rem;
+            border-radius: 10px;
+            max-width: 70%;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .typing-text {
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 2px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--secondary-color);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+            30% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
             transform: translateX(-50%);
             width: 95%;
             max-width: 1200px;
@@ -1381,6 +1437,9 @@
             addMessage(message, 'user');
             chatInput.value = '';
 
+            // Show typing indicator
+            showTypingIndicator();
+
             try {
                 // Use the selected model from the search dropdown
                 
@@ -1403,6 +1462,9 @@
 
                 const data = await response.json();
                 
+                // Remove typing indicator before showing response
+                removeTypingIndicator();
+                
                 // Update current conversation ID
                 if (data.conversation_id) {
                     currentConversationId = data.conversation_id;
@@ -1415,6 +1477,8 @@
 
             } catch (error) {
                 console.error('Chat error:', error);
+                // Remove typing indicator on error too
+                removeTypingIndicator();
                 addMessage('Sorry, I encountered an error. Please try again.', 'assistant', 'Error occurred');
             } finally {
                 // Re-enable input
@@ -1422,6 +1486,33 @@
                 sendButton.disabled = false;
                 sendButton.textContent = 'Send';
                 chatInput.focus();
+            }
+        }
+
+        // Show typing indicator
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.id = 'typing-indicator';
+            
+            typingDiv.innerHTML = `
+                <span class="typing-text">Thinking</span>
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Remove typing indicator
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
             }
         }
 
