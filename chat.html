@@ -1243,6 +1243,26 @@
         </div>
     </div>
 
+    <!-- Topic/Subtopic Deletion Modal -->
+    <div class="modal-overlay" id="topicDeleteModal">
+        <div class="modal">
+            <h3 id="topicDeleteTitle">Delete Topic</h3>
+            <div id="topicDeleteContent">
+                <p><strong>Topic:</strong> <span id="deleteTopic"></span></p>
+                <p id="deleteSubtopicRow" style="display: none;"><strong>Subtopic:</strong> <span id="deleteSubtopic"></span></p>
+                <p><strong>Conversations:</strong> <span id="deleteConversationCount"></span></p>
+                <p id="deleteSubtopicCountRow"><strong>Subtopics:</strong> <span id="deleteSubtopicCount"></span></p>
+                <p><strong>Total messages:</strong> <span id="deleteTotalMessages"></span></p>
+                <br>
+                <p style="color: #dc3545; font-weight: bold;">⚠️ This action will permanently delete all data and cannot be undone.</p>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-button cancel" id="cancelTopicDeleteBtn">Cancel</button>
+                <button class="modal-button delete" id="confirmTopicDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
@@ -1268,6 +1288,10 @@
         const saveTopicBtn = document.getElementById('saveTopicBtn');
         const removeTopicBtn = document.getElementById('removeTopicBtn');
         const cancelTopicBtn = document.getElementById('cancelTopicBtn');
+        
+        // Topic deletion modal elements
+        const cancelTopicDeleteBtn = document.getElementById('cancelTopicDeleteBtn');
+        const confirmTopicDeleteBtn = document.getElementById('confirmTopicDeleteBtn');
         const topicDisplayText = document.getElementById('topicDisplayText');
         
         // Delete modal elements
@@ -1482,8 +1506,13 @@
                     loadConversations();
                 }
                 
-                // Add assistant response to chat
-                addMessage(data.response, 'assistant');
+                // Check if this is a deletion confirmation request
+                if (data.response === 'DELETION_CONFIRM' && data.deletion_info) {
+                    showTopicDeleteModal(data.deletion_info);
+                } else {
+                    // Add assistant response to chat
+                    addMessage(data.response, 'assistant');
+                }
 
             } catch (error) {
                 console.error('Chat error:', error);
@@ -2573,6 +2602,15 @@
             }
         });
 
+        // Topic deletion modal event listeners
+        cancelTopicDeleteBtn.addEventListener('click', hideTopicDeleteModal);
+        confirmTopicDeleteBtn.addEventListener('click', confirmTopicDeletion);
+        document.getElementById('topicDeleteModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                hideTopicDeleteModal();
+            }
+        });
+
         // File search event listeners
         fileSearch.addEventListener('click', () => {
             fileDropdown.style.display = fileDropdown.style.display === 'block' ? 'none' : 'block';
@@ -2591,6 +2629,84 @@
                 });
             }
         });
+
+        // Topic deletion modal functions
+        function showTopicDeleteModal(deletionInfo) {
+            const modal = document.getElementById('topicDeleteModal');
+            const title = document.getElementById('topicDeleteTitle');
+            const topicSpan = document.getElementById('deleteTopic');
+            const subtopicRow = document.getElementById('deleteSubtopicRow');
+            const subtopicSpan = document.getElementById('deleteSubtopic');
+            const subtopicCountRow = document.getElementById('deleteSubtopicCountRow');
+            const conversationCount = document.getElementById('deleteConversationCount');
+            const subtopicCount = document.getElementById('deleteSubtopicCount');
+            const totalMessages = document.getElementById('deleteTotalMessages');
+            
+            // Store deletion info for confirmation
+            modal.dataset.deletionInfo = JSON.stringify(deletionInfo);
+            
+            // Update modal content based on deletion type
+            if (deletionInfo.type === 'topic') {
+                title.textContent = 'Delete Topic';
+                topicSpan.textContent = deletionInfo.topic;
+                subtopicRow.style.display = 'none';
+                subtopicCountRow.style.display = 'block';
+                subtopicCount.textContent = deletionInfo.subtopic_count;
+            } else {
+                title.textContent = 'Delete Subtopic';
+                topicSpan.textContent = deletionInfo.topic;
+                subtopicRow.style.display = 'block';
+                subtopicSpan.textContent = deletionInfo.subtopic;
+                subtopicCountRow.style.display = 'none';
+            }
+            
+            conversationCount.textContent = deletionInfo.conversation_count;
+            totalMessages.textContent = deletionInfo.total_messages;
+            
+            modal.style.display = 'flex';
+        }
+
+        function hideTopicDeleteModal() {
+            document.getElementById('topicDeleteModal').style.display = 'none';
+        }
+
+        async function confirmTopicDeletion() {
+            const modal = document.getElementById('topicDeleteModal');
+            const deletionInfo = JSON.parse(modal.dataset.deletionInfo);
+            
+            try {
+                let url;
+                if (deletionInfo.type === 'topic') {
+                    url = `/api/topics/${encodeURIComponent(deletionInfo.topic)}`;
+                } else {
+                    url = `/api/topics/${encodeURIComponent(deletionInfo.topic)}/subtopics/${encodeURIComponent(deletionInfo.subtopic)}`;
+                }
+                
+                const response = await fetch(url, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    hideTopicDeleteModal();
+                    
+                    // Show success message
+                    addMessage(`✅ ${result.message}`, 'assistant');
+                    
+                    // Refresh topics and conversations
+                    await loadTopics();
+                    await loadConversations(true);
+                } else {
+                    const error = await response.json();
+                    addMessage(`❌ ${error.detail}`, 'assistant');
+                }
+            } catch (error) {
+                console.error('Error deleting:', error);
+                addMessage('❌ Error during deletion. Please try again.', 'assistant');
+            }
+            
+            hideTopicDeleteModal();
+        }
 
         // Initialize app
         async function initializeApp() {
