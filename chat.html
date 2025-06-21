@@ -1508,6 +1508,7 @@
                 
                 // Check if this is a deletion confirmation request
                 if (data.response === 'DELETION_CONFIRM' && data.deletion_info) {
+                    console.log('DEBUG: Deletion confirmation detected:', data.deletion_info);
                     showTopicDeleteModal(data.deletion_info);
                 } else {
                     // Add assistant response to chat

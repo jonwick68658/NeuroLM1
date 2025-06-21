@@ -986,14 +986,17 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                 response = "Usage: `/delete-topic [topic_name]`\nExample: `/delete-topic cooking`\n⚠️ **Warning:** This will delete the entire topic, all its subtopics, conversations, and memories permanently."
             else:
                 topic_name = ' '.join(parts[1:]).lower()
+                print(f"DEBUG: Processing delete-topic command for: {topic_name}")
                 
                 # Get deletion info first
                 info = get_topic_deletion_info(user_id, topic_name)
+                print(f"DEBUG: Topic deletion info: {info}")
                 
                 if not info['exists']:
                     response = f"Topic '{topic_name}' not found. Use `/topics` to see available topics."
                 else:
                     # Return JSON for frontend popup
+                    print("DEBUG: Returning DELETION_CONFIRM response")
                     return ChatResponse(
                         response="DELETION_CONFIRM",
                         memory_stored=False,
