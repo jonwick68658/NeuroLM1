@@ -180,7 +180,8 @@ def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0) -> Di
         
         # Get total count
         cursor.execute('SELECT COUNT(*) FROM conversations WHERE user_id = %s', (user_id,))
-        total_count = cursor.fetchone()[0]
+        count_result = cursor.fetchone()
+        total_count = count_result[0] if count_result and count_result[0] is not None else 0
         
         # Get paginated conversations with latest message preview
         cursor.execute('''
@@ -560,6 +561,238 @@ def get_linked_memories(current_topic: str, user_id: str, limit: int = 2) -> Lis
         print(f"Error getting linked memories: {e}")
         return []
 
+# Topic deletion functions
+def get_topic_deletion_info(user_id: str, topic: str) -> Dict:
+    """Get information about what will be deleted when deleting a topic"""
+    try:
+        topic = topic.lower().strip()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get conversation count and subtopics
+        cursor.execute('''
+            SELECT COUNT(*) as conversation_count,
+                   COUNT(DISTINCT sub_topic) as subtopic_count,
+                   COALESCE(SUM(message_count), 0) as total_messages
+            FROM conversations
+            WHERE user_id = %s AND topic = %s
+        ''', (user_id, topic))
+        
+        result = cursor.fetchone()
+        if not result:
+            cursor.close()
+            conn.close()
+            return {'exists': False}
+        
+        conversation_count = result[0] if result[0] is not None else 0
+        subtopic_count = result[1] if result[1] is not None and result[1] > 0 else 0
+        total_messages = result[2] if result[2] is not None else 0
+        
+        # Get list of subtopics
+        cursor.execute('''
+            SELECT DISTINCT sub_topic
+            FROM conversations
+            WHERE user_id = %s AND topic = %s AND sub_topic IS NOT NULL
+        ''', (user_id, topic))
+        
+        subtopics = [row[0] for row in cursor.fetchall()]
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            'topic': topic,
+            'conversation_count': conversation_count,
+            'subtopic_count': subtopic_count,
+            'subtopics': subtopics,
+            'total_messages': total_messages,
+            'exists': conversation_count > 0
+        }
+    except Exception as e:
+        print(f"Error getting topic deletion info: {e}")
+        return {'exists': False}
+
+def get_subtopic_deletion_info(user_id: str, topic: str, subtopic: str) -> Dict:
+    """Get information about what will be deleted when deleting a subtopic"""
+    try:
+        topic = topic.lower().strip()
+        subtopic = subtopic.lower().strip()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get conversation count and message count for this subtopic
+        cursor.execute('''
+            SELECT COUNT(*) as conversation_count,
+                   COALESCE(SUM(message_count), 0) as total_messages
+            FROM conversations
+            WHERE user_id = %s AND topic = %s AND sub_topic = %s
+        ''', (user_id, topic, subtopic))
+        
+        result = cursor.fetchone()
+        conversation_count = result[0]
+        total_messages = result[1]
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            'topic': topic,
+            'subtopic': subtopic,
+            'conversation_count': conversation_count,
+            'total_messages': total_messages,
+            'exists': conversation_count > 0
+        }
+    except Exception as e:
+        print(f"Error getting subtopic deletion info: {e}")
+        return {'exists': False}
+
+def delete_topic_and_data(user_id: str, topic: str) -> bool:
+    """Delete a topic and all associated data from both PostgreSQL and Neo4j"""
+    try:
+        topic = topic.lower().strip()
+        
+        # First get all conversation IDs for this topic
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id FROM conversations
+            WHERE user_id = %s AND topic = %s
+        ''', (user_id, topic))
+        
+        conversation_ids = [row[0] for row in cursor.fetchall()]
+        
+        if not conversation_ids:
+            cursor.close()
+            conn.close()
+            return False  # Topic doesn't exist
+        
+        # Begin transaction
+        conn.autocommit = False
+        
+        try:
+            # Delete from PostgreSQL in proper order
+            # 1. Delete memory links
+            cursor.execute('''
+                DELETE FROM memory_links
+                WHERE user_id = %s AND linked_topic = %s
+            ''', (user_id, topic))
+            
+            # 2. Delete conversation messages
+            for conv_id in conversation_ids:
+                cursor.execute('''
+                    DELETE FROM conversation_messages
+                    WHERE conversation_id = %s
+                ''', (conv_id,))
+            
+            # 3. Delete conversations
+            cursor.execute('''
+                DELETE FROM conversations
+                WHERE user_id = %s AND topic = %s
+            ''', (user_id, topic))
+            
+            # Commit PostgreSQL transaction
+            conn.commit()
+            
+            # Delete from Neo4j - memories associated with these conversations
+            from intelligent_memory import IntelligentMemorySystem
+            memory_system = IntelligentMemorySystem()
+            
+            with memory_system.driver.session() as session:
+                for conv_id in conversation_ids:
+                    session.run("""
+                        MATCH (m:IntelligentMemory {user_id: $user_id, conversation_id: $conversation_id})
+                        DELETE m
+                    """, {'user_id': user_id, 'conversation_id': conv_id})
+            
+            memory_system.close()
+            
+            cursor.close()
+            conn.close()
+            return True
+            
+        except Exception as e:
+            # Rollback on error
+            conn.rollback()
+            cursor.close()
+            conn.close()
+            print(f"Error during topic deletion transaction: {e}")
+            return False
+            
+    except Exception as e:
+        print(f"Error deleting topic: {e}")
+        return False
+
+def delete_subtopic_and_data(user_id: str, topic: str, subtopic: str) -> bool:
+    """Delete a subtopic and all associated data from both PostgreSQL and Neo4j"""
+    try:
+        topic = topic.lower().strip()
+        subtopic = subtopic.lower().strip()
+        
+        # First get all conversation IDs for this subtopic
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id FROM conversations
+            WHERE user_id = %s AND topic = %s AND sub_topic = %s
+        ''', (user_id, topic, subtopic))
+        
+        conversation_ids = [row[0] for row in cursor.fetchall()]
+        
+        if not conversation_ids:
+            cursor.close()
+            conn.close()
+            return False  # Subtopic doesn't exist
+        
+        # Begin transaction
+        conn.autocommit = False
+        
+        try:
+            # Delete from PostgreSQL in proper order
+            # 1. Delete conversation messages
+            for conv_id in conversation_ids:
+                cursor.execute('''
+                    DELETE FROM conversation_messages
+                    WHERE conversation_id = %s
+                ''', (conv_id,))
+            
+            # 2. Delete conversations
+            cursor.execute('''
+                DELETE FROM conversations
+                WHERE user_id = %s AND topic = %s AND sub_topic = %s
+            ''', (user_id, topic, subtopic))
+            
+            # Commit PostgreSQL transaction
+            conn.commit()
+            
+            # Delete from Neo4j - memories associated with these conversations
+            from intelligent_memory import IntelligentMemorySystem
+            memory_system = IntelligentMemorySystem()
+            
+            with memory_system.driver.session() as session:
+                for conv_id in conversation_ids:
+                    session.run("""
+                        MATCH (m:IntelligentMemory {user_id: $user_id, conversation_id: $conversation_id})
+                        DELETE m
+                    """, {'user_id': user_id, 'conversation_id': conv_id})
+            
+            memory_system.close()
+            
+            cursor.close()
+            conn.close()
+            return True
+            
+        except Exception as e:
+            # Rollback on error
+            conn.rollback()
+            cursor.close()
+            conn.close()
+            print(f"Error during subtopic deletion transaction: {e}")
+            return False
+            
+    except Exception as e:
+        print(f"Error deleting subtopic: {e}")
+        return False
+
 # Chat models - define before usage
 class ChatMessage(BaseModel):
     message: str
@@ -736,8 +969,91 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
                     else:
                         response = "Current conversation has no topic set."
         
+        elif cmd == '/delete-topic':
+            if len(parts) < 2:
+                response = "Usage: `/delete-topic [topic_name]`\nExample: `/delete-topic cooking`\n⚠️ **Warning:** This will delete the entire topic, all its subtopics, conversations, and memories permanently."
+            else:
+                topic_name = ' '.join(parts[1:]).lower()
+                
+                # Get deletion info first
+                info = get_topic_deletion_info(user_id, topic_name)
+                
+                if not info['exists']:
+                    response = f"Topic '{topic_name}' not found. Use `/topics` to see available topics."
+                else:
+                    # Show confirmation details
+                    response = f"⚠️ **PERMANENT DELETION CONFIRMATION**\n\n"
+                    response += f"**Topic:** {info['topic']}\n"
+                    response += f"**Conversations:** {info['conversation_count']}\n"
+                    response += f"**Subtopics:** {info['subtopic_count']}\n"
+                    if info['subtopics']:
+                        response += f"**Subtopic names:** {', '.join(info['subtopics'])}\n"
+                    response += f"**Total messages:** {info['total_messages']}\n\n"
+                    response += f"**This action will permanently delete:**\n"
+                    response += f"• All {info['conversation_count']} conversations in this topic\n"
+                    response += f"• All {info['subtopic_count']} subtopics and their conversations\n"
+                    response += f"• All {info['total_messages']} messages and memories\n"
+                    response += f"• All associated data from the system\n\n"
+                    response += f"**To confirm deletion, type:** `/confirm-delete-topic {topic_name}`\n"
+                    response += f"**This action cannot be undone!**"
+        
+        elif cmd == '/confirm-delete-topic':
+            if len(parts) < 2:
+                response = "Usage: `/confirm-delete-topic [topic_name]`\nThis confirms permanent deletion of the topic."
+            else:
+                topic_name = ' '.join(parts[1:]).lower()
+                
+                # Perform the deletion
+                success = delete_topic_and_data(user_id, topic_name)
+                
+                if success:
+                    response = f"✅ **Topic '{topic_name}' has been permanently deleted.**\n\nAll conversations, subtopics, messages, and memories associated with this topic have been removed from the system."
+                else:
+                    response = f"❌ **Error deleting topic '{topic_name}'.**\n\nThe topic may not exist or there was a system error. Use `/topics` to see available topics."
+        
+        elif cmd == '/delete-subtopic':
+            if len(parts) < 3:
+                response = "Usage: `/delete-subtopic [topic] [subtopic]`\nExample: `/delete-subtopic cooking recipes`\n⚠️ **Warning:** This will delete the subtopic and all its conversations and memories permanently."
+            else:
+                topic_name = parts[1].lower()
+                subtopic_name = ' '.join(parts[2:]).lower()
+                
+                # Get deletion info first
+                info = get_subtopic_deletion_info(user_id, topic_name, subtopic_name)
+                
+                if not info['exists']:
+                    response = f"Subtopic '{subtopic_name}' under topic '{topic_name}' not found. Use `/topics` to see available topics and subtopics."
+                else:
+                    # Show confirmation details
+                    response = f"⚠️ **PERMANENT DELETION CONFIRMATION**\n\n"
+                    response += f"**Topic:** {info['topic']}\n"
+                    response += f"**Subtopic:** {info['subtopic']}\n"
+                    response += f"**Conversations:** {info['conversation_count']}\n"
+                    response += f"**Total messages:** {info['total_messages']}\n\n"
+                    response += f"**This action will permanently delete:**\n"
+                    response += f"• All {info['conversation_count']} conversations in this subtopic\n"
+                    response += f"• All {info['total_messages']} messages and memories\n"
+                    response += f"• All associated data from the system\n\n"
+                    response += f"**To confirm deletion, type:** `/confirm-delete-subtopic {topic_name} {subtopic_name}`\n"
+                    response += f"**This action cannot be undone!**"
+        
+        elif cmd == '/confirm-delete-subtopic':
+            if len(parts) < 3:
+                response = "Usage: `/confirm-delete-subtopic [topic] [subtopic]`\nThis confirms permanent deletion of the subtopic."
+            else:
+                topic_name = parts[1].lower()
+                subtopic_name = ' '.join(parts[2:]).lower()
+                
+                # Perform the deletion
+                success = delete_subtopic_and_data(user_id, topic_name, subtopic_name)
+                
+                if success:
+                    response = f"✅ **Subtopic '{subtopic_name}' under topic '{topic_name}' has been permanently deleted.**\n\nAll conversations, messages, and memories associated with this subtopic have been removed from the system."
+                else:
+                    response = f"❌ **Error deleting subtopic '{subtopic_name}' under topic '{topic_name}'.**\n\nThe subtopic may not exist or there was a system error. Use `/topics` to see available topics and subtopics."
+        
         else:
-            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file\n• `/topics` - List all topics and sub-topics\n• `/link [topic]` - Link current message to specified topic\n• `/unlink [topic]` - Remove links between topics"
+            response = "**Available commands:**\n\n• `/files` - List all uploaded files\n• `/view [filename]` - Display file content\n• `/delete [filename]` - Delete a file\n• `/search [term]` - Search files by name\n• `/download [filename]` - Download a file\n• `/topics` - List all topics and sub-topics\n• `/link [topic]` - Link current message to specified topic\n• `/unlink [topic]` - Remove links between topics\n• `/delete-topic [topic]` - Delete a topic and all its data\n• `/delete-subtopic [topic] [subtopic]` - Delete a subtopic and all its data"
         
         # Save command and response to conversation
         save_conversation_message(conversation_id, 'user', command)
