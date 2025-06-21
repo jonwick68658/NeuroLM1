@@ -629,8 +629,13 @@ def get_subtopic_deletion_info(user_id: str, topic: str, subtopic: str) -> Dict:
         ''', (user_id, topic, subtopic))
         
         result = cursor.fetchone()
-        conversation_count = result[0]
-        total_messages = result[1]
+        if not result:
+            cursor.close()
+            conn.close()
+            return {'exists': False}
+        
+        conversation_count = result[0] if result[0] is not None else 0
+        total_messages = result[1] if result[1] is not None else 0
         
         cursor.close()
         conn.close()
