@@ -249,8 +249,8 @@ def save_conversation_message(conversation_id: str, message_type: str, content: 
         # Update conversation title if it's the first user message
         if message_type == 'user':
             cursor.execute('SELECT message_count FROM conversations WHERE id = %s', (conversation_id,))
-            count = cursor.fetchone()[0]
-            if count == 1:  # First message, update title
+            count_result = cursor.fetchone()
+            if count_result and count_result[0] is not None and count_result[0] == 1:  # First message, update title
                 title = content[:50] + "..." if len(content) > 50 else content
                 cursor.execute('UPDATE conversations SET title = %s WHERE id = %s', (title, conversation_id))
         
@@ -260,7 +260,7 @@ def save_conversation_message(conversation_id: str, message_type: str, content: 
     except Exception as e:
         print(f"Error saving message: {e}")
 
-def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: str = None) -> Dict:
+def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: Optional[str] = None) -> Dict:
     """Get paginated messages for a conversation"""
     try:
         conn = get_db_connection()
@@ -268,7 +268,8 @@ def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: 
         
         # Get total message count
         cursor.execute('SELECT COUNT(*) FROM conversation_messages WHERE conversation_id = %s', (conversation_id,))
-        total_count = cursor.fetchone()[0]
+        count_result = cursor.fetchone()
+        total_count = count_result[0] if count_result and count_result[0] is not None else 0
         
         if before_id:
             # Load messages before a specific message ID
@@ -319,7 +320,8 @@ def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: 
                     SELECT created_at FROM conversation_messages WHERE id = %s
                 )
             ''', (conversation_id, oldest_id))
-            has_more = cursor.fetchone()[0] > 0
+            more_result = cursor.fetchone()
+            has_more = more_result[0] > 0 if more_result and more_result[0] is not None else False
             cursor.close()
         
         return {
@@ -400,7 +402,8 @@ def get_sub_topic_count(user_id: str, topic: str) -> int:
             WHERE user_id = %s AND topic = %s AND sub_topic IS NOT NULL
         ''', (user_id, topic.lower()))
         
-        count = cursor.fetchone()[0]
+        count_result = cursor.fetchone()
+        count = count_result[0] if count_result and count_result[0] is not None else 0
         cursor.close()
         conn.close()
         return count
@@ -421,7 +424,8 @@ def create_topic_entry(user_id: str, topic: str) -> bool:
             WHERE user_id = %s AND topic = %s
         ''', (user_id, topic))
         
-        if cursor.fetchone()[0] > 0:
+        exists_result = cursor.fetchone()
+        if exists_result and exists_result[0] is not None and exists_result[0] > 0:
             cursor.close()
             conn.close()
             return True  # Topic already exists
