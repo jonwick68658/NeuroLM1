@@ -464,7 +464,8 @@ def create_subtopic_entry(user_id: str, topic: str, sub_topic: str) -> bool:
             WHERE user_id = %s AND topic = %s AND sub_topic = %s
         ''', (user_id, topic, sub_topic))
         
-        if cursor.fetchone()[0] > 0:
+        subtopic_exists_result = cursor.fetchone()
+        if subtopic_exists_result and subtopic_exists_result[0] is not None and subtopic_exists_result[0] > 0:
             cursor.close()
             conn.close()
             return True  # Sub-topic already exists
@@ -497,7 +498,8 @@ def create_memory_link(memory_id: str, linked_topic: str, user_id: str) -> bool:
             WHERE source_memory_id = %s AND linked_topic = %s AND user_id = %s
         ''', (memory_id, linked_topic.lower(), user_id))
         
-        if cursor.fetchone()[0] > 0:
+        link_exists_result = cursor.fetchone()
+        if link_exists_result and link_exists_result[0] is not None and link_exists_result[0] > 0:
             cursor.close()
             conn.close()
             return True  # Link already exists
@@ -1549,7 +1551,16 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         
         # Check for slash commands
         if chat_request.message.startswith('/'):
-            return await handle_slash_command(chat_request.message, user_id, chat_request.conversation_id or create_conversation(user_id))
+            conversation_id = chat_request.conversation_id or create_conversation(user_id)
+            if conversation_id:
+                return await handle_slash_command(chat_request.message, user_id, conversation_id)
+            else:
+                return ChatResponse(
+                    response="Error creating conversation for command processing.",
+                    memory_stored=False,
+                    context_used=0,
+                    conversation_id=""
+                )
         
         # Check for /link command within message and extract it
         link_topic = None
@@ -1561,11 +1572,12 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
                 message_content = parts[2]  # Extract actual message content after /link [topic]
             elif len(parts) == 2:
                 # Just /link [topic] without message content
+                fallback_conversation_id = chat_request.conversation_id or create_conversation(user_id)
                 return ChatResponse(
                     response=f"Please include your message after `/link {parts[1]}`. Example: `/link cooking I love pasta recipes`",
                     memory_stored=False,
                     context_used=0,
-                    conversation_id=chat_request.conversation_id or create_conversation(user_id)
+                    conversation_id=fallback_conversation_id or ""
                 )
         
         # Handle conversation management first to ensure we have topic context
@@ -1781,7 +1793,7 @@ async def create_new_conversation(request: Request, conversation_data: Conversat
         raise HTTPException(status_code=500, detail=f"Error creating conversation: {str(e)}")
 
 @app.get("/api/conversations/{conversation_id}/messages", response_model=MessageListResponse)
-async def get_conversation_messages_endpoint(conversation_id: str, request: Request, limit: int = 30, before_id: str = None):
+async def get_conversation_messages_endpoint(conversation_id: str, request: Request, limit: int = 30, before_id: Optional[str] = None):
     """Get paginated messages for a specific conversation"""
     try:
         session_id = request.cookies.get("session_id")
@@ -1956,7 +1968,8 @@ async def delete_conversation(conversation_id: str, request: Request):
                         'conversation_id': conversation_id,
                         'user_id': user_id
                     })
-                    deleted_memories = result.single()['deleted_count']
+                    memory_result = result.single()
+                    deleted_memories = memory_result['deleted_count'] if memory_result else 0
                     print(f"Deleted {deleted_memories} memories from Neo4j")
         except Exception as e:
             print(f"Error deleting memories from Neo4j: {e}")
@@ -2067,7 +2080,7 @@ async def download_file(filename: str, request: Request):
 
 # Get user files endpoint
 @app.get("/api/user-files")
-async def get_user_files(request: Request, search: str = None):
+async def get_user_files(request: Request, search: Optional[str] = None):
     """Get all files for the current user with optional search"""
     try:
         session_id = request.cookies.get("session_id")
@@ -2078,7 +2091,7 @@ async def get_user_files(request: Request, search: str = None):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        if search:
+        if search is not None:
             cursor.execute("""
                 SELECT id, filename, file_type, uploaded_at, 
                        LEFT(content, 100) as content_preview
