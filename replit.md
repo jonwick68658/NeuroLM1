@@ -36,7 +36,8 @@ The application follows a FastAPI-based microservice architecture with the follo
 - **User Isolation**: Memory segmentation per user for privacy
 
 ### 2. Model Service (`model_service.py`)
-- **OpenRouter Integration**: API wrapper for multiple AI model providers
+- **OpenRouter Integration**: API wrapper for multiple AI model providers with web search support
+- **Web Search Capability**: Real-time web data integration using OpenRouter's `:online` suffix
 - **Model Management**: Dynamic model listing and selection
 - **Request Handling**: Standardized chat completion interface
 - **Error Handling**: Robust fallback mechanisms for API failures
@@ -51,6 +52,7 @@ The application follows a FastAPI-based microservice architecture with the follo
 ### 4. Web Interface (`chat.html`, `mobile.html`)
 - **Responsive Design**: Desktop and mobile-optimized interfaces
 - **Real-time Chat**: Asynchronous message handling with streaming
+- **Web Search Integration**: Toggle button (🌐) for enabling real-time web data access
 - **Markdown Support**: Rich text rendering with syntax highlighting
 - **PWA Features**: Offline support, installable app experience
 - **File Integration**: Drag-and-drop file upload with AI integration
@@ -122,7 +124,8 @@ The application follows a FastAPI-based microservice architecture with the follo
 
 ## Changelog
 
-- June 24, 2025. Initial setup
+- June 24, 2025: Added OpenRouter web search integration with 🌐 button for real-time web data access
+- June 24, 2025: Initial setup
 
 ## User Preferences
 
