@@ -56,8 +56,8 @@ class ModelService:
             print(f"Error fetching models: {e}")
             return self.default_models
     
-    async def chat_completion(self, messages: List[Dict], model: str = "openai/gpt-4o-mini", web_search: bool = False) -> str:
-        """Generate chat completion using OpenRouter API"""
+    async def chat_completion(self, messages: List[Dict], model: str = "openai/gpt-4o-mini", web_search: bool = False, tools: Optional[List[Dict]] = None) -> Dict:
+        """Generate chat completion using OpenRouter API with optional tool calling support"""
         
         if not self.api_key:
             raise Exception("OpenRouter API key is required for chat completions")
@@ -74,6 +74,10 @@ class ModelService:
             "messages": messages,
             "temperature": 0.7
         }
+        
+        # Add tools if provided
+        if tools:
+            payload["tools"] = tools
         
         # Add web search functionality if enabled
         if web_search:
@@ -92,7 +96,7 @@ class ModelService:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    return data["choices"][0]["message"]["content"]
+                    return data["choices"][0]["message"]  # Return full message object for tool calling
                 else:
                     raise Exception(f"API error: {response.status_code} - {response.text}")
                     
