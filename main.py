@@ -810,6 +810,7 @@ class ChatMessage(BaseModel):
     model: Optional[str] = "gpt-4o-mini"
     conversation_id: Optional[str] = None
     web_search: Optional[bool] = False
+    use_tools: Optional[bool] = False
 
 class ChatResponse(BaseModel):
     response: str
@@ -817,6 +818,7 @@ class ChatResponse(BaseModel):
     context_used: int
     conversation_id: str
     deletion_info: Optional[Dict] = None
+    tools_used: Optional[List[Dict]] = None
 
 # Slash command handler
 async def handle_slash_command(command: str, user_id: str, conversation_id: str) -> ChatResponse:
