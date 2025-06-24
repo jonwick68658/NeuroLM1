@@ -229,7 +229,7 @@ body {
 }
 
 /* Touch-optimized buttons */
-.send-button, .file-button {
+.send-button, .file-button, .web-search-button {
     min-width: 48px;
     min-height: 48px;
     border: none;
@@ -262,6 +262,23 @@ body {
 .file-button:active {
     background: #e2e8f0;
     transform: scale(0.95);
+}
+
+.web-search-button {
+    background: #f8fafc;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+}
+
+.web-search-button:active {
+    background: #e2e8f0;
+    transform: scale(0.95);
+}
+
+.web-search-button.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: 2px solid #667eea;
 }
 
 /* Model selector mobile styles */

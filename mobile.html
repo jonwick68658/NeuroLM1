@@ -101,6 +101,7 @@
         let currentOffset = 0;
         let hasMoreConversations = true;
         let isLoadingConversations = false;
+        let webSearchEnabled = false;
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', async function() {
@@ -135,6 +136,14 @@
             
             sidebar.classList.remove('open');
             overlay.classList.remove('show');
+        }
+
+        // Web search toggle function
+        function toggleWebSearch() {
+            webSearchEnabled = !webSearchEnabled;
+            const button = document.getElementById('webSearchButtonMobile');
+            button.classList.toggle('active', webSearchEnabled);
+            button.title = webSearchEnabled ? 'Disable web search' : 'Enable web search';
         }
 
         // Auto-resize textarea with improved functionality
@@ -506,14 +515,20 @@
             showTypingIndicator();
             
             try {
+                const requestBody = {
+                    message: message,
+                    model: selectedModel,
+                    conversation_id: currentConversationId
+                };
+                
+                if (webSearchEnabled) {
+                    requestBody.web_search = true;
+                }
+                
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: message,
-                        model: selectedModel,
-                        conversation_id: currentConversationId
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 const data = await response.json();
