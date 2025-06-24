@@ -99,47 +99,6 @@ class ModelService:
         except Exception as e:
             raise Exception(f"Chat completion failed: {str(e)}")
     
-    async def chat_completion_with_tools(self, messages: List[Dict], model: str = "openai/gpt-4o-mini", tools: List[Dict] = None) -> Dict:
-        """Generate chat completion with tool calling support"""
-        
-        if not self.api_key:
-            raise Exception("OpenRouter API key is required for chat completions")
-        
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://neurolm.replit.app",
-            "X-Title": "NeuroLM Chat"
-        }
-        
-        payload = {
-            "model": model,
-            "messages": messages,
-            "temperature": 0.7
-        }
-        
-        # Add tools if provided
-        if tools:
-            payload["tools"] = tools
-        
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=30.0
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return data["choices"][0]["message"]
-                else:
-                    raise Exception(f"API error: {response.status_code} - {response.text}")
-                    
-        except Exception as e:
-            raise Exception(f"Chat completion failed: {str(e)}")
-    
     def search_models(self, query: str) -> List[Dict]:
         """Search models by name or description"""
         models = self.get_models()
