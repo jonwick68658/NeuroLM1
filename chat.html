@@ -764,6 +764,35 @@
             color: var(--primary-color);
         }
 
+        .web-search-button {
+            background: var(--border-color);
+            color: var(--dark-text);
+            border: 1px solid var(--border-color);
+            padding: 0;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .web-search-button:hover {
+            background: var(--light-bg);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .web-search-button.active {
+            background: var(--primary-color);
+            color: var(--light-text);
+            border-color: var(--primary-color);
+        }
+
         .send-button {
             background: var(--primary-color);
             color: var(--light-text);
@@ -1200,7 +1229,8 @@
             <div class="slash-suggestions" id="slashSuggestions"></div>
             <div class="input-buttons">
                 <input type="file" id="fileInput" style="display: none;" accept=".txt,.py,.js,.html,.css,.md,.json,.xml,.csv">
-                <button id="uploadButton" class="upload-button" title="Upload file">+</button>
+                <button id="uploadButton" class="upload-button" title="Upload file">📎</button>
+                <button id="webSearchButton" class="web-search-button" title="Enable web search">🌐</button>
                 <button id="sendButton" class="send-button">Send</button>
             </div>
         </div>
@@ -1268,6 +1298,7 @@
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
         const uploadButton = document.getElementById('uploadButton');
+        const webSearchButton = document.getElementById('webSearchButton');
         const fileInput = document.getElementById('fileInput');
 
         const newChatBtn = document.getElementById('newChatBtn');
@@ -1322,6 +1353,7 @@
         let userName = '';
         let currentConversationTopic = null;
         let currentConversationSubtopic = null;
+        let webSearchEnabled = false;
         
         // Topic selection elements
         const topicSelect = document.getElementById('topicSelect');
@@ -1478,16 +1510,22 @@
                 // Use the selected model from the search dropdown
                 
                 // Call chat API
+                const requestBody = { 
+                    message: message,
+                    model: selectedModel,
+                    conversation_id: currentConversationId
+                };
+                
+                if (webSearchEnabled) {
+                    requestBody.web_search = true;
+                }
+                
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ 
-                        message: message,
-                        model: selectedModel,
-                        conversation_id: currentConversationId
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) {
@@ -1686,6 +1724,12 @@
             if (file) {
                 uploadFile(file);
             }
+        });
+        
+        webSearchButton.addEventListener('click', () => {
+            webSearchEnabled = !webSearchEnabled;
+            webSearchButton.classList.toggle('active', webSearchEnabled);
+            webSearchButton.title = webSearchEnabled ? 'Disable web search' : 'Enable web search';
         });
         
         sendButton.addEventListener('click', sendMessage);
