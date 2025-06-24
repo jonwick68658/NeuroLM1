@@ -56,7 +56,7 @@ class ModelService:
             print(f"Error fetching models: {e}")
             return self.default_models
     
-    async def chat_completion(self, messages: List[Dict], model: str = "openai/gpt-4o-mini") -> str:
+    async def chat_completion(self, messages: List[Dict], model: str = "openai/gpt-4o-mini", web_search: bool = False) -> str:
         """Generate chat completion using OpenRouter API"""
         
         if not self.api_key:
@@ -74,6 +74,12 @@ class ModelService:
             "messages": messages,
             "temperature": 0.7
         }
+        
+        # Add web search functionality if enabled
+        if web_search:
+            # Use the :online shortcut for web search
+            if not payload["model"].endswith(":online"):
+                payload["model"] = f"{model}:online"
         
         try:
             async with httpx.AsyncClient() as client:

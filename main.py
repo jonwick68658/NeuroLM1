@@ -809,6 +809,7 @@ class ChatMessage(BaseModel):
     message: str
     model: Optional[str] = "gpt-4o-mini"
     conversation_id: Optional[str] = None
+    web_search: Optional[bool] = False
 
 class ChatResponse(BaseModel):
     response: str
@@ -1673,7 +1674,8 @@ Instructions:
         try:
             response_text = await model_service.chat_completion(
                 messages=messages,
-                model=chat_request.model or "openai/gpt-4o-mini"
+                model=chat_request.model or "openai/gpt-4o-mini",
+                web_search=chat_request.web_search or False
             )
             print(f"DEBUG: Generated response: {response_text[:100]}...")
         except Exception as e:
