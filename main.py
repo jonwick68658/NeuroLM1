@@ -2155,6 +2155,59 @@ async def delete_subtopic_endpoint(topic_name: str, subtopic_name: str, request:
     else:
         raise HTTPException(status_code=400, detail=f"Error deleting subtopic '{subtopic_name}' from topic '{topic_name}'. It may not exist or there was a system error.")
 
+# Test tool calling endpoint
+@app.post("/api/test-tools")
+async def test_tool_calling(request: Request):
+    """Test endpoint for tool calling functionality"""
+    try:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
+        
+        from model_service import ModelService
+        from tools import AVAILABLE_TOOLS, execute_tool
+        import json
+        
+        model_service = ModelService()
+        
+        # Test message asking for current time
+        messages = [
+            {"role": "user", "content": "What's the current time?"}
+        ]
+        
+        # Make request with tools
+        response = await model_service.chat_completion_with_tools(
+            messages=messages,
+            model="openai/gpt-4o-mini",
+            tools=AVAILABLE_TOOLS
+        )
+        
+        # Check if tool was called
+        if hasattr(response, 'tool_calls') and response.tool_calls:
+            tool_call = response.tool_calls[0]
+            tool_name = tool_call.function.name
+            tool_args = json.loads(tool_call.function.arguments)
+            
+            # Execute the tool
+            tool_result = await execute_tool(tool_name, tool_args, user_id)
+            
+            return {
+                "success": True,
+                "tool_called": tool_name,
+                "tool_result": tool_result,
+                "response": response
+            }
+        else:
+            return {
+                "success": False,
+                "message": "No tool was called",
+                "response": response
+            }
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
