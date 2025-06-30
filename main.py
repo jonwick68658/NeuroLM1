@@ -37,6 +37,16 @@ except Exception as e:
     print(f"❌ Failed to initialize intelligent memory: {e}")
     intelligent_memory_system = None
 
+# Initialize memory summarizer
+memory_summarizer_instance = None
+try:
+    from memory_summarizer import memory_summarizer
+    memory_summarizer_instance = memory_summarizer
+    print("✅ Memory summarizer initialized")
+except Exception as e:
+    print(f"❌ Failed to initialize memory summarizer: {e}")
+    memory_summarizer_instance = None
+
 # Note: Sessions cleared on restart - users need to re-login
 
 def get_db_connection():
@@ -2154,6 +2164,29 @@ async def delete_subtopic_endpoint(topic_name: str, subtopic_name: str, request:
         return {"success": True, "message": f"Subtopic '{subtopic_name}' has been permanently deleted from topic '{topic_name}'."}
     else:
         raise HTTPException(status_code=400, detail=f"Error deleting subtopic '{subtopic_name}' from topic '{topic_name}'. It may not exist or there was a system error.")
+
+# Memory summarization test endpoint
+@app.post("/api/memory/summarize-test")
+async def test_memory_summarization(request: Request):
+    """Manual trigger for testing memory summarization"""
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in user_sessions:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    user_id = user_sessions[session_id]['user_id']
+    
+    if not memory_summarizer_instance:
+        raise HTTPException(status_code=500, detail="Memory summarizer not available")
+    
+    try:
+        result = await memory_summarizer_instance.process_user_daily_summaries(user_id)
+        return {
+            "status": "success",
+            "result": result,
+            "message": f"Processed {result.get('memories_processed', 0)} memories into {result.get('summaries_created', 0)} summaries"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Summarization failed: {str(e)}")
 
 # Health check endpoint
 @app.get("/health")
