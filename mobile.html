@@ -76,9 +76,13 @@
             
             <div class="input-container">
                 <textarea class="message-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+                <button class="send-button" onclick="sendMessage()">▶</button>
+            </div>
+            
+            <!-- Floating action buttons -->
+            <div class="floating-buttons">
                 <button class="file-button" onclick="document.getElementById('fileInput').click()">📎</button>
                 <button class="web-search-button" id="webSearchButtonMobile" onclick="toggleWebSearch()" title="Enable web search">🌐</button>
-                <button class="send-button" onclick="sendMessage()">▶</button>
             </div>
             <input type="file" id="fileInput" style="display: none;" onchange="handleFileUpload(event)">
         </div>
