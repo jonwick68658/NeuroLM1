@@ -194,3 +194,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 Built with ❤️ using FastAPI, Neo4j, and OpenRouter AI
+
+📄 License  
+This project is licensed under the MIT License - see the LICENSE file for details.
