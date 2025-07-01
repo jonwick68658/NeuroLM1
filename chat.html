@@ -1446,6 +1446,9 @@
         let filteredFiles = [];
         let sidebarOpen = false; // Default closed on all devices
         let highlightedSuggestion = -1;
+        let toolsMenuOpen = false;
+        let isRecording = false;
+        let recognition = null;
         let allTopics = {};
         let selectedTopic = '';
         let selectedSubtopic = '';
@@ -1458,6 +1461,68 @@
         const topicSelect = document.getElementById('topicSelect');
         const subtopicSelect = document.getElementById('subtopicSelect');
         
+        // Initialize speech recognition
+        function initializeSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = function() {
+                    isRecording = true;
+                    microphoneButton.classList.add('voice-recording');
+                    microphoneButton.querySelector('.tool-label').textContent = 'Listening...';
+                };
+
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    chatInput.value = transcript;
+                    chatInput.focus();
+                };
+
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error:', event.error);
+                    stopRecording();
+                };
+
+                recognition.onend = function() {
+                    stopRecording();
+                };
+            } else {
+                microphoneButton.style.display = 'none';
+                console.log('Speech recognition not supported in this browser');
+            }
+        }
+
+        function startRecording() {
+            if (recognition && !isRecording) {
+                recognition.start();
+            }
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            microphoneButton.classList.remove('voice-recording');
+            microphoneButton.querySelector('.tool-label').textContent = 'Voice Input';
+            if (recognition) {
+                recognition.stop();
+            }
+        }
+
+        function toggleToolsMenu() {
+            toolsMenuOpen = !toolsMenuOpen;
+            toolsButton.classList.toggle('active', toolsMenuOpen);
+            toolsMenu.classList.toggle('show', toolsMenuOpen);
+        }
+
+        function closeToolsMenu() {
+            toolsMenuOpen = false;
+            toolsButton.classList.remove('active');
+            toolsMenu.classList.remove('show');
+        }
+
         // Slash command definitions
         const slashCommands = [
             {
@@ -2772,6 +2837,9 @@
                     menu.classList.remove('show');
                 });
             }
+            if (!e.target.closest('.tools-container') && toolsMenuOpen) {
+                closeToolsMenu();
+            }
         });
 
         // Topic deletion modal functions
@@ -2862,6 +2930,20 @@
             
             // Initialize sidebar state
             updateSidebarState();
+            
+            // Initialize speech recognition
+            initializeSpeechRecognition();
+            
+            // Add event listeners for new functionality
+            toolsButton.addEventListener('click', toggleToolsMenu);
+            microphoneButton.addEventListener('click', () => {
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+                closeToolsMenu();
+            });
             
             // If no current conversation, start a new one
             if (!currentConversationId) {
