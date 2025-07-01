@@ -671,8 +671,8 @@
             background: white;
             border-radius: 10px;
             box-shadow: 0 0 15px rgba(0,0,0,0.05);
-            margin-bottom: 120px;
-            height: calc(100vh - 140px);
+            margin-bottom: 140px;
+            height: calc(100vh - 120px);
         }
 
         .message {
@@ -704,44 +704,40 @@
 
         .chat-input-container {
             position: fixed;
-            bottom: 0;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 96%;
-            max-width: 1200px;
-            padding: 16px 20px 20px 20px;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid var(--border-color);
+            width: 90%;
+            max-width: 768px;
             z-index: 1000;
         }
 
         .input-wrapper {
             position: relative;
             background: white;
-            border: 1px solid var(--border-color);
-            border-radius: 30px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 1px solid #d1d5db;
+            border-radius: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             transition: all 0.2s ease;
-            min-height: 56px;
+            min-height: 48px;
             display: flex;
             flex-direction: column;
         }
 
         .input-wrapper:focus-within {
-            border-color: var(--primary-color);
-            box-shadow: 0 4px 16px rgba(74, 111, 165, 0.15);
+            border-color: #9ca3af;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .chat-input {
             width: 100%;
             background: transparent;
             border: none;
-            padding: 18px 20px 4px 20px;
+            padding: 14px 16px 4px 16px;
             font-size: 16px;
             outline: none;
             resize: none;
-            min-height: 24px;
+            min-height: 20px;
             max-height: 144px;
             font-family: inherit;
             line-height: 24px;
@@ -755,33 +751,34 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 4px 16px 14px 20px;
-            gap: 12px;
+            padding: 6px 12px 10px 16px;
+            gap: 8px;
             flex-shrink: 0;
         }
 
 
 
         .send-button {
-            background: var(--primary-color);
-            color: var(--light-text);
+            background: #374151;
+            color: white;
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-size: 0.9rem;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s ease;
-            min-width: 60px;
-            height: 36px;
+            min-width: 48px;
+            height: 32px;
             flex-shrink: 0;
+            font-weight: 500;
         }
 
         .send-button:hover {
-            background: var(--secondary-color);
+            background: #1f2937;
         }
 
         .send-button:disabled {
-            background: #ccc;
+            background: #9ca3af;
             cursor: not-allowed;
         }
 
@@ -794,31 +791,29 @@
         .tools-button {
             display: flex;
             align-items: center;
-            gap: 6px;
-            background: var(--border-color);
-            color: var(--dark-text);
-            border: 1px solid var(--border-color);
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-size: 0.9rem;
+            gap: 4px;
+            background: transparent;
+            color: #6b7280;
+            border: none;
+            padding: 6px 8px;
+            border-radius: 16px;
+            font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .tools-button:hover {
-            background: var(--light-bg);
-            border-color: var(--primary-color);
-            color: var(--primary-color);
+            background: #f3f4f6;
+            color: #374151;
         }
 
         .tools-button.active {
-            background: var(--primary-color);
-            color: var(--light-text);
-            border-color: var(--primary-color);
+            background: #e5e7eb;
+            color: #374151;
         }
 
         .tools-icon {
-            font-size: 1.1rem;
+            font-size: 1rem;
             transition: transform 0.2s ease;
         }
 
@@ -835,12 +830,12 @@
             bottom: 100%;
             left: 0;
             background: white;
-            border: 1px solid var(--border-color);
+            border: 1px solid #e5e7eb;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            padding: 8px;
-            min-width: 180px;
-            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 6px;
+            min-width: 160px;
+            margin-bottom: 6px;
             opacity: 0;
             visibility: hidden;
             transform: translateY(10px);
@@ -857,30 +852,31 @@
         .tool-item {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             width: 100%;
-            padding: 10px 12px;
+            padding: 8px 10px;
             background: transparent;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s ease;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             text-align: left;
+            color: #374151;
         }
 
         .tool-item:hover {
-            background: var(--light-bg);
+            background: #f3f4f6;
         }
 
         .tool-item.active {
-            background: var(--primary-color);
-            color: var(--light-text);
+            background: #e5e7eb;
+            color: #1f2937;
         }
 
         .tool-icon {
-            font-size: 1.1rem;
-            width: 20px;
+            font-size: 1rem;
+            width: 18px;
             text-align: center;
         }
 
@@ -1531,7 +1527,7 @@
         }
 
         function autoResizeTextarea() {
-            chatInput.style.height = '24px';
+            chatInput.style.height = '20px';
             const scrollHeight = chatInput.scrollHeight;
             const maxHeight = 144; // 6 lines at 24px line-height
             
@@ -1689,7 +1685,7 @@
             chatInput.value = '';
             
             // Reset textarea height
-            chatInput.style.height = '24px';
+            chatInput.style.height = '20px';
             chatInput.style.overflowY = 'hidden';
 
             // Show typing indicator
