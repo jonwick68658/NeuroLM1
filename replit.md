@@ -147,6 +147,7 @@ The application follows a FastAPI-based microservice architecture with the follo
 
 ## Changelog
 
+- July 1, 2025: Implemented ChatGPT-style floating input bubble with borderless design and content overlay effect
 - June 30, 2025: Completed Phase 1 memory enhancement with daily summarization
 - June 30, 2025: Abandoned Phase 2 relationship mapping due to performance issues
 - June 24, 2025: Added OpenRouter web search integration with 🌐 button for real-time web data access
