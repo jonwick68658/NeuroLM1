@@ -703,34 +703,42 @@
         }
 
         .chat-input-container {
-            display: flex;
-            gap: 0.5rem;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 0.5rem;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.05);
             position: fixed;
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
             width: 98%;
             max-width: 1200px;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             border-top: 1px solid var(--border-color);
             z-index: 1000;
-            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            position: relative;
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 25px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 12px rgba(74, 111, 165, 0.2);
         }
 
         .chat-input {
-            flex: 1;
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 0.95rem;
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 16px 20px 8px 20px;
+            font-size: 1rem;
             outline: none;
-            transition: border-color 0.3s ease;
             resize: none;
-            min-height: 36px;
+            min-height: 24px;
             max-height: 120px;
             font-family: inherit;
             line-height: 1.4;
@@ -738,61 +746,15 @@
             overflow-wrap: break-word;
         }
 
-        .chat-input:focus {
-            border-color: var(--primary-color);
-        }
-
-        .upload-button {
-            background: var(--border-color);
-            color: var(--dark-text);
-            border: 1px solid var(--border-color);
-            padding: 0;
-            border-radius: 6px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            width: 36px;
-            height: 36px;
+        .input-controls {
             display: flex;
             align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
+            justify-content: space-between;
+            padding: 8px 16px 12px 20px;
+            gap: 12px;
         }
 
-        .upload-button:hover {
-            background: var(--light-bg);
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
 
-        .web-search-button {
-            background: var(--border-color);
-            color: var(--dark-text);
-            border: 1px solid var(--border-color);
-            padding: 0;
-            border-radius: 6px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .web-search-button:hover {
-            background: var(--light-bg);
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-
-        .web-search-button.active {
-            background: var(--primary-color);
-            color: var(--light-text);
-            border-color: var(--primary-color);
-        }
 
         .send-button {
             background: var(--primary-color);
@@ -815,6 +777,119 @@
         .send-button:disabled {
             background: #ccc;
             cursor: not-allowed;
+        }
+
+        .tools-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .tools-button {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--border-color);
+            color: var(--dark-text);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tools-button:hover {
+            background: var(--light-bg);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .tools-button.active {
+            background: var(--primary-color);
+            color: var(--light-text);
+            border-color: var(--primary-color);
+        }
+
+        .tools-icon {
+            font-size: 1.1rem;
+            transition: transform 0.2s ease;
+        }
+
+        .tools-button.active .tools-icon {
+            transform: rotate(45deg);
+        }
+
+        .tools-text {
+            font-weight: 500;
+        }
+
+        .tools-menu {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 8px;
+            min-width: 180px;
+            margin-bottom: 8px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+            z-index: 1001;
+        }
+
+        .tools-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .tool-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        .tool-item:hover {
+            background: var(--light-bg);
+        }
+
+        .tool-item.active {
+            background: var(--primary-color);
+            color: var(--light-text);
+        }
+
+        .tool-icon {
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .tool-label {
+            font-weight: 500;
+        }
+
+        .voice-recording {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
 
         .memory-indicator {
@@ -1226,13 +1301,33 @@
 
 
         <div class="chat-input-container">
-            <textarea id="chatInput" class="chat-input" placeholder="Type your message here... (Shift+Enter for new line)"></textarea>
-            <div class="slash-suggestions" id="slashSuggestions"></div>
-            <div class="input-buttons">
-                <input type="file" id="fileInput" style="display: none;" accept=".txt,.py,.js,.html,.css,.md,.json,.xml,.csv">
-                <button id="uploadButton" class="upload-button" title="Upload file">📎</button>
-                <button id="webSearchButton" class="web-search-button" title="Enable web search">🌐</button>
-                <button id="sendButton" class="send-button">Send</button>
+            <div class="input-wrapper">
+                <textarea id="chatInput" class="chat-input" placeholder="Ask anything"></textarea>
+                <div class="slash-suggestions" id="slashSuggestions"></div>
+                <div class="input-controls">
+                    <div class="tools-container">
+                        <button id="toolsButton" class="tools-button" title="Tools">
+                            <span class="tools-icon">+</span>
+                            <span class="tools-text">Tools</span>
+                        </button>
+                        <div class="tools-menu" id="toolsMenu">
+                            <input type="file" id="fileInput" style="display: none;" accept=".txt,.py,.js,.html,.css,.md,.json,.xml,.csv">
+                            <button id="uploadButton" class="tool-item" title="Upload file">
+                                <span class="tool-icon">📎</span>
+                                <span class="tool-label">Upload File</span>
+                            </button>
+                            <button id="webSearchButton" class="tool-item" title="Web search">
+                                <span class="tool-icon">🌐</span>
+                                <span class="tool-label">Web Search</span>
+                            </button>
+                            <button id="microphoneButton" class="tool-item" title="Voice input">
+                                <span class="tool-icon">🎤</span>
+                                <span class="tool-label">Voice Input</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="sendButton" class="send-button">Send</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1298,8 +1393,11 @@
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
+        const toolsButton = document.getElementById('toolsButton');
+        const toolsMenu = document.getElementById('toolsMenu');
         const uploadButton = document.getElementById('uploadButton');
         const webSearchButton = document.getElementById('webSearchButton');
+        const microphoneButton = document.getElementById('microphoneButton');
         const fileInput = document.getElementById('fileInput');
 
         const newChatBtn = document.getElementById('newChatBtn');
