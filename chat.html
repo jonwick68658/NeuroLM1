@@ -1895,9 +1895,9 @@
             const likeButton = messageElement.querySelector('.like-button');
             const dislikeButton = messageElement.querySelector('.dislike-button');
             
-            // Clear previous active states
-            likeButton.classList.remove('active');
-            dislikeButton.classList.remove('active');
+            // Clear previous active states (with null checks)
+            if (likeButton) likeButton.classList.remove('active');
+            if (dislikeButton) dislikeButton.classList.remove('active');
             
             // If clicking the same button that's already active, remove feedback
             if (currentFeedback === feedbackType) {
@@ -1906,9 +1906,9 @@
             } else {
                 // Set new feedback
                 localStorage.setItem(feedbackKey, feedbackType);
-                if (feedbackType === 'like') {
+                if (feedbackType === 'like' && likeButton) {
                     likeButton.classList.add('active');
-                } else if (feedbackType === 'dislike') {
+                } else if (feedbackType === 'dislike' && dislikeButton) {
                     dislikeButton.classList.add('active');
                 }
             }
