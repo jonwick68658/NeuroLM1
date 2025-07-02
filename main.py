@@ -119,21 +119,13 @@ def cleanup_expired_sessions():
         return False
 
 def get_authenticated_user(request: Request) -> Optional[Dict]:
-    """Get authenticated user from database session with fallback to memory"""
+    """Get authenticated user from database session"""
     session_id = request.cookies.get("session_id")
     if not session_id:
         return None
     
-    # Try database first
-    session_data = get_session(session_id)
-    if session_data:
-        return session_data
-    
-    # Fallback to memory session during transition
-    if session_id in user_sessions:
-        return user_sessions[session_id]
-    
-    return None
+    # Use database session only
+    return get_session(session_id)
 
 # Initialize intelligent memory system globally
 intelligent_memory_system = None
@@ -1901,10 +1893,10 @@ class ConversationListResponse(BaseModel):
 async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
     """Get paginated conversations for the current user"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         result = get_user_conversations(user_id, limit, offset)
         return result
