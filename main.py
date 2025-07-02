@@ -12,10 +12,14 @@ import uuid
 import psycopg2
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from passlib.context import CryptContext
 
 # Use environment variables
 SECRET_KEY = os.getenv("SECRET_KEY", "default-secret")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Initialize password context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Create FastAPI application
 app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
@@ -1083,8 +1087,8 @@ async def handle_slash_command(command: str, user_id: str, conversation_id: str)
         )
 
 def hash_password(password: str) -> str:
-    """Hash password using SHA256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash password using BCrypt with salt"""
+    return pwd_context.hash(password)
 
 def create_user_in_db(first_name: str, username: str, email: str, password_hash: str) -> bool:
     """Create user in both PostgreSQL and Neo4j databases"""
@@ -1118,19 +1122,48 @@ def create_user_in_db(first_name: str, username: str, email: str, password_hash:
         return False
 
 def verify_user_login(username: str, password: str) -> Optional[str]:
-    """Verify user login and return user ID if successful"""
+    """Verify user login with BCrypt and migrate from SHA256 if needed"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        password_hash = hash_password(password)
         cursor.execute(
-            "SELECT id FROM users WHERE username = %s AND password_hash = %s",
-            (username, password_hash)
+            "SELECT id, password_hash FROM users WHERE username = %s",
+            (username,)
         )
         result = cursor.fetchone()
+        if not result:
+            cursor.close()
+            conn.close()
+            return None
+        
+        user_id, stored_hash = result
+        
+        # Check if this is a BCrypt hash (starts with $2b$)
+        if stored_hash.startswith('$2b$'):
+            # Use BCrypt verification
+            if pwd_context.verify(password, stored_hash):
+                cursor.close()
+                conn.close()
+                return user_id
+        else:
+            # Legacy SHA256 hash - verify and migrate if successful
+            legacy_hash = hashlib.sha256(password.encode()).hexdigest()
+            if legacy_hash == stored_hash:
+                # Password is correct, migrate to BCrypt
+                new_hash = pwd_context.hash(password)
+                cursor.execute(
+                    "UPDATE users SET password_hash = %s WHERE id = %s",
+                    (new_hash, user_id)
+                )
+                conn.commit()
+                cursor.close()
+                conn.close()
+                print(f"Migrated user {username} to BCrypt")
+                return user_id
+        
         cursor.close()
         conn.close()
-        return result[0] if result else None
+        return None
     except Exception as e:
         print(f"Error verifying login: {e}")
         return None
