@@ -1886,7 +1886,17 @@
         function copyToClipboard(messageId, button) {
             const messageElement = document.getElementById(messageId);
             if (messageElement) {
-                const messageContent = messageElement.querySelector('div:first-child').textContent;
+                // Clone the message element to avoid modifying the original
+                const clone = messageElement.cloneNode(true);
+                
+                // Remove elements we don't want to copy
+                const messageInfo = clone.querySelector('.message-info');
+                const messageActions = clone.querySelector('.message-actions');
+                if (messageInfo) messageInfo.remove();
+                if (messageActions) messageActions.remove();
+                
+                // Get the remaining text content
+                const messageContent = clone.textContent.trim();
                 
                 navigator.clipboard.writeText(messageContent).then(() => {
                     const originalTitle = button.title;
