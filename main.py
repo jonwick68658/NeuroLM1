@@ -1912,10 +1912,10 @@ async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
 async def create_new_conversation(request: Request, conversation_data: ConversationCreate):
     """Create a new conversation"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         # Validate sub-topic limit if provided
         if conversation_data.topic and conversation_data.sub_topic:
@@ -1942,8 +1942,8 @@ async def create_new_conversation(request: Request, conversation_data: Conversat
 async def get_conversation_messages_endpoint(conversation_id: str, request: Request, limit: int = 30, before_id: Optional[str] = None):
     """Get paginated messages for a specific conversation"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
         
         result = get_conversation_messages(conversation_id, limit, before_id)
