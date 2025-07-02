@@ -1955,8 +1955,8 @@ async def get_conversation_messages_endpoint(conversation_id: str, request: Requ
 async def get_conversation_messages_all_endpoint(conversation_id: str, request: Request):
     """Get all messages for a specific conversation (legacy endpoint)"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
         
         messages = get_conversation_messages_all(conversation_id)
@@ -1968,10 +1968,10 @@ async def get_conversation_messages_all_endpoint(conversation_id: str, request: 
 async def get_topics_endpoint(request: Request):
     """Get all topics and sub-topics for the current user"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         topics = get_all_topics(user_id)
         return topics
@@ -1982,10 +1982,10 @@ async def get_topics_endpoint(request: Request):
 async def get_user_name_endpoint(request: Request):
     """Get the current user's first name"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         first_name = get_user_first_name(user_id)
         return {"first_name": first_name}
@@ -2004,10 +2004,10 @@ class SubtopicCreate(BaseModel):
 async def create_topic_endpoint(request: Request, topic_data: TopicCreate):
     """Create a new topic"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         if not topic_data.name or not topic_data.name.strip():
             raise HTTPException(status_code=400, detail="Topic name cannot be empty")
@@ -2026,10 +2026,10 @@ async def create_topic_endpoint(request: Request, topic_data: TopicCreate):
 async def create_subtopic_endpoint(request: Request, topic: str, subtopic_data: SubtopicCreate):
     """Create a new sub-topic under an existing topic"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         if not subtopic_data.name or not subtopic_data.name.strip():
             raise HTTPException(status_code=400, detail="Sub-topic name cannot be empty")
@@ -2061,10 +2061,10 @@ class ConversationTopicUpdate(BaseModel):
 async def update_conversation_topic_endpoint(conversation_id: str, request: Request, topic_data: ConversationTopicUpdate):
     """Update the topic and sub-topic of an existing conversation"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         # Verify the conversation belongs to the user
         conversations = get_user_conversations(user_id, limit=1000, offset=0)  # Get all conversations to check ownership
@@ -2089,10 +2089,10 @@ async def update_conversation_topic_endpoint(conversation_id: str, request: Requ
 async def delete_conversation(conversation_id: str, request: Request):
     """Delete a conversation and all its memories"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         # Verify the conversation belongs to the user
         conversations = get_user_conversations(user_id, limit=1000, offset=0)
@@ -2163,10 +2163,10 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     """Upload and store file content in PostgreSQL"""
     try:
         # Get user from session
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         # Read file content
         content = await file.read()
@@ -2192,10 +2192,10 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
 async def download_file(filename: str, request: Request):
     """Download a file for the current user"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -2229,10 +2229,10 @@ async def download_file(filename: str, request: Request):
 async def get_user_files(request: Request, search: Optional[str] = None):
     """Get all files for the current user with optional search"""
     try:
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -2321,11 +2321,11 @@ async def delete_subtopic_endpoint(topic_name: str, subtopic_name: str, request:
 @app.post("/api/memory/summarize-test")
 async def test_memory_summarization(request: Request):
     """Manual trigger for testing memory summarization"""
-    session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in user_sessions:
+    user_data = get_authenticated_user(request)
+    if not user_data:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    user_id = user_sessions[session_id]['user_id']
+    user_id = user_data['user_id']
     
     if not memory_summarizer_instance:
         raise HTTPException(status_code=500, detail="Memory summarizer not available")
