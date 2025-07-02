@@ -13,11 +13,15 @@ import psycopg2
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+# Use environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "default-secret")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 # Create FastAPI application
 app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
 
 # Add session middleware
-app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # Router removed - simplified API structure
 
