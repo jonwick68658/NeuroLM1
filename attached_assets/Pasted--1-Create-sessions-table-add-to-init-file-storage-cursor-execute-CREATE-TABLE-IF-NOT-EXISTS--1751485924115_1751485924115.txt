@@ -1,0 +1,72 @@
+# 1. Create sessions table (add to init_file_storage)
+cursor.execute('''CREATE TABLE IF NOT EXISTS sessions (
+    session_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP NOT NULL
+)''')
+
+# 2. Modify login endpoint
+@app.post("/login")
+async def login_user(username: str = Form(...), password: str = Form(...)):
+    user_id = verify_user_login(username, password)
+    if not user_id:
+        return HTMLResponse("""<script>alert('Invalid credentials'); window.location.href='/login';</script>""")
+    
+    # Create persistent session
+    session_id = str(uuid.uuid4())
+    expires_at = datetime.now() + timedelta(hours=1)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO sessions (session_id, user_id, expires_at) VALUES (%s, %s, %s)",
+        (session_id, user_id, expires_at)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    response = RedirectResponse(url="/", status_code=302)
+    response.set_cookie(key="session_id", value=session_id, httponly=True)
+    return response
+
+# 3. Create session validation helper
+def get_current_user(request: Request) -> Optional[str]:
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        return None
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT user_id, expires_at FROM sessions WHERE session_id = %s",
+        (session_id,)
+    )
+    result = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    
+    if not result:
+        return None
+    
+    user_id, expires_at = result
+    if expires_at < datetime.now():
+        # Clean expired session
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions WHERE session_id = %s", (session_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return None
+    
+    return user_id
+
+# 4. Update all auth checks to use get_current_user
+# Example for chat endpoint:
+@app.post("/api/chat")
+async def chat_with_memory(chat_request: ChatMessage, request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        raise HTTPException(401, "Not authenticated")
+    # Rest of code...
