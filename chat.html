@@ -1165,6 +1165,22 @@
             fill: #059669;
         }
 
+        .like-button:hover svg {
+            fill: #059669;
+        }
+
+        .like-button.active svg {
+            fill: #059669;
+        }
+
+        .dislike-button:hover svg {
+            fill: #dc2626;
+        }
+
+        .dislike-button.active svg {
+            fill: #dc2626;
+        }
+
         .code-container {
             position: relative;
             margin: 1rem 0;
@@ -1810,6 +1826,16 @@
                                 <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                             </svg>
                         </button>
+                        <button class="action-button like-button" onclick="toggleFeedback('${messageId}', 'like', this)" title="Like this response">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/>
+                            </svg>
+                        </button>
+                        <button class="action-button dislike-button" onclick="toggleFeedback('${messageId}', 'dislike', this)" title="Dislike this response">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/>
+                            </svg>
+                        </button>
                     </div>
                 `;
             } else {
@@ -1857,23 +1883,56 @@
             });
         }
 
-        function copyToClipboard(messageId, button) {
+        function toggleFeedback(messageId, feedbackType, button) {
+            // Get current feedback from localStorage
+            const feedbackKey = `feedback_${messageId}`;
+            let currentFeedback = localStorage.getItem(feedbackKey);
+            
+            // Find the message element to get both buttons
             const messageElement = document.getElementById(messageId);
-            if (messageElement) {
-                const messageContent = messageElement.querySelector('div:first-child').textContent;
-                
-                navigator.clipboard.writeText(messageContent).then(() => {
-                    const originalTitle = button.title;
-                    button.title = 'Copied!';
-                    button.style.opacity = '0.7';
-                    setTimeout(() => {
-                        button.title = originalTitle;
-                        button.style.opacity = '1';
-                    }, 2000);
-                }).catch(err => {
-                    console.error('Failed to copy: ', err);
-                });
+            if (!messageElement) return;
+            
+            const likeButton = messageElement.querySelector('.like-button');
+            const dislikeButton = messageElement.querySelector('.dislike-button');
+            
+            // Clear previous active states
+            likeButton.classList.remove('active');
+            dislikeButton.classList.remove('active');
+            
+            // If clicking the same button that's already active, remove feedback
+            if (currentFeedback === feedbackType) {
+                localStorage.removeItem(feedbackKey);
+                // No active state needed, buttons return to default
+            } else {
+                // Set new feedback
+                localStorage.setItem(feedbackKey, feedbackType);
+                if (feedbackType === 'like') {
+                    likeButton.classList.add('active');
+                } else if (feedbackType === 'dislike') {
+                    dislikeButton.classList.add('active');
+                }
             }
+        }
+
+        function restoreFeedbackStates() {
+            // Restore feedback states from localStorage when page loads
+            const messages = document.querySelectorAll('.assistant-message[id]');
+            messages.forEach(messageElement => {
+                const messageId = messageElement.id;
+                const feedbackKey = `feedback_${messageId}`;
+                const feedback = localStorage.getItem(feedbackKey);
+                
+                if (feedback) {
+                    const likeButton = messageElement.querySelector('.like-button');
+                    const dislikeButton = messageElement.querySelector('.dislike-button');
+                    
+                    if (feedback === 'like' && likeButton) {
+                        likeButton.classList.add('active');
+                    } else if (feedback === 'dislike' && dislikeButton) {
+                        dislikeButton.classList.add('active');
+                    }
+                }
+            });
         }
 
 
