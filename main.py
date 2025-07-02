@@ -11,7 +11,7 @@ import hashlib
 import uuid
 import psycopg2
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from passlib.context import CryptContext
 
 # Use environment variables
@@ -131,16 +131,7 @@ def init_file_storage():
             )
         ''')
         
-        # Create sessions table for persistent authentication
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS sessions (
-                session_id VARCHAR(255) PRIMARY KEY,
-                user_id VARCHAR(255) NOT NULL,
-                expires_at TIMESTAMP NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )
-        ''')
+
         
         conn.commit()
         cursor.close()
@@ -152,44 +143,7 @@ def init_file_storage():
 # Initialize file storage on startup
 init_file_storage()
 
-def get_current_user(request: Request) -> Optional[str]:
-    """Get current user ID from session, handling expiration automatically"""
-    session_id = request.cookies.get("session_id")
-    if not session_id:
-        return None
-    
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT user_id, expires_at FROM sessions WHERE session_id = %s",
-            (session_id,)
-        )
-        result = cursor.fetchone()
-        
-        if not result:
-            cursor.close()
-            conn.close()
-            return None
-        
-        user_id, expires_at = result
-        
-        # Check if session has expired
-        if expires_at < datetime.now():
-            # Clean up expired session
-            cursor.execute("DELETE FROM sessions WHERE session_id = %s", (session_id,))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return None
-        
-        cursor.close()
-        conn.close()
-        return user_id
-        
-    except Exception as e:
-        print(f"Error validating session: {e}")
-        return None
+
 
 # Conversation database helper functions
 def create_conversation(user_id: str, title: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Optional[str]:
@@ -1540,28 +1494,12 @@ async def login_user(
         </script>
         """)
     
-    # Create persistent session in database
+    # Create session
     session_id = str(uuid.uuid4())
-    expires_at = datetime.now() + timedelta(hours=1)
-    
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO sessions (session_id, user_id, expires_at) VALUES (%s, %s, %s)",
-            (session_id, user_id, expires_at)
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Error creating session: {e}")
-        return HTMLResponse("""
-        <script>
-            alert('Login error occurred. Please try again.');
-            window.location.href = '/login';
-        </script>
-        """)
+    user_sessions[session_id] = {
+        'user_id': user_id,
+        'username': username
+    }
     
     # Redirect to chat with session
     response = RedirectResponse(url="/", status_code=302)
@@ -1573,8 +1511,8 @@ async def login_user(
 async def serve_chat(request: Request):
     """Serve the chat interface"""
     # Check if user is logged in
-    user_id = get_current_user(request)
-    if not user_id:
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in user_sessions:
         return RedirectResponse(url="/login")
     
     return FileResponse("chat.html")
@@ -1583,8 +1521,8 @@ async def serve_chat(request: Request):
 async def serve_mobile(request: Request):
     """Serve the mobile PWA interface"""
     # Check if user is logged in
-    user_id = get_current_user(request)
-    if not user_id:
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in user_sessions:
         return RedirectResponse(url="/login")
     
     return FileResponse("mobile.html")
@@ -1640,9 +1578,10 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
     """
     try:
         # Extract user_id from session
-        user_id = get_current_user(request)
-        if not user_id:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         # Check for slash commands
         if chat_request.message.startswith('/'):
@@ -1842,9 +1781,10 @@ class ConversationListResponse(BaseModel):
 async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
     """Get paginated conversations for the current user"""
     try:
-        user_id = get_current_user(request)
-        if not user_id:
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in user_sessions:
             raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_sessions[session_id]['user_id']
         
         result = get_user_conversations(user_id, limit, offset)
         return result
