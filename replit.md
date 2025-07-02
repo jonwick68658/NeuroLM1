@@ -147,6 +147,7 @@ The application follows a FastAPI-based microservice architecture with the follo
 
 ## Changelog
 
+- July 2, 2025: Fixed textarea auto-resize functionality with proper bidirectional resizing and baseline height constraints
 - July 2, 2025: Implemented like/dislike feedback buttons with localStorage storage (no backend integration)
 - July 2, 2025: Fixed copy button reliability using clone-and-remove approach for all message types
 - July 1, 2025: Implemented ChatGPT-style floating input bubble with borderless design and content overlay effect
