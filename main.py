@@ -11,7 +11,7 @@ import hashlib
 import uuid
 import psycopg2
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from passlib.context import CryptContext
 
 # Use environment variables
@@ -34,6 +34,106 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Global session storage (in production, use Redis or database)
 user_sessions = {}
+
+# Database session management functions
+def create_session(user_id: str, username: str) -> Optional[str]:
+    """Create a new session in the database and return session_id"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        session_id = str(uuid.uuid4())
+        expires_at = datetime.now() + timedelta(hours=24)  # 24 hour expiry
+        
+        cursor.execute('''
+            INSERT INTO sessions (session_id, user_id, username, expires_at)
+            VALUES (%s, %s, %s, %s)
+        ''', (session_id, user_id, username, expires_at))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return session_id
+    except Exception as e:
+        print(f"Error creating session: {e}")
+        return None
+
+def get_session(session_id: str) -> Optional[Dict]:
+    """Get session data from database if valid and not expired"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT user_id, username, expires_at FROM sessions 
+            WHERE session_id = %s AND expires_at > NOW()
+        ''', (session_id,))
+        
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if result:
+            return {
+                'user_id': result[0],
+                'username': result[1]
+            }
+        return None
+    except Exception as e:
+        print(f"Error getting session: {e}")
+        return None
+
+def delete_session(session_id: str) -> bool:
+    """Delete a session from the database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('DELETE FROM sessions WHERE session_id = %s', (session_id,))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return True
+    except Exception as e:
+        print(f"Error deleting session: {e}")
+        return False
+
+def cleanup_expired_sessions():
+    """Remove expired sessions from database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('DELETE FROM sessions WHERE expires_at <= NOW()')
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return True
+    except Exception as e:
+        print(f"Error cleaning up sessions: {e}")
+        return False
+
+def get_authenticated_user(request: Request) -> Optional[Dict]:
+    """Get authenticated user from database session with fallback to memory"""
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        return None
+    
+    # Try database first
+    session_data = get_session(session_id)
+    if session_data:
+        return session_data
+    
+    # Fallback to memory session during transition
+    if session_id in user_sessions:
+        return user_sessions[session_id]
+    
+    return None
 
 # Initialize intelligent memory system globally
 intelligent_memory_system = None
@@ -131,7 +231,17 @@ def init_file_storage():
             )
         ''')
         
-
+        # Create sessions table for persistent authentication
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sessions (
+                session_id VARCHAR(255) PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
         
         conn.commit()
         cursor.close()
@@ -1494,8 +1604,18 @@ async def login_user(
         </script>
         """)
     
-    # Create session
-    session_id = str(uuid.uuid4())
+    # Create session in database
+    session_id = create_session(user_id, username)
+    
+    if not session_id:
+        return HTMLResponse("""
+        <script>
+            alert('Failed to create session. Please try again.');
+            window.location.href = '/login';
+        </script>
+        """)
+    
+    # Also store in memory for backward compatibility during transition
     user_sessions[session_id] = {
         'user_id': user_id,
         'username': username
@@ -1511,8 +1631,8 @@ async def login_user(
 async def serve_chat(request: Request):
     """Serve the chat interface"""
     # Check if user is logged in
-    session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in user_sessions:
+    user_data = get_authenticated_user(request)
+    if not user_data:
         return RedirectResponse(url="/login")
     
     return FileResponse("chat.html")
@@ -1521,8 +1641,8 @@ async def serve_chat(request: Request):
 async def serve_mobile(request: Request):
     """Serve the mobile PWA interface"""
     # Check if user is logged in
-    session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in user_sessions:
+    user_data = get_authenticated_user(request)
+    if not user_data:
         return RedirectResponse(url="/login")
     
     return FileResponse("mobile.html")
@@ -1578,10 +1698,10 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
     """
     try:
         # Extract user_id from session
-        session_id = request.cookies.get("session_id")
-        if not session_id or session_id not in user_sessions:
+        user_data = get_authenticated_user(request)
+        if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_id = user_sessions[session_id]['user_id']
+        user_id = user_data['user_id']
         
         # Check for slash commands
         if chat_request.message.startswith('/'):
