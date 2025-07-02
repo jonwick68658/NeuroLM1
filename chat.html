@@ -1883,6 +1883,25 @@
             });
         }
 
+        function copyToClipboard(messageId, button) {
+            const messageElement = document.getElementById(messageId);
+            if (messageElement) {
+                const messageContent = messageElement.querySelector('div:first-child').textContent;
+                
+                navigator.clipboard.writeText(messageContent).then(() => {
+                    const originalTitle = button.title;
+                    button.title = 'Copied!';
+                    button.style.opacity = '0.7';
+                    setTimeout(() => {
+                        button.title = originalTitle;
+                        button.style.opacity = '1';
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                });
+            }
+        }
+
         function toggleFeedback(messageId, feedbackType, button) {
             // Get current feedback from localStorage
             const feedbackKey = `feedback_${messageId}`;
