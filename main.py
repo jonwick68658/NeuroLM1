@@ -2386,6 +2386,108 @@ async def test_riai_scoring(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RIAI test failed: {str(e)}")
 
+# Human feedback endpoint for RIAI H(t) function
+class FeedbackRequest(BaseModel):
+    message_id: str
+    feedback_type: str  # 'like' or 'dislike'
+
+@app.post("/api/feedback")
+async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
+    """Submit human feedback for RIAI H(t) function"""
+    try:
+        user_data = get_authenticated_user(request)
+        if not user_data:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_data['user_id']
+        
+        # Validate feedback type
+        if feedback_request.feedback_type not in ['like', 'dislike']:
+            raise HTTPException(status_code=400, detail="Invalid feedback type. Must be 'like' or 'dislike'")
+        
+        if not intelligent_memory_system:
+            raise HTTPException(status_code=500, detail="Memory system not available")
+        
+        # Convert feedback to H(t) score
+        feedback_score = 2.0 if feedback_request.feedback_type == 'like' else -2.0
+        
+        # Update memory with human feedback
+        success = await intelligent_memory_system.update_human_feedback(
+            message_id=feedback_request.message_id,
+            feedback_score=feedback_score,
+            feedback_type=feedback_request.feedback_type,
+            user_id=user_id
+        )
+        
+        if success:
+            return {
+                "status": "success",
+                "message": f"Feedback recorded: {feedback_request.feedback_type}",
+                "h_t_score": feedback_score
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Message not found or feedback update failed")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Feedback submission failed: {str(e)}")
+
+# Implicit feedback endpoint for behavioral signals
+class ImplicitFeedbackRequest(BaseModel):
+    message_id: str
+    action_type: str  # 'copy', 'continue', etc.
+    feedback_score: float  # Implicit score value
+
+@app.post("/api/feedback-implicit")
+async def submit_implicit_feedback(feedback_request: ImplicitFeedbackRequest, request: Request):
+    """Submit implicit behavioral feedback for RIAI H(t) function"""
+    try:
+        user_data = get_authenticated_user(request)
+        if not user_data:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_data['user_id']
+        
+        # Validate action type and score
+        valid_actions = ['copy', 'continue', 'followup']
+        if feedback_request.action_type not in valid_actions:
+            raise HTTPException(status_code=400, detail=f"Invalid action type. Must be one of: {valid_actions}")
+        
+        if not -1.0 <= feedback_request.feedback_score <= 1.0:
+            raise HTTPException(status_code=400, detail="Feedback score must be between -1.0 and 1.0")
+        
+        if not intelligent_memory_system:
+            raise HTTPException(status_code=500, detail="Memory system not available")
+        
+        # Update memory with implicit feedback
+        success = await intelligent_memory_system.update_human_feedback(
+            message_id=feedback_request.message_id,
+            feedback_score=feedback_request.feedback_score,
+            feedback_type=f"implicit_{feedback_request.action_type}",
+            user_id=user_id
+        )
+        
+        if success:
+            return {
+                "status": "success",
+                "message": f"Implicit feedback recorded: {feedback_request.action_type}",
+                "h_t_score": feedback_request.feedback_score
+            }
+        else:
+            # Don't fail silently for implicit feedback - just log and continue
+            return {
+                "status": "skipped",
+                "message": "Message not found or already has feedback"
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Implicit feedback failures should not break user experience
+        return {
+            "status": "error",
+            "message": "Implicit feedback failed silently"
+        }
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():

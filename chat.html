@@ -1891,7 +1891,7 @@
             });
         }
 
-        function copyToClipboard(messageId, button) {
+        async function copyToClipboard(messageId, button) {
             const messageElement = document.getElementById(messageId);
             if (messageElement) {
                 // Clone the message element to avoid modifying the original
@@ -1914,13 +1914,41 @@
                         button.title = originalTitle;
                         button.style.opacity = '1';
                     }, 2000);
+                    
+                    // Send positive feedback to RIAI system for copy action
+                    sendImplicitFeedback(messageId, 'copy', 0.3);
+                    
                 }).catch(err => {
                     console.error('Failed to copy: ', err);
                 });
             }
         }
+        
+        async function sendImplicitFeedback(messageId, actionType, score) {
+            try {
+                const response = await fetch('/api/feedback-implicit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message_id: messageId,
+                        action_type: actionType,
+                        feedback_score: score
+                    })
+                });
+                
+                if (response.ok) {
+                    console.log(`RIAI implicit feedback recorded: ${actionType} = ${score}`);
+                } else {
+                    console.log('Implicit feedback submission failed silently');
+                }
+            } catch (error) {
+                console.log('Implicit feedback error (continuing silently):', error);
+            }
+        }
 
-        function toggleFeedback(messageId, feedbackType, button) {
+        async function toggleFeedback(messageId, feedbackType, button) {
             // Get current feedback from localStorage
             const feedbackKey = `feedback_${messageId}`;
             let currentFeedback = localStorage.getItem(feedbackKey);
@@ -1940,6 +1968,7 @@
             if (currentFeedback === feedbackType) {
                 localStorage.removeItem(feedbackKey);
                 // No active state needed, buttons return to default
+                // TODO: Implement feedback removal API call
             } else {
                 // Set new feedback
                 localStorage.setItem(feedbackKey, feedbackType);
@@ -1947,6 +1976,30 @@
                     likeButton.classList.add('active');
                 } else if (feedbackType === 'dislike' && dislikeButton) {
                     dislikeButton.classList.add('active');
+                }
+                
+                // Send feedback to backend for RIAI H(t) function
+                try {
+                    const response = await fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message_id: messageId,
+                            feedback_type: feedbackType
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`RIAI feedback recorded: ${data.h_t_score}`);
+                    } else {
+                        console.error('Failed to submit feedback to RIAI system');
+                    }
+                } catch (error) {
+                    console.error('Error submitting feedback:', error);
+                    // Keep localStorage functionality even if API fails
                 }
             }
         }

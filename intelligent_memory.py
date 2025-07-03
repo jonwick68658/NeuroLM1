@@ -250,6 +250,9 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                         quality_score: null,
                         evaluation_timestamp: null,
                         evaluation_model: null,
+                        human_feedback_score: null,
+                        human_feedback_type: null,
+                        human_feedback_timestamp: null,
                         timestamp: datetime(),
                         created_at: datetime()
                     })
@@ -292,6 +295,30 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                 
         except Exception as e:
             print(f"Error updating memory quality score: {e}")
+            return False
+    
+    async def update_human_feedback(self, message_id: str, feedback_score: float, feedback_type: str, user_id: str) -> bool:
+        """Update memory with human feedback (H(t) function)"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (m:IntelligentMemory {id: $message_id})
+                    WHERE m.user_id = $user_id
+                    SET m.human_feedback_score = $feedback_score,
+                        m.human_feedback_type = $feedback_type,
+                        m.human_feedback_timestamp = datetime()
+                    RETURN m.id AS updated_id
+                """, {
+                    'message_id': message_id,
+                    'feedback_score': feedback_score,
+                    'feedback_type': feedback_type,
+                    'user_id': user_id
+                })
+                
+                return result.single() is not None
+                
+        except Exception as e:
+            print(f"Error updating human feedback: {e}")
             return False
     
     async def get_unscored_memories(self, user_id: str, limit: int = 10) -> List[Dict]:
