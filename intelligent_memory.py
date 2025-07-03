@@ -432,10 +432,10 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
         
         try:
             with self.driver.session() as session:
-                # Hybrid search: both raw memories and daily summaries
+                # Search raw memories with RIAI quality boost
                 memories = []
                 
-                # 1. Search raw memories with quality boost
+                # Search memories with quality-boosted scoring
                 memory_result = session.run("""
                     CALL db.index.vector.queryNodes('memory_embedding_index', $limit, $query_embedding)
                     YIELD node, score
@@ -461,29 +461,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                     score = record['score']
                     memories.append(f"Previous message: {content}")
                 
-                # 2. Search daily summaries if available
-                try:
-                    summary_result = session.run("""
-                        CALL db.index.vector.queryNodes('summary_embedding_index', $limit, $query_embedding)
-                        YIELD node, score
-                        WHERE node.user_id = $user_id AND score > 0.3
-                        RETURN node.summary_content AS content, score, 'summary' as type
-                        ORDER BY score DESC
-                    """, {
-                        'query_embedding': query_embedding,
-                        'user_id': user_id,
-                        'limit': min(limit, 2)  # Limit summaries to avoid overwhelming
-                    })
-                    
-                    for record in summary_result:
-                        content = record['content']
-                        score = record['score']
-                        memories.append(f"Daily summary: {content}")
-                        
-                except Exception as e:
-                    # Summaries might not be available yet - continue with just memories
-                    print(f"Summary search unavailable: {e}")
-                    pass
+
                 
                 # Also get recent conversation context if no semantic matches
                 if not memories and conversation_id:

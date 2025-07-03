@@ -138,15 +138,7 @@ except Exception as e:
     print(f"❌ Failed to initialize intelligent memory: {e}")
     intelligent_memory_system = None
 
-# Initialize memory summarizer
-memory_summarizer_instance = None
-try:
-    from memory_summarizer import memory_summarizer
-    memory_summarizer_instance = memory_summarizer
-    print("✅ Memory summarizer initialized")
-except Exception as e:
-    print(f"❌ Failed to initialize memory summarizer: {e}")
-    memory_summarizer_instance = None
+# Memory summarizer removed - replaced by RIAI quality-boosted retrieval
 
 # Note: Sessions cleared on restart - users need to re-login
 
@@ -2323,28 +2315,7 @@ async def delete_subtopic_endpoint(topic_name: str, subtopic_name: str, request:
     else:
         raise HTTPException(status_code=400, detail=f"Error deleting subtopic '{subtopic_name}' from topic '{topic_name}'. It may not exist or there was a system error.")
 
-# Memory summarization test endpoint
-@app.post("/api/memory/summarize-test")
-async def test_memory_summarization(request: Request):
-    """Manual trigger for testing memory summarization"""
-    user_data = get_authenticated_user(request)
-    if not user_data:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    user_id = user_data['user_id']
-    
-    if not memory_summarizer_instance:
-        raise HTTPException(status_code=500, detail="Memory summarizer not available")
-    
-    try:
-        result = await memory_summarizer_instance.process_user_daily_summaries(user_id)
-        return {
-            "status": "success",
-            "result": result,
-            "message": f"Processed {result.get('memories_processed', 0)} memories into {result.get('summaries_created', 0)} summaries"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Summarization failed: {str(e)}")
+# Daily summary endpoint removed - functionality replaced by RIAI quality-boosted retrieval
 
 # RIAI test endpoint
 @app.post("/api/test-riai")
