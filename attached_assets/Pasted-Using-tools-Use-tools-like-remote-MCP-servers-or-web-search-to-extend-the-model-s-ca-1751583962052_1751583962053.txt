@@ -1,0 +1,86 @@
+Using tools
+===========
+
+Use tools like remote MCP servers or web search to extend the model's capabilities.
+
+When generating model responses, you can extend model capabilities using built-in **tools**. These tools help models access additional context and information from the web or your files. The example below uses the [web search tool](/docs/guides/tools-web-search) to use the latest information from the web to generate a model response.
+
+Include web search results for the completion
+
+```javascript
+import OpenAI from "openai";
+const client = new OpenAI();
+
+const completion = await client.chat.completions.create({
+    model: "gpt-4o-search-preview",
+    web_search_options: {},
+    messages: [{
+        "role": "user",
+        "content": "What was a positive news story from today?"
+    }],
+});
+
+console.log(completion.choices[0].message.content);
+```
+
+```python
+from openai import OpenAI
+client = OpenAI()
+
+completion = client.chat.completions.create(
+    model="gpt-4o-search-preview",
+    web_search_options={},
+    messages=[
+        {
+            "role": "user",
+            "content": "What was a positive news story from today?",
+        }
+    ],
+)
+
+print(completion.choices[0].message.content)
+```
+
+```bash
+curl -X POST "https://api.openai.com/v1/chat/completions" \
+    -H "Authorization: Bearer $OPENAI_API_KEY" \
+    -H "Content-type: application/json" \
+    -d '{
+        "model": "gpt-4o-search-preview",
+        "web_search_options": {},
+        "messages": [{
+            "role": "user",
+            "content": "What was a positive news story from today?"
+        }]
+    }'
+```
+
+Available tools
+---------------
+
+Here's an overview of the tools available in the OpenAI platform—select one of them for further guidance on usage. Note that currently the file search and computer use tools are only available using the new [Responses API](/docs/api-reference/responses).
+
+[
+
+Function calling
+
+Call custom code to give the model access to additional data and capabilities.
+
+](/docs/guides/function-calling)[
+
+Web search
+
+Include data from the Internet in model response generation.
+
+](/docs/guides/tools-web-search)
+
+Usage in the API
+----------------
+
+When making a request to generate a [chat completion](/docs/api-reference/chat/create), you can enable web search by using the `web_search` parameter. This allows the model to access current Internet information during response generation. For additional details, refer to the [web search guide](/docs/guides/tools-web-search).
+
+### Function calling
+
+In addition to built-in tools, you can define custom functions using the `tools` array. These custom functions allow the model to call your application's code, enabling access to specific data or capabilities not directly available within the model.
+
+Learn more in the [function calling guide](/docs/guides/function-calling).
