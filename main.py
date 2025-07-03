@@ -350,11 +350,17 @@ def save_conversation_message(conversation_id: str, message_type: str, content: 
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Insert message
+        # Insert message and return the generated ID
         cursor.execute('''
             INSERT INTO conversation_messages (conversation_id, message_type, content, created_at)
             VALUES (%s, %s, %s, %s)
+            RETURNING id
         ''', (conversation_id, message_type, content, datetime.now()))
+        
+        result = cursor.fetchone()
+        if not result:
+            raise Exception("Failed to insert message")
+        message_id = result[0]
         
         # Update conversation message count and timestamp
         cursor.execute('''
@@ -374,8 +380,10 @@ def save_conversation_message(conversation_id: str, message_type: str, content: 
         conn.commit()
         cursor.close()
         conn.close()
+        return message_id
     except Exception as e:
         print(f"Error saving message: {e}")
+        return None
 
 def get_conversation_messages(conversation_id: str, limit: int = 30, before_id: Optional[str] = None) -> Dict:
     """Get paginated messages for a conversation"""
@@ -1789,20 +1797,7 @@ async def chat_with_memory(chat_request: ChatMessage, request: Request):
         # Get user's first name for personalized responses
         user_first_name = get_user_first_name(user_id)
         
-        # Store user message using intelligent memory system
-        user_memory_id = None
-        if intelligent_memory_system:
-            try:
-                user_memory_id = await intelligent_memory_system.store_memory(
-                    content=message_content,
-                    user_id=user_id,
-                    conversation_id=conversation_id,
-                    message_type="user"
-                )
-                if user_memory_id:
-                    print(f"DEBUG: Stored user message with ID: {user_memory_id}")
-            except Exception as e:
-                print(f"Error storing user message in intelligent memory: {e}")
+        # User message will be stored in memory after PostgreSQL save to get proper message_id
         
         # Generate response using LLM with memory context
         from model_service import ModelService
@@ -1838,33 +1833,50 @@ Instructions:
             print(f"LLM error: {e}")
             response_text = "I apologize, but I'm experiencing technical difficulties processing your request right now."
         
-        # Store assistant response using intelligent memory system
-        assistant_memory_id = None
-        if intelligent_memory_system:
-            try:
-                assistant_memory_id = await intelligent_memory_system.store_memory(
-                    content=response_text,
-                    user_id=user_id,
-                    conversation_id=conversation_id,
-                    message_type="assistant"
-                )
-                if assistant_memory_id:
-                    print(f"DEBUG: Stored assistant response with ID: {assistant_memory_id}")
-                    
-                    # RIAI: Memory stored for background R(t) evaluation
-                    print(f"DEBUG: Memory {assistant_memory_id} queued for background R(t) evaluation")
-                        
-            except Exception as e:
-                print(f"Error storing assistant response in intelligent memory: {e}")
+        # Assistant response will be stored in memory after PostgreSQL save to get proper message_id
         
         # Ensure conversation_id is not None before saving messages
+        user_message_id = None
+        assistant_message_id = None
         if conversation_id:
             try:
-                # Save user message to conversation
-                save_conversation_message(conversation_id, 'user', chat_request.message)
+                # Save user message to conversation and get PostgreSQL message ID
+                user_message_id = save_conversation_message(conversation_id, 'user', chat_request.message)
                 
-                # Save assistant response to conversation
-                save_conversation_message(conversation_id, 'assistant', response_text)
+                # Save assistant response to conversation and get PostgreSQL message ID
+                assistant_message_id = save_conversation_message(conversation_id, 'assistant', response_text)
+                
+                # Now store messages in intelligent memory system with PostgreSQL message IDs
+                if intelligent_memory_system:
+                    try:
+                        # Store user message with PostgreSQL message ID
+                        if user_message_id:
+                            user_memory_id = await intelligent_memory_system.store_memory(
+                                content=message_content,
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                message_type="user",
+                                message_id=user_message_id
+                            )
+                            if user_memory_id:
+                                print(f"DEBUG: Stored user message with PostgreSQL ID {user_message_id}")
+                        
+                        # Store assistant response with PostgreSQL message ID
+                        if assistant_message_id:
+                            assistant_memory_id = await intelligent_memory_system.store_memory(
+                                content=response_text,
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                message_type="assistant",
+                                message_id=assistant_message_id
+                            )
+                            if assistant_memory_id:
+                                print(f"DEBUG: Stored assistant response with PostgreSQL ID {assistant_message_id}")
+                                print(f"DEBUG: Memory {assistant_memory_id} queued for background R(t) evaluation")
+                                
+                    except Exception as e:
+                        print(f"Error storing messages in intelligent memory: {e}")
+                        
             except Exception as e:
                 print(f"Error saving conversation messages: {e}")
         else:
@@ -2377,7 +2389,8 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
             # Calculate final quality score using f(R(t), H(t))
             await intelligent_memory_system.update_final_quality_score(
                 memory_id=feedback_request.message_id,
-                user_id=user_id
+                user_id=user_id,
+                use_message_id=True
             )
             
             return {
@@ -2431,7 +2444,8 @@ async def submit_implicit_feedback(feedback_request: ImplicitFeedbackRequest, re
             # Calculate final quality score using f(R(t), H(t))
             await intelligent_memory_system.update_final_quality_score(
                 memory_id=feedback_request.message_id,
-                user_id=user_id
+                user_id=user_id,
+                use_message_id=True
             )
             
             return {

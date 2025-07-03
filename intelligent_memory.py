@@ -220,7 +220,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
             print(f"❌ Vector index setup failed: {e}")
     
     async def store_memory(self, content: str, user_id: str, conversation_id: Optional[str], 
-                          message_type: str = "user") -> Optional[str]:
+                          message_type: str = "user", message_id: Optional[int] = None) -> Optional[str]:
         """Store memory with intelligent importance scoring"""
         
         # Score importance
@@ -245,6 +245,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                         user_id: $user_id,
                         conversation_id: $conversation_id,
                         message_type: $message_type,
+                        message_id: $message_id,
                         importance: $importance,
                         embedding: $embedding,
                         quality_score: null,
@@ -264,6 +265,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                     'user_id': user_id,
                     'conversation_id': conversation_id or "",
                     'message_type': message_type,
+                    'message_id': message_id,
                     'importance': importance,
                     'embedding': embedding
                 })
@@ -299,19 +301,25 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
             print(f"Error updating memory quality score: {e}")
             return False
     
-    async def update_human_feedback(self, message_id: str, feedback_score: float, feedback_type: str, user_id: str) -> bool:
+    async def update_human_feedback(self, message_id, feedback_score: float, feedback_type: str, user_id: str) -> bool:
         """Update memory with human feedback (H(t) function)"""
         try:
             with self.driver.session() as session:
+                # Convert message_id to integer if it's a string representation
+                try:
+                    search_message_id = int(message_id) if isinstance(message_id, str) else message_id
+                except (ValueError, TypeError):
+                    search_message_id = message_id
+                
                 result = session.run("""
-                    MATCH (m:IntelligentMemory {id: $message_id})
+                    MATCH (m:IntelligentMemory {message_id: $message_id})
                     WHERE m.user_id = $user_id
                     SET m.human_feedback_score = $feedback_score,
                         m.human_feedback_type = $feedback_type,
                         m.human_feedback_timestamp = datetime()
                     RETURN m.id AS updated_id
                 """, {
-                    'message_id': message_id,
+                    'message_id': search_message_id,
                     'feedback_score': feedback_score,
                     'feedback_type': feedback_type,
                     'user_id': user_id
@@ -344,18 +352,40 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
             # No human feedback, use R(t) only - still apply clamping
             return max(1.0, min(10.0, r_t_score))
     
-    async def update_final_quality_score(self, memory_id: str, user_id: str) -> bool:
+    async def update_final_quality_score(self, memory_id: str, user_id: str, use_message_id: bool = False) -> bool:
         """Update final quality score for a memory using f(R(t), H(t))"""
         try:
             with self.driver.session() as session:
                 # Get current R(t) and H(t) scores
-                result = session.run("""
-                    MATCH (m:IntelligentMemory {id: $memory_id})
-                    WHERE m.user_id = $user_id
-                    RETURN m.quality_score AS r_t_score,
-                           m.human_feedback_score AS h_t_score
-                """, {
-                    'memory_id': memory_id,
+                if use_message_id:
+                    # Query by PostgreSQL message_id
+                    query = """
+                        MATCH (m:IntelligentMemory {message_id: $memory_id})
+                        WHERE m.user_id = $user_id
+                        RETURN m.id AS internal_id, 
+                               m.quality_score AS r_t_score,
+                               m.human_feedback_score AS h_t_score
+                    """
+                else:
+                    # Query by Neo4j internal ID
+                    query = """
+                        MATCH (m:IntelligentMemory {id: $memory_id})
+                        WHERE m.user_id = $user_id
+                        RETURN m.id AS internal_id,
+                               m.quality_score AS r_t_score,
+                               m.human_feedback_score AS h_t_score
+                    """
+                
+                # Convert memory_id to integer if using message_id and it's a string
+                search_id = memory_id
+                if use_message_id:
+                    try:
+                        search_id = int(memory_id) if isinstance(memory_id, str) else memory_id
+                    except (ValueError, TypeError):
+                        search_id = memory_id
+                
+                result = session.run(query, {
+                    'memory_id': search_id,
                     'user_id': user_id
                 })
                 
@@ -363,6 +393,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                 if not record:
                     return False
                 
+                internal_id = record['internal_id']
                 r_t_score = record['r_t_score']
                 h_t_score = record['h_t_score']
                 
@@ -370,15 +401,15 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                 final_score = self.calculate_final_quality_score(r_t_score, h_t_score)
                 
                 if final_score is not None:
-                    # Update memory with final quality score
+                    # Update memory with final quality score using internal Neo4j ID
                     update_result = session.run("""
-                        MATCH (m:IntelligentMemory {id: $memory_id})
+                        MATCH (m:IntelligentMemory {id: $internal_id})
                         WHERE m.user_id = $user_id
                         SET m.final_quality_score = $final_score,
                             m.final_score_timestamp = datetime()
                         RETURN m.id AS updated_id
                     """, {
-                        'memory_id': memory_id,
+                        'internal_id': internal_id,
                         'user_id': user_id,
                         'final_score': final_score
                     })
