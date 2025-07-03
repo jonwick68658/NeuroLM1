@@ -131,6 +131,7 @@ def get_authenticated_user(request: Request) -> Optional[Dict]:
 intelligent_memory_system = None
 try:
     from intelligent_memory import IntelligentMemorySystem
+    from background_riai import process_riai_batch
     intelligent_memory_system = IntelligentMemorySystem()
     print("✅ Intelligent memory system initialized")
 except Exception as e:
@@ -1858,32 +1859,8 @@ Instructions:
                 if assistant_memory_id:
                     print(f"DEBUG: Stored assistant response with ID: {assistant_memory_id}")
                     
-                    # RIAI: Evaluate response quality (R(t) function)
-                    try:
-                        quality_score = await intelligent_memory_system.evaluate_response(
-                            user_query=message_content,
-                            ai_response=response_text
-                        )
-                        
-                        if quality_score is not None:
-                            # Update memory with quality score
-                            await intelligent_memory_system.update_memory_quality_score(
-                                memory_id=assistant_memory_id,
-                                quality_score=quality_score
-                            )
-                            print(f"DEBUG: RIAI quality score: {quality_score}/10 for memory {assistant_memory_id}")
-                            
-                            # Calculate final quality score using f(R(t), H(t))
-                            await intelligent_memory_system.update_final_quality_score(
-                                memory_id=assistant_memory_id,
-                                user_id=user_id
-                            )
-                            print(f"DEBUG: Final quality score calculated for memory {assistant_memory_id}")
-                        else:
-                            print("DEBUG: Could not evaluate response quality")
-                            
-                    except Exception as e:
-                        print(f"RIAI evaluation error (continuing): {e}")
+                    # RIAI: Memory stored for background R(t) evaluation
+                    print(f"DEBUG: Memory {assistant_memory_id} queued for background R(t) evaluation")
                         
             except Exception as e:
                 print(f"Error storing assistant response in intelligent memory: {e}")
@@ -2382,13 +2359,13 @@ async def test_riai_scoring(request: Request):
         if not intelligent_memory_system:
             raise HTTPException(status_code=500, detail="RIAI system not available")
         
-        # Run background scoring
-        result = await intelligent_memory_system.score_unscored_memories_background(user_id)
+        # Run background R(t) evaluation
+        result = await process_riai_batch()
         
         return {
             "status": "success",
             "riai_results": result,
-            "message": f"RIAI scored {result.get('scored', 0)} memories, {result.get('failed', 0)} failed"
+            "message": f"Background R(t) evaluation: {result.get('processed', 0)} processed, {result.get('cached', 0)} cached, {result.get('evaluated', 0)} evaluated"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RIAI test failed: {str(e)}")

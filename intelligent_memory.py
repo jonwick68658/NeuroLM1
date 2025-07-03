@@ -326,7 +326,11 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
     def calculate_final_quality_score(self, r_t_score: Optional[float], h_t_score: Optional[float]) -> Optional[float]:
         """Calculate final quality score using f(R(t), H(t)) intelligence refinement function"""
         if r_t_score is None:
-            return None
+            # If no R(t) score yet, use neutral baseline if H(t) feedback exists
+            if h_t_score is not None:
+                r_t_score = 6.0  # Neutral baseline for immediate H(t) processing
+            else:
+                return None  # Wait for background R(t) evaluation
         
         # Human feedback weight factor (amplifies human signals)
         human_weight = 1.5
