@@ -132,6 +132,9 @@ class IntelligentMemorySystem:
         self.router = MemoryRouter()
         self.scorer = ImportanceScorer()
         
+        # RIAI Configuration
+        self.evaluation_model = "deepseek/deepseek-r1-distill-qwen-7b"
+        
         # Neo4j connection (reuse existing)
         neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
         neo4j_user = os.getenv("NEO4J_USERNAME", "neo4j")
@@ -143,6 +146,48 @@ class IntelligentMemorySystem:
         )
         
         self._setup_vector_index()
+    
+    async def evaluate_response(self, user_query: str, ai_response: str) -> Optional[float]:
+        """Evaluate AI response quality using DeepSeek-R1-Distill model (R(t) function)"""
+        try:
+            from model_service import ModelService
+            model_service = ModelService()
+            
+            evaluation_prompt = f"""Rate this AI response quality on a scale of 1-10:
+
+User Query: {user_query}
+AI Response: {ai_response}
+
+Scoring criteria:
+- Relevance (answers the question directly)
+- Accuracy (factually correct information)
+- Helpfulness (actionable and useful)
+- Completeness (thorough coverage of the topic)
+
+Return only the numeric score as a decimal (e.g., 7.5):"""
+
+            messages = [
+                {"role": "system", "content": "You are an expert AI response evaluator. Rate responses objectively based on quality criteria."},
+                {"role": "user", "content": evaluation_prompt}
+            ]
+            
+            response = await model_service.chat_completion(
+                messages=messages,
+                model=self.evaluation_model,
+                web_search=False
+            )
+            
+            # Extract numeric score from response
+            score_match = re.search(r'(\d+\.?\d*)', response.strip())
+            if score_match:
+                score = float(score_match.group(1))
+                return min(max(score, 1.0), 10.0)  # Clamp between 1-10
+            
+            return None
+            
+        except Exception as e:
+            print(f"Response evaluation error: {e}")
+            return None
     
     def generate_embedding(self, text: str) -> List[float]:
         """Generate embeddings using OpenAI API"""
@@ -202,6 +247,9 @@ class IntelligentMemorySystem:
                         message_type: $message_type,
                         importance: $importance,
                         embedding: $embedding,
+                        quality_score: null,
+                        evaluation_timestamp: null,
+                        evaluation_model: null,
                         timestamp: datetime(),
                         created_at: datetime()
                     })
@@ -223,6 +271,51 @@ class IntelligentMemorySystem:
             import traceback
             traceback.print_exc()
             return None
+    
+    async def update_memory_quality_score(self, memory_id: str, quality_score: float) -> bool:
+        """Update quality score for a specific memory (RIAI scoring)"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (m:IntelligentMemory {id: $memory_id})
+                    SET m.quality_score = $quality_score,
+                        m.evaluation_timestamp = datetime(),
+                        m.evaluation_model = $evaluation_model
+                    RETURN m.id AS updated_id
+                """, {
+                    'memory_id': memory_id,
+                    'quality_score': quality_score,
+                    'evaluation_model': self.evaluation_model
+                })
+                
+                return result.single() is not None
+                
+        except Exception as e:
+            print(f"Error updating memory quality score: {e}")
+            return False
+    
+    async def get_unscored_memories(self, user_id: str, limit: int = 10) -> List[Dict]:
+        """Get memories that haven't been quality scored yet"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (m:IntelligentMemory)
+                    WHERE m.user_id = $user_id 
+                    AND m.quality_score IS NULL
+                    AND m.message_type = 'assistant'
+                    RETURN m.id AS memory_id, m.content AS content
+                    ORDER BY m.timestamp DESC
+                    LIMIT $limit
+                """, {
+                    'user_id': user_id,
+                    'limit': limit
+                })
+                
+                return [{'memory_id': record['memory_id'], 'content': record['content']} for record in result]
+                
+        except Exception as e:
+            print(f"Error getting unscored memories: {e}")
+            return []
     
     async def retrieve_memory(self, query: str, user_id: str, conversation_id: Optional[str], 
                             limit: int = 5) -> str:
@@ -342,6 +435,73 @@ class IntelligentMemorySystem:
                 })
         
         return facts
+    
+    async def score_unscored_memories_background(self, user_id: str) -> Dict[str, int]:
+        """Background process to score any unscored memories"""
+        try:
+            unscored_memories = await self.get_unscored_memories(user_id, limit=20)
+            scored_count = 0
+            failed_count = 0
+            
+            for memory in unscored_memories:
+                memory_id = memory['memory_id']
+                content = memory['content']
+                
+                # For assistant messages, we need the user query to evaluate properly
+                try:
+                    # Get the user message that preceded this assistant response
+                    with self.driver.session() as session:
+                        result = session.run("""
+                            MATCH (user_msg:IntelligentMemory)
+                            WHERE user_msg.user_id = $user_id 
+                            AND user_msg.message_type = 'user'
+                            AND user_msg.timestamp < (
+                                SELECT m.timestamp 
+                                FROM IntelligentMemory m 
+                                WHERE m.id = $memory_id
+                            )
+                            RETURN user_msg.content AS user_query
+                            ORDER BY user_msg.timestamp DESC
+                            LIMIT 1
+                        """, {
+                            'user_id': user_id,
+                            'memory_id': memory_id
+                        })
+                        
+                        user_record = result.single()
+                        if user_record:
+                            user_query = user_record['user_query']
+                            
+                            # Evaluate the response
+                            quality_score = await self.evaluate_response(user_query, content)
+                            
+                            if quality_score is not None:
+                                # Update with quality score
+                                success = await self.update_memory_quality_score(memory_id, quality_score)
+                                if success:
+                                    scored_count += 1
+                                    print(f"DEBUG: Background scored memory {memory_id}: {quality_score}/10")
+                                else:
+                                    failed_count += 1
+                            else:
+                                failed_count += 1
+                        else:
+                            # Skip memories without corresponding user queries
+                            print(f"DEBUG: Skipping memory {memory_id} - no user query found")
+                            
+                except Exception as e:
+                    print(f"Error scoring memory {memory_id}: {e}")
+                    failed_count += 1
+            
+            return {
+                'total_unscored': len(unscored_memories),
+                'scored': scored_count,
+                'failed': failed_count
+            }
+            
+        except Exception as e:
+            print(f"Background scoring error: {e}")
+            return {'total_unscored': 0, 'scored': 0, 'failed': 0}
     
     def close(self):
         """Close database connection"""

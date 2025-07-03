@@ -1846,6 +1846,7 @@ Instructions:
             response_text = "I apologize, but I'm experiencing technical difficulties processing your request right now."
         
         # Store assistant response using intelligent memory system
+        assistant_memory_id = None
         if intelligent_memory_system:
             try:
                 assistant_memory_id = await intelligent_memory_system.store_memory(
@@ -1856,6 +1857,27 @@ Instructions:
                 )
                 if assistant_memory_id:
                     print(f"DEBUG: Stored assistant response with ID: {assistant_memory_id}")
+                    
+                    # RIAI: Evaluate response quality (R(t) function)
+                    try:
+                        quality_score = await intelligent_memory_system.evaluate_response(
+                            user_query=message_content,
+                            ai_response=response_text
+                        )
+                        
+                        if quality_score is not None:
+                            # Update memory with quality score
+                            await intelligent_memory_system.update_memory_quality_score(
+                                memory_id=assistant_memory_id,
+                                quality_score=quality_score
+                            )
+                            print(f"DEBUG: RIAI quality score: {quality_score}/10 for memory {assistant_memory_id}")
+                        else:
+                            print("DEBUG: Could not evaluate response quality")
+                            
+                    except Exception as e:
+                        print(f"RIAI evaluation error (continuing): {e}")
+                        
             except Exception as e:
                 print(f"Error storing assistant response in intelligent memory: {e}")
         
@@ -2339,6 +2361,30 @@ async def test_memory_summarization(request: Request):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Summarization failed: {str(e)}")
+
+# RIAI test endpoint
+@app.post("/api/test-riai")
+async def test_riai_scoring(request: Request):
+    """Test RIAI background scoring system"""
+    try:
+        user_data = get_authenticated_user(request)
+        if not user_data:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_id = user_data['user_id']
+        
+        if not intelligent_memory_system:
+            raise HTTPException(status_code=500, detail="RIAI system not available")
+        
+        # Run background scoring
+        result = await intelligent_memory_system.score_unscored_memories_background(user_id)
+        
+        return {
+            "status": "success",
+            "riai_results": result,
+            "message": f"RIAI scored {result.get('scored', 0)} memories, {result.get('failed', 0)} failed"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"RIAI test failed: {str(e)}")
 
 # Health check endpoint
 @app.get("/health")
