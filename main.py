@@ -1872,6 +1872,13 @@ Instructions:
                                 quality_score=quality_score
                             )
                             print(f"DEBUG: RIAI quality score: {quality_score}/10 for memory {assistant_memory_id}")
+                            
+                            # Calculate final quality score using f(R(t), H(t))
+                            await intelligent_memory_system.update_final_quality_score(
+                                memory_id=assistant_memory_id,
+                                user_id=user_id
+                            )
+                            print(f"DEBUG: Final quality score calculated for memory {assistant_memory_id}")
                         else:
                             print("DEBUG: Could not evaluate response quality")
                             
@@ -2419,6 +2426,12 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
         )
         
         if success:
+            # Calculate final quality score using f(R(t), H(t))
+            await intelligent_memory_system.update_final_quality_score(
+                memory_id=feedback_request.message_id,
+                user_id=user_id
+            )
+            
             return {
                 "status": "success",
                 "message": f"Feedback recorded: {feedback_request.feedback_type}",
@@ -2467,6 +2480,12 @@ async def submit_implicit_feedback(feedback_request: ImplicitFeedbackRequest, re
         )
         
         if success:
+            # Calculate final quality score using f(R(t), H(t))
+            await intelligent_memory_system.update_final_quality_score(
+                memory_id=feedback_request.message_id,
+                user_id=user_id
+            )
+            
             return {
                 "status": "success",
                 "message": f"Implicit feedback recorded: {feedback_request.action_type}",

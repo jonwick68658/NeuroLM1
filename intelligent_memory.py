@@ -253,6 +253,8 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                         human_feedback_score: null,
                         human_feedback_type: null,
                         human_feedback_timestamp: null,
+                        final_quality_score: null,
+                        final_score_timestamp: null,
                         timestamp: datetime(),
                         created_at: datetime()
                     })
@@ -321,6 +323,70 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
             print(f"Error updating human feedback: {e}")
             return False
     
+    def calculate_final_quality_score(self, r_t_score: Optional[float], h_t_score: Optional[float]) -> Optional[float]:
+        """Calculate final quality score using f(R(t), H(t)) intelligence refinement function"""
+        if r_t_score is None:
+            return None
+        
+        # Human feedback weight factor (amplifies human signals)
+        human_weight = 1.5
+        
+        if h_t_score is not None:
+            # Combine R(t) and H(t) with weighted human feedback
+            final_score = r_t_score + (h_t_score * human_weight)
+            # Clamp between 1-10 range
+            return max(1.0, min(10.0, final_score))
+        else:
+            # No human feedback, use R(t) only - still apply clamping
+            return max(1.0, min(10.0, r_t_score))
+    
+    async def update_final_quality_score(self, memory_id: str, user_id: str) -> bool:
+        """Update final quality score for a memory using f(R(t), H(t))"""
+        try:
+            with self.driver.session() as session:
+                # Get current R(t) and H(t) scores
+                result = session.run("""
+                    MATCH (m:IntelligentMemory {id: $memory_id})
+                    WHERE m.user_id = $user_id
+                    RETURN m.quality_score AS r_t_score,
+                           m.human_feedback_score AS h_t_score
+                """, {
+                    'memory_id': memory_id,
+                    'user_id': user_id
+                })
+                
+                record = result.single()
+                if not record:
+                    return False
+                
+                r_t_score = record['r_t_score']
+                h_t_score = record['h_t_score']
+                
+                # Calculate final quality score
+                final_score = self.calculate_final_quality_score(r_t_score, h_t_score)
+                
+                if final_score is not None:
+                    # Update memory with final quality score
+                    update_result = session.run("""
+                        MATCH (m:IntelligentMemory {id: $memory_id})
+                        WHERE m.user_id = $user_id
+                        SET m.final_quality_score = $final_score,
+                            m.final_score_timestamp = datetime()
+                        RETURN m.id AS updated_id
+                    """, {
+                        'memory_id': memory_id,
+                        'user_id': user_id,
+                        'final_score': final_score
+                    })
+                    
+                    return update_result.single() is not None
+                
+                return False
+                
+        except Exception as e:
+            print(f"Error updating final quality score: {e}")
+            return False
+    
     async def get_unscored_memories(self, user_id: str, limit: int = 10) -> List[Dict]:
         """Get memories that haven't been quality scored yet"""
         try:
@@ -365,13 +431,21 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                 # Hybrid search: both raw memories and daily summaries
                 memories = []
                 
-                # 1. Search raw memories
+                # 1. Search raw memories with quality boost
                 memory_result = session.run("""
                     CALL db.index.vector.queryNodes('memory_embedding_index', $limit, $query_embedding)
                     YIELD node, score
                     WHERE node.user_id = $user_id AND score > 0.3
-                    RETURN node.content AS content, score, 'memory' as type
-                    ORDER BY score DESC
+                    RETURN node.content AS content, 
+                           score, 
+                           'memory' as type,
+                           node.final_quality_score AS final_quality_score,
+                           CASE 
+                               WHEN node.final_quality_score IS NOT NULL 
+                               THEN node.final_quality_score * 0.2 + score * 0.8
+                               ELSE score
+                           END AS boosted_score
+                    ORDER BY boosted_score DESC
                 """, {
                     'query_embedding': query_embedding,
                     'user_id': user_id,
