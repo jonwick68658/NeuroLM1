@@ -1294,13 +1294,13 @@
                 <div class="topic-selection">
                     <label for="topicSelect">Topic:</label>
                     <select class="topic-select" id="topicSelect">
-                        <option value="">Select or create topic</option>
+                        <option value="">All Topics</option>
                         <option value="__new__">+ Create New Topic</option>
                     </select>
                     
                     <label for="subtopicSelect">Sub-topic:</label>
                     <select class="subtopic-select" id="subtopicSelect" disabled>
-                        <option value="">Select or create sub-topic</option>
+                        <option value="">All Sub-topics</option>
                         <option value="__new__">+ Create New Sub-topic</option>
                     </select>
                 </div>
@@ -2134,7 +2134,21 @@
                     conversations = [];
                 }
                 
-                const response = await fetch(`/api/conversations?limit=20&offset=${conversationsOffset}`);
+                // Build query parameters for filtering
+                let url = `/api/conversations?limit=20&offset=${conversationsOffset}`;
+                
+                const selectedTopic = document.getElementById('topicSelect').value;
+                const selectedSubtopic = document.getElementById('subtopicSelect').value;
+                
+                if (selectedTopic && selectedTopic !== '__new__') {
+                    url += `&topic=${encodeURIComponent(selectedTopic)}`;
+                }
+                
+                if (selectedSubtopic && selectedSubtopic !== '__new__') {
+                    url += `&sub_topic=${encodeURIComponent(selectedSubtopic)}`;
+                }
+                
+                const response = await fetch(url);
                 if (response.ok) {
                     const result = await response.json();
                     
@@ -2575,6 +2589,9 @@
             }
             
             updateSubtopicDropdown();
+            
+            // Reload conversations with new topic filter
+            await loadConversations(true);
         });
 
         subtopicSelect.addEventListener('change', async function() {
@@ -2596,6 +2613,9 @@
                     this.value = '';
                 }
             }
+            
+            // Reload conversations with new subtopic filter
+            await loadConversations(true);
         });
 
         newChatBtn.addEventListener('click', startNewChat);

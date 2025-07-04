@@ -396,19 +396,38 @@ def update_conversation_topic(conversation_id: str, topic: Optional[str] = None,
         print(f"Error updating conversation topic: {e}")
         return False
 
-def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0) -> Dict:
-    """Get paginated conversations for a user with previews"""
+def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Dict:
+    """Get paginated conversations for a user with previews, optionally filtered by topic/subtopic"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get total count
-        cursor.execute('SELECT COUNT(*) FROM conversations WHERE user_id = %s', (user_id,))
+        # Build WHERE clause for filtering
+        where_conditions = ['c.user_id = %s']
+        params = [user_id]
+        
+        if topic is not None:
+            # Normalize topic for consistent filtering
+            topic = topic.lower().strip()
+            where_conditions.append('c.topic = %s')
+            params.append(topic)
+            
+        if sub_topic is not None:
+            # Normalize sub_topic for consistent filtering
+            sub_topic = sub_topic.lower().strip()
+            where_conditions.append('c.sub_topic = %s')
+            params.append(sub_topic)
+        
+        where_clause = ' AND '.join(where_conditions)
+        
+        # Get total count with filtering
+        count_query = f'SELECT COUNT(*) FROM conversations c WHERE {where_clause}'
+        cursor.execute(count_query, params)
         count_result = cursor.fetchone()
         total_count = count_result[0] if count_result and count_result[0] is not None else 0
         
-        # Get paginated conversations with latest message preview
-        cursor.execute('''
+        # Get paginated conversations with latest message preview and filtering
+        main_query = f'''
             SELECT c.id, c.title, c.topic, c.sub_topic, c.created_at, c.updated_at, c.message_count,
                    m.content as last_message, m.message_type as last_message_type
             FROM conversations c
@@ -419,10 +438,12 @@ def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0) -> Di
                 ORDER BY created_at DESC 
                 LIMIT 1
             ) m ON true
-            WHERE c.user_id = %s
+            WHERE {where_clause}
             ORDER BY c.updated_at DESC
             LIMIT %s OFFSET %s
-        ''', (user_id, limit, offset))
+        '''
+        
+        cursor.execute(main_query, params + [limit, offset])
         
         conversations = []
         for row in cursor.fetchall():
@@ -2061,15 +2082,15 @@ class ConversationListResponse(BaseModel):
     next_offset: Optional[int]
 
 @app.get("/api/conversations", response_model=ConversationListResponse)
-async def get_conversations(request: Request, limit: int = 20, offset: int = 0):
-    """Get paginated conversations for the current user"""
+async def get_conversations(request: Request, limit: int = 20, offset: int = 0, topic: Optional[str] = None, sub_topic: Optional[str] = None):
+    """Get paginated conversations for the current user, optionally filtered by topic/subtopic"""
     try:
         user_data = get_authenticated_user(request)
         if not user_data:
             raise HTTPException(status_code=401, detail="Not authenticated")
         user_id = user_data['user_id']
         
-        result = get_user_conversations(user_id, limit, offset)
+        result = get_user_conversations(user_id, limit, offset, topic, sub_topic)
         return result
     except HTTPException:
         raise
@@ -2099,7 +2120,7 @@ async def create_new_conversation(request: Request, conversation_data: Conversat
             raise HTTPException(status_code=500, detail="Failed to create conversation")
         
         # Get the created conversation details
-        conversations_data = get_user_conversations(user_id)
+        conversations_data = get_user_conversations(user_id, limit=20, offset=0, topic=None, sub_topic=None)
         new_conversation = next((c for c in conversations_data['conversations'] if c['id'] == conversation_id), None)
         
         if not new_conversation:
@@ -2238,7 +2259,7 @@ async def update_conversation_topic_endpoint(conversation_id: str, request: Requ
         user_id = user_data['user_id']
         
         # Verify the conversation belongs to the user
-        conversations = get_user_conversations(user_id, limit=1000, offset=0)  # Get all conversations to check ownership
+        conversations = get_user_conversations(user_id, limit=1000, offset=0, topic=None, sub_topic=None)  # Get all conversations to check ownership
         conversation_exists = any(conv['id'] == conversation_id for conv in conversations['conversations'])
         
         if not conversation_exists:
@@ -2266,7 +2287,7 @@ async def delete_conversation(conversation_id: str, request: Request):
         user_id = user_data['user_id']
         
         # Verify the conversation belongs to the user
-        conversations = get_user_conversations(user_id, limit=1000, offset=0)
+        conversations = get_user_conversations(user_id, limit=1000, offset=0, topic=None, sub_topic=None)
         conversation_exists = any(conv['id'] == conversation_id for conv in conversations['conversations'])
         
         if not conversation_exists:
