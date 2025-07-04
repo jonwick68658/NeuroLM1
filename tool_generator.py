@@ -17,7 +17,7 @@ class ToolGenerator:
     def __init__(self):
         self.api_key = os.getenv('OPENROUTER_API_KEY')
         self.base_url = "https://openrouter.ai/api/v1"
-        self.model = "mistralai/mistral-small-3.2-24b-instruct"
+        self.model = "mistralai/devstral-small"
         
     def generate_tool(self, user_request: str, user_id: str) -> Optional[Dict]:
         """
@@ -89,25 +89,32 @@ You must respond with valid JSON in this exact format:
 Requirements:
 - Function must be simple and safe
 - No file system access or dangerous operations
-- Use only standard Python libraries or simple API calls
+- CRITICAL: DO NOT use any import statements - function must work with built-in Python only
+- For math operations, define constants directly (e.g., pi = 3.14159265359)
+- Available built-ins: len, str, int, float, bool, list, dict, tuple, set, min, max, sum, abs, round, range, enumerate, zip
 - Function name must be valid Python identifier
 - Return meaningful results
 - Keep it under 20 lines of code
 
-Example for "get current time":
+Example for "calculate circle area":
 {{
-    "name": "get_current_time",
-    "description": "Get the current date and time",
-    "function_code": "def get_current_time() -> str:\\n    from datetime import datetime\\n    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')",
+    "name": "calculate_circle_area",
+    "description": "Calculate the area of a circle given radius",
+    "function_code": "def calculate_circle_area(radius: float) -> float:\\n    pi = 3.14159265359\\n    return pi * (radius ** 2)",
     "schema": {{
         "type": "function",
         "function": {{
-            "name": "get_current_time",
-            "description": "Get the current date and time",
+            "name": "calculate_circle_area",
+            "description": "Calculate the area of a circle given radius",
             "parameters": {{
                 "type": "object",
-                "properties": {{}},
-                "required": [],
+                "properties": {{
+                    "radius": {{
+                        "type": "number",
+                        "description": "The radius of the circle"
+                    }}
+                }},
+                "required": ["radius"],
                 "additionalProperties": false
             }},
             "strict": true

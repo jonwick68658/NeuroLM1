@@ -132,8 +132,13 @@ intelligent_memory_system = None
 try:
     from intelligent_memory import IntelligentMemorySystem
     from background_riai import process_riai_batch
+    from tool_generator import ToolGenerator
+    from tool_executor import ToolExecutor
     intelligent_memory_system = IntelligentMemorySystem()
+    tool_generator = ToolGenerator()
+    tool_executor = ToolExecutor()
     print("✅ Intelligent memory system initialized")
+    print("✅ Tool generation system initialized")
 except Exception as e:
     print(f"❌ Failed to initialize intelligent memory: {e}")
     intelligent_memory_system = None
