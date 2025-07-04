@@ -228,6 +228,7 @@ This creates the first truly self-improving conversational AI that learns mathem
 
 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
+
 ---
 
 Built with ❤️ using FastAPI, Neo4j, RIAI Mathematics, and OpenRouter AI
