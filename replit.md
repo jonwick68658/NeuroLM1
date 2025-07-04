@@ -148,6 +148,7 @@ The application follows a FastAPI-based microservice architecture with the follo
 
 ## Changelog
 
+- July 4, 2025: **UX ENHANCEMENT**: Implemented topic-based conversation filtering in both desktop and mobile interfaces - users can now select topics/subtopics in sidebar to filter conversations, following industry standard patterns like Discord/Slack for improved navigation
 - July 4, 2025: **REVOLUTIONARY EXPANSION**: Completed automatic tool creation system for RIAI - AI can now generate custom functions on-demand using DevStral model via OpenRouter, expanding self-improvement capabilities through real-time capability creation and R(t)/H(t) evaluation of tool effectiveness
 - July 4, 2025: **BREAKTHROUGH**: Implemented safe tool execution environment with comprehensive sandboxing - generated tools execute in isolated environment with controlled built-ins, preventing security risks while enabling powerful capability expansion
 - July 4, 2025: **INFRASTRUCTURE**: Added complete tool management system with PostgreSQL storage for user-generated tools, usage tracking, and performance analytics - foundation for capability evolution tracking
