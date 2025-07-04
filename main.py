@@ -228,12 +228,111 @@ def init_file_storage():
             )
         ''')
         
+        # Create user_tools table for custom tool storage
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_tools (
+                id SERIAL PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                tool_name VARCHAR(255) NOT NULL,
+                function_code TEXT NOT NULL,
+                schema_json TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE,
+                usage_count INTEGER DEFAULT 0,
+                success_count INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, tool_name)
+            )
+        ''')
+        
         conn.commit()
         cursor.close()
         conn.close()
         print("✓ All database tables initialized successfully")
     except Exception as e:
         print(f"Error initializing database: {e}")
+
+# Tool management functions
+def store_user_tool(user_id: str, tool_name: str, function_code: str, schema_json: str, description: Optional[str] = None) -> bool:
+    """Store a custom tool for a user"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO user_tools (user_id, tool_name, function_code, schema_json, description)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id, tool_name) 
+            DO UPDATE SET 
+                function_code = EXCLUDED.function_code,
+                schema_json = EXCLUDED.schema_json,
+                description = EXCLUDED.description,
+                created_at = CURRENT_TIMESTAMP
+        ''', (user_id, tool_name, function_code, schema_json, description or ""))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error storing user tool: {e}")
+        return False
+
+def get_user_tools(user_id: str) -> List[Dict]:
+    """Get all active tools for a user"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT tool_name, function_code, schema_json, description, usage_count, success_count
+            FROM user_tools
+            WHERE user_id = %s AND is_active = TRUE
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        
+        tools = []
+        for row in cursor.fetchall():
+            tools.append({
+                'tool_name': row[0],
+                'function_code': row[1],
+                'schema_json': row[2],
+                'description': row[3],
+                'usage_count': row[4],
+                'success_count': row[5]
+            })
+        
+        cursor.close()
+        conn.close()
+        return tools
+    except Exception as e:
+        print(f"Error getting user tools: {e}")
+        return []
+
+def update_tool_usage(user_id: str, tool_name: str, success: bool = True) -> bool:
+    """Update tool usage statistics"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if success:
+            cursor.execute('''
+                UPDATE user_tools 
+                SET usage_count = usage_count + 1, success_count = success_count + 1
+                WHERE user_id = %s AND tool_name = %s
+            ''', (user_id, tool_name))
+        else:
+            cursor.execute('''
+                UPDATE user_tools 
+                SET usage_count = usage_count + 1
+                WHERE user_id = %s AND tool_name = %s
+            ''', (user_id, tool_name))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error updating tool usage: {e}")
+        return False
 
 # Initialize file storage on startup
 init_file_storage()
