@@ -5,6 +5,8 @@ An intelligent AI chat system featuring the world's first operational RIAI (Recu
 ## ✨ Revolutionary Features
 
 - **RIAI Self-Improvement**: Mathematical framework for continuous AI learning without manual training
+- **Automatic Tool Creation**: AI generates custom functions on-demand using DevStral model
+- **Safe Tool Execution**: Sandboxed environment for secure custom function execution
 - **Background R(t) Evaluation**: AI self-assessment using DeepSeek-R1-Distill model
 - **Human Feedback Integration**: H(t) scoring with 1.5x amplification weighting
 - **Quality-Boosted Retrieval**: Memory search prioritizing mathematically superior responses
@@ -93,12 +95,15 @@ An intelligent AI chat system featuring the world's first operational RIAI (Recu
 3. Start chatting - your conversation history is automatically saved
 4. Use the 🌐 button to enable real-time web search
 
-### RIAI Memory Features
+### RIAI Memory & Tool Features
 
 - **Self-Improving Memory**: System learns which responses are most valuable
 - **Quality-Boosted Retrieval**: Mathematically prioritizes better memories
 - **R(t) Background Evaluation**: AI continuously scores response quality
 - **H(t) Human Feedback**: Like/dislike feedback improves future responses
+- **Automatic Tool Creation**: AI generates custom functions when needed
+- **Safe Tool Execution**: Sandboxed environment prevents security risks
+- **Tool Performance Tracking**: R(t)/H(t) evaluation of tool effectiveness
 - **Topic Organization**: Categorize conversations for better organization
 
 ### File Integration
@@ -112,6 +117,8 @@ An intelligent AI chat system featuring the world's first operational RIAI (Recu
 - **Slash Commands**: Use `/clear` to reset conversation context
 - **Model Selection**: Choose from GPT-4, Claude, Gemini, and many others
 - **Web Search**: Toggle real-time web data integration
+- **Tool Creation**: Request custom functions like "Create a tool to calculate compound interest"
+- **Tool Execution**: Generated tools run safely in sandboxed environment
 - **PWA Installation**: Install as a mobile app for offline access
 
 ## 🔧 Development
@@ -123,6 +130,8 @@ neurolm/
 ├── main.py                 # FastAPI application and API endpoints
 ├── intelligent_memory.py   # RIAI memory system with quality-boosted retrieval
 ├── background_riai.py      # Background R(t) evaluation service
+├── tool_generator.py       # Automatic tool creation using DevStral model
+├── tool_executor.py        # Safe sandboxed tool execution environment
 ├── model_service.py        # OpenRouter integration
 ├── chat.html              # Desktop web interface
 ├── mobile.html            # Mobile PWA interface
@@ -134,6 +143,8 @@ neurolm/
 
 - **IntelligentMemorySystem**: RIAI memory management with quality scoring
 - **BackgroundRIAIService**: Background R(t) evaluation and caching
+- **ToolGenerator**: Automatic tool creation using DevStral model
+- **ToolExecutor**: Safe sandboxed execution environment
 - **MemoryRouter**: Intent classification for optimal retrieval
 - **ModelService**: AI model integration and management
 
@@ -194,6 +205,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 📈 Recent Updates
 
+- **July 4, 2025**: **REVOLUTIONARY EXPANSION** - Completed automatic tool creation system with DevStral model integration, enabling AI to generate custom functions on-demand and expand capabilities in real-time
+- **July 4, 2025**: Implemented safe tool execution environment with comprehensive sandboxing and PostgreSQL storage for user-generated tools
 - **July 3, 2025**: **REVOLUTIONARY** - Completed world's first operational RIAI system with mathematical self-improvement framework I(t+1) = I(t) + f(R(t), H(t))
 - **July 3, 2025**: Removed redundant daily summary system - RIAI quality-boosted retrieval provides superior performance
 - **July 2, 2025**: Implemented database-persistent sessions with full API migration
