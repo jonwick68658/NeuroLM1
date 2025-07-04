@@ -2167,6 +2167,7 @@
             conversations.forEach(conversation => {
                 const conversationDiv = document.createElement('div');
                 conversationDiv.className = 'conversation-item';
+                conversationDiv.setAttribute('data-conversation-id', conversation.id);
                 if (conversation.id === currentConversationId) {
                     conversationDiv.classList.add('active');
                 }
@@ -2219,6 +2220,19 @@
             }
         }
 
+        function updateActiveConversation(conversationId) {
+            // Efficiently update only the active state without rebuilding the entire list
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Find and activate the selected conversation
+            const activeItem = document.querySelector(`.conversation-item[data-conversation-id="${conversationId}"]`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+            }
+        }
+
         async function loadConversation(conversationId) {
             try {
                 // Clear current chat and reset message state
@@ -2253,7 +2267,7 @@
                     
                     // Update current conversation topic state and display
                     updateCurrentTopicDisplay(result.messages[0]);
-                    renderConversations(); // Update active state
+                    updateActiveConversation(conversationId); // Update active state efficiently
                 }
             } catch (error) {
                 console.error('Error loading conversation:', error);
