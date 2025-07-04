@@ -348,6 +348,9 @@ init_file_storage()
 def create_conversation(user_id: str, title: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Optional[str]:
     """Create a new conversation and return its ID"""
     try:
+        # Clean up any placeholder conversations for this topic/subtopic before creating real one
+        cleanup_placeholder_conversations(user_id, topic, sub_topic)
+        
         conversation_id = str(uuid.uuid4())
         if not title:
             title = "New Conversation"
@@ -713,6 +716,60 @@ def create_subtopic_entry(user_id: str, topic: str, sub_topic: str) -> bool:
     except Exception as e:
         print(f"Error creating sub-topic: {e}")
         return False
+
+def cleanup_placeholder_conversations(user_id: str, topic: Optional[str], sub_topic: Optional[str]) -> int:
+    """Remove placeholder conversations that match the topic/subtopic being used for real conversation"""
+    try:
+        if not topic:
+            return 0  # No cleanup needed if no topic specified
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Normalize topic and sub_topic like the rest of the system
+        topic = topic.lower().strip()
+        sub_topic = sub_topic.lower().strip() if sub_topic else None
+        
+        # Find placeholder conversations that match exactly
+        # Placeholders have 0 messages and specific title patterns
+        if sub_topic:
+            # Looking for subtopic placeholder: [Sub-topic: topic → sub_topic]
+            placeholder_title = f"[Sub-topic: {topic} → {sub_topic}]"
+            cursor.execute('''
+                SELECT id FROM conversations 
+                WHERE user_id = %s AND topic = %s AND sub_topic = %s 
+                AND message_count = 0 AND title = %s
+            ''', (user_id, topic, sub_topic, placeholder_title))
+        else:
+            # Looking for topic placeholder: [Topic: topic]
+            placeholder_title = f"[Topic: {topic}]"
+            cursor.execute('''
+                SELECT id FROM conversations 
+                WHERE user_id = %s AND topic = %s AND sub_topic IS NULL 
+                AND message_count = 0 AND title = %s
+            ''', (user_id, topic, placeholder_title))
+        
+        placeholder_ids = [row[0] for row in cursor.fetchall()]
+        
+        # Delete the placeholder conversations
+        deleted_count = 0
+        for placeholder_id in placeholder_ids:
+            cursor.execute('DELETE FROM conversations WHERE id = %s', (placeholder_id,))
+            deleted_count += cursor.rowcount
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        if deleted_count > 0:
+            print(f"DEBUG: Cleaned up {deleted_count} placeholder conversation(s) for topic '{topic}'" + 
+                  (f" → '{sub_topic}'" if sub_topic else ""))
+        
+        return deleted_count
+        
+    except Exception as e:
+        print(f"Error cleaning up placeholder conversations: {e}")
+        return 0
 
 # Memory linking functions
 def create_memory_link(memory_id: str, linked_topic: str, user_id: str) -> bool:
