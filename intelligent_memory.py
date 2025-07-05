@@ -334,7 +334,23 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
     async def update_human_feedback_by_node_id(self, node_id: str, feedback_score: float, feedback_type: str, user_id: str) -> bool:
         """Update memory with human feedback using Neo4j node ID directly (simplified approach)"""
         try:
+            print(f"DEBUG: Attempting to update feedback for node_id={node_id}, user_id={user_id}")
+            
             with self.driver.session() as session:
+                # First, check if the node exists at all
+                check_result = session.run("""
+                    MATCH (m:IntelligentMemory {id: $node_id})
+                    RETURN m.id AS node_id, m.user_id AS user_id
+                """, {'node_id': node_id})
+                
+                check_record = check_result.single()
+                if not check_record:
+                    print(f"DEBUG: Node {node_id} not found in database")
+                    return False
+                
+                print(f"DEBUG: Found node {check_record['node_id']} with user_id {check_record['user_id']}")
+                
+                # Now try the update
                 result = session.run("""
                     MATCH (m:IntelligentMemory {id: $node_id})
                     WHERE m.user_id = $user_id
@@ -349,10 +365,16 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                     'user_id': user_id
                 })
                 
-                return result.single() is not None
+                update_record = result.single()
+                if update_record:
+                    print(f"DEBUG: Successfully updated feedback for node {update_record['updated_id']}")
+                    return True
+                else:
+                    print(f"DEBUG: Update failed - node exists but user_id mismatch or other condition failed")
+                    return False
                 
         except Exception as e:
-            print(f"Error updating human feedback by node ID: {e}")
+            print(f"ERROR: Exception in update_human_feedback_by_node_id: {e}")
             return False
     
     def calculate_final_quality_score(self, r_t_score: Optional[float], h_t_score: Optional[float]) -> Optional[float]:

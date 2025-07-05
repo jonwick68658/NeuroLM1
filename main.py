@@ -2563,6 +2563,7 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
         feedback_score = 2.0 if feedback_request.feedback_type == 'like' else -2.0
         
         # Update memory with human feedback using Neo4j node ID directly
+        print(f"DEBUG: Feedback endpoint called with message_id={feedback_request.message_id}, type={feedback_request.feedback_type}, user_id={user_id}")
         success = await intelligent_memory_system.update_human_feedback_by_node_id(
             node_id=feedback_request.message_id,
             feedback_score=feedback_score,
