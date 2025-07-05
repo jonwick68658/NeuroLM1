@@ -187,7 +187,7 @@ def init_file_storage():
         # Create conversation messages table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS conversation_messages (
-                id VARCHAR(255) PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 conversation_id VARCHAR(255) NOT NULL,
                 message_type VARCHAR(50) NOT NULL,
                 content TEXT NOT NULL,
@@ -472,22 +472,23 @@ def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0, topic
         print(f"Error getting conversations: {e}")
         return {'conversations': [], 'total_count': 0, 'has_more': False, 'next_offset': None}
 
-def save_conversation_message(conversation_id: str, message_type: str, content: str, message_id: str = None):
-    """Save a message to a conversation with provided message_id (Neo4j UUID)"""
+def save_conversation_message(conversation_id: str, message_type: str, content: str):
+    """Save a message to a conversation"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Use provided message_id or generate UUID for backward compatibility
-        if not message_id:
-            import uuid
-            message_id = str(uuid.uuid4())
-        
-        # Insert message with provided ID
+        # Insert message and return the generated ID
         cursor.execute('''
-            INSERT INTO conversation_messages (id, conversation_id, message_type, content, created_at)
-            VALUES (%s, %s, %s, %s, %s)
-        ''', (message_id, conversation_id, message_type, content, datetime.now()))
+            INSERT INTO conversation_messages (conversation_id, message_type, content, created_at)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+        ''', (conversation_id, message_type, content, datetime.now()))
+        
+        result = cursor.fetchone()
+        if not result:
+            raise Exception("Failed to insert message")
+        message_id = result[0]
         
         # Update conversation message count and timestamp
         cursor.execute('''
@@ -2022,45 +2023,43 @@ Instructions:
         assistant_message_id = None
         assistant_memory_node_id = None
         if conversation_id:
-            # Store messages in intelligent memory system first to get Neo4j UUIDs
-            user_memory_node_id = None
-            assistant_memory_node_id = None
-            
-            if intelligent_memory_system:
-                try:
-                    # Store user message in Neo4j and get UUID
-                    user_memory_node_id = await intelligent_memory_system.store_memory(
-                        content=message_content,
-                        user_id=user_id,
-                        conversation_id=conversation_id,
-                        message_type="user"
-                    )
-                    if user_memory_node_id:
-                        print(f"DEBUG: Stored user message with Neo4j UUID {user_memory_node_id}")
-                    
-                    # Store assistant response in Neo4j and get UUID
-                    assistant_memory_node_id = await intelligent_memory_system.store_memory(
-                        content=response_text,
-                        user_id=user_id,
-                        conversation_id=conversation_id,
-                        message_type="assistant"
-                    )
-                    if assistant_memory_node_id:
-                        print(f"DEBUG: Stored assistant response with Neo4j UUID {assistant_memory_node_id}")
-                        print(f"DEBUG: Memory {assistant_memory_node_id} queued for background R(t) evaluation")
-                        
-                except Exception as e:
-                    print(f"Error storing messages in intelligent memory: {e}")
-            
-            # Save messages to PostgreSQL using Neo4j UUIDs as primary keys
             try:
-                # Save user message with Neo4j UUID
-                if user_memory_node_id:
-                    save_conversation_message(conversation_id, 'user', chat_request.message, user_memory_node_id)
+                # Save user message to conversation and get PostgreSQL message ID
+                user_message_id = save_conversation_message(conversation_id, 'user', chat_request.message)
                 
-                # Save assistant response with Neo4j UUID  
-                if assistant_memory_node_id:
-                    save_conversation_message(conversation_id, 'assistant', response_text, assistant_memory_node_id)
+                # Save assistant response to conversation and get PostgreSQL message ID
+                assistant_message_id = save_conversation_message(conversation_id, 'assistant', response_text)
+                
+                # Now store messages in intelligent memory system with PostgreSQL message IDs
+                if intelligent_memory_system:
+                    try:
+                        # Store user message with PostgreSQL message ID
+                        if user_message_id:
+                            user_memory_id = await intelligent_memory_system.store_memory(
+                                content=message_content,
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                message_type="user",
+                                message_id=user_message_id
+                            )
+                            if user_memory_id:
+                                print(f"DEBUG: Stored user message with PostgreSQL ID {user_message_id}")
+                        
+                        # Store assistant response with PostgreSQL message ID
+                        if assistant_message_id:
+                            assistant_memory_node_id = await intelligent_memory_system.store_memory(
+                                content=response_text,
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                message_type="assistant",
+                                message_id=assistant_message_id
+                            )
+                            if assistant_memory_node_id:
+                                print(f"DEBUG: Stored assistant response with PostgreSQL ID {assistant_message_id}")
+                                print(f"DEBUG: Memory {assistant_memory_node_id} queued for background R(t) evaluation")
+                                
+                    except Exception as e:
+                        print(f"Error storing messages in intelligent memory: {e}")
                         
             except Exception as e:
                 print(f"Error saving conversation messages: {e}")

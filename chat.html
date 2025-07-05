@@ -2275,7 +2275,8 @@
                     // Render messages
                     result.messages.forEach(message => {
                         addMessage(message.content, message.message_type, 
-                                 message.message_type === 'assistant' ? 'Loaded from conversation' : null);
+                                 message.message_type === 'assistant' ? 'Loaded from conversation' : null,
+                                 message.id);
                     });
                     
                     // Restore feedback states for loaded messages
