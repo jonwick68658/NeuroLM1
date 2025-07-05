@@ -2021,6 +2021,7 @@ Instructions:
         # Ensure conversation_id is not None before saving messages
         user_message_id = None
         assistant_message_id = None
+        assistant_memory_node_id = None
         if conversation_id:
             try:
                 # Save user message to conversation and get PostgreSQL message ID
@@ -2046,16 +2047,16 @@ Instructions:
                         
                         # Store assistant response with PostgreSQL message ID
                         if assistant_message_id:
-                            assistant_memory_id = await intelligent_memory_system.store_memory(
+                            assistant_memory_node_id = await intelligent_memory_system.store_memory(
                                 content=response_text,
                                 user_id=user_id,
                                 conversation_id=conversation_id,
                                 message_type="assistant",
                                 message_id=assistant_message_id
                             )
-                            if assistant_memory_id:
+                            if assistant_memory_node_id:
                                 print(f"DEBUG: Stored assistant response with PostgreSQL ID {assistant_message_id}")
-                                print(f"DEBUG: Memory {assistant_memory_id} queued for background R(t) evaluation")
+                                print(f"DEBUG: Memory {assistant_memory_node_id} queued for background R(t) evaluation")
                                 
                     except Exception as e:
                         print(f"Error storing messages in intelligent memory: {e}")
@@ -2070,7 +2071,7 @@ Instructions:
             memory_stored=True,
             context_used=1 if context else 0,
             conversation_id=conversation_id or "",
-            assistant_message_id=str(assistant_message_id) if assistant_message_id else None
+            assistant_message_id=assistant_memory_node_id if assistant_memory_node_id else None
         )
         
     except Exception as e:
@@ -2561,9 +2562,9 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
         # Convert feedback to H(t) score
         feedback_score = 2.0 if feedback_request.feedback_type == 'like' else -2.0
         
-        # Update memory with human feedback
-        success = await intelligent_memory_system.update_human_feedback(
-            message_id=feedback_request.message_id,
+        # Update memory with human feedback using Neo4j node ID directly
+        success = await intelligent_memory_system.update_human_feedback_by_node_id(
+            node_id=feedback_request.message_id,
             feedback_score=feedback_score,
             feedback_type=feedback_request.feedback_type,
             user_id=user_id
@@ -2574,7 +2575,7 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
             await intelligent_memory_system.update_final_quality_score(
                 memory_id=feedback_request.message_id,
                 user_id=user_id,
-                use_message_id=True
+                use_message_id=False  # Now using Neo4j node ID directly
             )
             
             return {

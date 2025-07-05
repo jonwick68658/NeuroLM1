@@ -302,7 +302,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
             return False
     
     async def update_human_feedback(self, message_id, feedback_score: float, feedback_type: str, user_id: str) -> bool:
-        """Update memory with human feedback (H(t) function)"""
+        """Update memory with human feedback (H(t) function) - Legacy method using PostgreSQL message_id"""
         try:
             with self.driver.session() as session:
                 # Convert message_id to integer if it's a string representation
@@ -329,6 +329,30 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                 
         except Exception as e:
             print(f"Error updating human feedback: {e}")
+            return False
+    
+    async def update_human_feedback_by_node_id(self, node_id: str, feedback_score: float, feedback_type: str, user_id: str) -> bool:
+        """Update memory with human feedback using Neo4j node ID directly (simplified approach)"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (m:IntelligentMemory {id: $node_id})
+                    WHERE m.user_id = $user_id
+                    SET m.human_feedback_score = $feedback_score,
+                        m.human_feedback_type = $feedback_type,
+                        m.human_feedback_timestamp = datetime()
+                    RETURN m.id AS updated_id
+                """, {
+                    'node_id': node_id,
+                    'feedback_score': feedback_score,
+                    'feedback_type': feedback_type,
+                    'user_id': user_id
+                })
+                
+                return result.single() is not None
+                
+        except Exception as e:
+            print(f"Error updating human feedback by node ID: {e}")
             return False
     
     def calculate_final_quality_score(self, r_t_score: Optional[float], h_t_score: Optional[float]) -> Optional[float]:
