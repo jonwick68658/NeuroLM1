@@ -275,6 +275,10 @@
             gap: 0.5rem;
         }
 
+        .input-left {
+            position: relative;
+        }
+
         .message-input {
             flex: 1;
             background: #2a2a2a;
@@ -491,13 +495,7 @@
     <!-- Input Area -->
     <div class="input-area">
         <div class="input-container">
-            <textarea 
-                class="message-input" 
-                id="messageInput" 
-                placeholder="How can I help you today?"
-                rows="1"
-            ></textarea>
-            <div class="action-buttons">
+            <div class="input-left">
                 <button class="action-btn" id="plusBtn" title="Options">+</button>
                 <div class="plus-menu" id="plusMenu">
                     <div class="plus-menu-item" id="fileMenuItem">
@@ -509,8 +507,14 @@
                         Web Search
                     </div>
                 </div>
-                <button class="action-btn send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
             </div>
+            <textarea 
+                class="message-input" 
+                id="messageInput" 
+                placeholder="How can I help you today?"
+                rows="1"
+            ></textarea>
+            <button class="action-btn send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
         </div>
         <input type="file" id="fileInput" style="display: none;">
     </div>
