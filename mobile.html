@@ -5,251 +5,706 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NeuroLM Mobile</title>
     <link rel="manifest" href="/manifest.json">
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <meta name="theme-color" content="#4f46e5">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="NeuroLM">
-    <link rel="apple-touch-icon" href="/icon.svg">
     <style>
-        /* Custom styles that can't be done with Tailwind */
-        .typing-indicator .typing-dot {
-            display: inline-block;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: #000000;
+            color: #ffffff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: #000000;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .menu-button {
+            background: none;
+            border: none;
+            color: #ffffff;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        /* Sidebar */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -320px;
+            width: 320px;
+            height: 100vh;
+            background: #000000;
+            z-index: 999;
+            transition: left 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #2a2a2a;
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .topic-selection {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .topic-selection label {
+            font-size: 0.9rem;
+            color: #ffffff;
+            font-weight: 500;
+        }
+
+        .topic-select, .subtopic-select {
+            background: #2a2a2a;
+            border: 1px solid #404040;
+            color: #ffffff;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .new-chat-btn {
+            background: #4f46e5;
+            color: #ffffff;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .new-chat-btn:hover {
+            background: #4338ca;
+        }
+
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .conversation-item {
+            background: #1a1a1a;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .conversation-item:hover {
+            background: #2a2a2a;
+        }
+
+        .conversation-item.active {
+            background: #4f46e5;
+        }
+
+        .conversation-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .conversation-topic {
+            font-size: 0.8rem;
+            color: #9ca3af;
+            margin-bottom: 0.25rem;
+        }
+
+        .conversation-preview {
+            font-size: 0.9rem;
+            color: #d1d5db;
+            line-height: 1.4;
+        }
+
+        .conversation-meta {
+            font-size: 0.8rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        /* Main Chat Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .welcome-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 2rem;
+        }
+
+        .welcome-text h2 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-text p {
+            font-size: 1.2rem;
+            color: #9ca3af;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: none;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 1rem;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background: #4f46e5;
+            color: #ffffff;
+            margin-left: auto;
+        }
+
+        .assistant-message {
+            background: #2a2a2a;
+            color: #ffffff;
+            margin-right: auto;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 1rem;
+            border-top: 1px solid #2a2a2a;
+            background: #000000;
+        }
+
+        .input-container {
+            position: relative;
+            display: flex;
+            align-items: end;
+            gap: 0.5rem;
+        }
+
+        .message-input {
+            flex: 1;
+            background: #2a2a2a;
+            border: 1px solid #404040;
+            color: #ffffff;
+            padding: 1rem;
+            border-radius: 1.5rem;
+            font-size: 1rem;
+            resize: none;
+            min-height: 48px;
+            max-height: 120px;
+        }
+
+        .message-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            background: #2a2a2a;
+            border: 1px solid #404040;
+            color: #ffffff;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.2rem;
+        }
+
+        .action-btn:hover {
+            background: #404040;
+        }
+
+        .action-btn.active {
+            background: #4f46e5;
+        }
+
+        .send-btn {
+            background: #4f46e5;
+        }
+
+        .send-btn:hover {
+            background: #4338ca;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 1rem;
+        }
+
+        .typing-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background-color: #6b7280;
-            margin: 0 2px;
-            animation: typing-dot 1.4s infinite ease-in-out;
-        }
-        .typing-indicator .typing-dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-        .typing-indicator .typing-dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-        @keyframes typing-dot {
-            0%, 60%, 100% { transform: translateY(0); }
-            30% { transform: translateY(-5px); }
-        }
-        .sidebar {
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-        }
-        .sidebar.open {
-            transform: translateX(0);
-        }
-        .sidebar-overlay {
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        .sidebar-overlay.show {
-            opacity: 0.5;
-            visibility: visible;
-        }
-        .message-input {
-            resize: none;
-            max-height: 150px;
-        }
-        .ai-message pre {
-            background-color: #1e293b;
-            color: #f8fafc;
-            padding: 12px;
-            border-radius: 6px;
-            overflow-x: auto;
-        }
-        .ai-message code {
-            background-color: #1e293b;
-            color: #f8fafc;
-            padding: 2px 4px;
-            border-radius: 4px;
-            font-family: monospace;
+            background: #9ca3af;
+            animation: typing 1.4s infinite ease-in-out;
         }
 
-        /* Dark mode styles */
-        .dark-mode body {
-            background-color: #111827;
-            color: #f3f4f6;
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
         }
-        .dark-mode .input-area {
-            background-color: #1f2937;
-            border-color: #374151;
-        }
-        .dark-mode .sidebar {
-            background-color: #1f2937;
-        }
-        .dark-mode .conversation-item {
-            border-color: #374151;
-        }
-        .dark-mode .conversation-item:hover {
-            background-color: #374151;
-        }
-        .dark-mode .ai-message {
-            background-color: #374151;
-            color: #f3f4f6;
-        }
-        .dark-mode .message-input {
-            background-color: #1f2937;
-            border-color: #374151;
-            color: #f3f4f6;
-        }
-        .dark-mode .message-input:focus {
-            border-color: #6366f1;
-        }
-        .dark-mode .typing-indicator .typing-dot {
-            background-color: #9ca3af;
-        }
-        .dark-mode .sidebar label {
-            color: #f3f4f6;
-        }
-        .dark-mode select {
-            background-color: #374151;
-            color: #f3f4f6;
-            border-color: #4b5563;
-        }
-        .dark-mode .conversation-title {
-            color: #f3f4f6;
-        }
-        .dark-mode .conversation-topic {
-            color: #9ca3af;
-        }
-        .dark-mode .conversation-preview {
-            color: #d1d5db;
-        }
-        .dark-mode .conversation-meta {
-            color: #9ca3af;
+
+        /* Responsive adjustments */
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 100vw;
+                left: -100vw;
+            }
+            
+            .header h1 {
+                font-size: 1rem;
+            }
+            
+            .welcome-text h2 {
+                font-size: 1.5rem;
+            }
+            
+            .welcome-text p {
+                font-size: 1rem;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-900 font-sans h-screen flex flex-col">
+<body>
     <!-- Header -->
-    <header class="bg-indigo-600 text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-10">
-        <button class="menu-button text-2xl" onclick="toggleSidebar()">☰</button>
-        <h1 class="text-xl font-bold">NeuroLM AI</h1>
-        <button class="dark-mode-toggle text-xl" onclick="toggleDarkMode()">🌙</button>
-    </header>
-
-    <!-- Sidebar Overlay -->
-    <div class="sidebar-overlay fixed inset-0 bg-black z-20" id="sidebarOverlay" onclick="closeSidebar()"></div>
-
-    <!-- Sidebar -->
-    <div class="sidebar fixed top-0 left-0 h-full w-72 bg-white shadow-lg z-30" id="sidebar">
-        <div class="p-4 flex flex-col h-full">
-            <div class="flex flex-col space-y-3 mb-4">
-                <button class="new-chat-btn bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                        onclick="createNewConversation()">
-                    + New Chat
-                </button>
-                
-                <div class="model-selector">
-                    <select id="modelSearch" class="w-full p-2 border border-gray-300 rounded-md text-sm">
-                        <option value="cerebras/llama-4-scout-17b-16e-instruct">Cerebras Llama Scout</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="topic-selection mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Topic:</label>
-                <select class="topic-select w-full p-2 border border-gray-300 rounded-md text-sm mb-2" 
-                        id="topicSelect" onchange="onTopicChange()">
-                    <option value="">All Topics</option>
-                </select>
-                
-                <label class="block text-sm font-medium text-gray-700 mb-1">Sub-topic:</label>
-                <select class="subtopic-select w-full p-2 border border-gray-300 rounded-md text-sm" 
-                        id="subtopicSelect" onchange="onSubtopicChange()">
-                    <option value="">All Sub-topics</option>
-                </select>
-            </div>
-            
-            <div class="conversations-list flex-1 overflow-y-auto" id="conversationsList">
-                <!-- Conversations will be loaded here -->
-            </div>
+    <div class="header">
+        <button class="menu-button" onclick="toggleSidebar()">☰</button>
+        <h1>NeuroLM</h1>
+        <div class="header-right">
+            <span id="userName">User</span>
         </div>
     </div>
 
-    <!-- Main Chat Area -->
-    <main class="flex-1 flex flex-col overflow-hidden">
-        <div class="messages-area flex-1 overflow-y-auto p-4 space-y-4" id="messagesArea">
-            <!-- Messages will appear here -->
-        </div>
-        
-        <div class="input-area bg-white border-t border-gray-200 p-3 sticky bottom-0">
-            <!-- Input Container -->
-            <div class="input-container relative">
-                <textarea class="message-input w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-                          id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+    <!-- Sidebar -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="topic-selection">
+                <label for="topicSelect">Topic:</label>
+                <select class="topic-select" id="topicSelect">
+                    <option value="">All Topics</option>
+                    <option value="__new__">+ Create New Topic</option>
+                </select>
                 
-                <!-- Floating action buttons -->
-                <div class="absolute right-2 bottom-2 flex space-x-1">
-                    <button class="file-button bg-gray-200 hover:bg-gray-300 text-gray-700 p-1 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                            onclick="document.getElementById('fileInput').click()">
-                        📎
-                    </button>
-                    <button class="web-search-button bg-gray-200 hover:bg-gray-300 text-gray-700 p-1 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                            id="webSearchButtonMobile" onclick="toggleWebSearch()" title="Enable web search">
-                        🌐
-                    </button>
-                    <button class="send-button bg-indigo-600 hover:bg-indigo-700 text-white p-1 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                            onclick="sendMessage()">
-                        ➤
-                    </button>
-                </div>
-                <input type="file" id="fileInput" style="display: none;" onchange="handleFileUpload(event)">
+                <label for="subtopicSelect">Sub-topic:</label>
+                <select class="subtopic-select" id="subtopicSelect" disabled>
+                    <option value="">All Sub-topics</option>
+                    <option value="__new__">+ Create New Sub-topic</option>
+                </select>
+            </div>
+            <button class="new-chat-btn" id="newChatBtn">+ Start New Chat</button>
+        </div>
+        <div class="conversations-list" id="conversationsList">
+            <!-- Conversations will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Welcome Screen -->
+        <div class="welcome-screen" id="welcomeScreen">
+            <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                <path d="M50 10 C35 10, 20 20, 20 35 C20 45, 25 50, 30 55 C25 60, 20 65, 25 75 C30 85, 45 90, 50 85 C55 90, 70 85, 75 75 C80 65, 75 60, 70 55 C75 50, 80 45, 80 35 C80 20, 65 10, 50 10 Z" fill="url(#brainGradient)" stroke="none"/>
+                <circle cx="40" cy="30" r="3" fill="#ffffff" opacity="0.8"/>
+                <circle cx="60" cy="30" r="3" fill="#ffffff" opacity="0.8"/>
+                <path d="M35 45 Q50 40, 65 45" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.6"/>
+                <path d="M30 55 Q50 50, 70 55" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.6"/>
+            </svg>
+            <div class="welcome-text">
+                <h2>Good morning</h2>
+                <p id="welcomeUserName">User</p>
             </div>
         </div>
-    </main>
+
+        <!-- Chat Messages -->
+        <div class="chat-messages" id="chatMessages">
+            <!-- Messages will appear here -->
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+        <div class="input-container">
+            <textarea 
+                class="message-input" 
+                id="messageInput" 
+                placeholder="How can I help you today?"
+                rows="1"
+            ></textarea>
+            <div class="action-buttons">
+                <button class="action-btn" id="fileBtn" title="Upload file">📎</button>
+                <button class="action-btn" id="webSearchBtn" title="Web search">🌐</button>
+                <button class="action-btn send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+            </div>
+        </div>
+        <input type="file" id="fileInput" style="display: none;">
+    </div>
 
     <script>
-        // PWA Service Worker Registration
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => console.log('SW registered'))
-                    .catch(error => console.log('SW registration failed'));
-            });
-        }
-
         // Global variables
         let currentConversationId = null;
-        let models = [];
+        let selectedTopic = '';
+        let selectedSubtopic = '';
+        let webSearchEnabled = false;
         let conversations = [];
         let currentOffset = 0;
         let hasMoreConversations = true;
         let isLoadingConversations = false;
-        let webSearchEnabled = false;
-
-        // Dark mode functions
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark-mode');
-            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark-mode'));
-        }
-
-        function checkDarkModePreference() {
-            const darkMode = localStorage.getItem('darkMode') === 'true';
-            if (darkMode) {
-                document.documentElement.classList.add('dark-mode');
-            }
-        }
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', async function() {
-            checkDarkModePreference();
-            await loadModels();
+            await loadUserName();
             await loadTopics();
             await loadConversations();
-            setupAutoResize();
+            setupEventListeners();
             
-            // Check for install prompt
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                setTimeout(() => {
-                    e.prompt();
-                }, 3000);
-            });
+            // PWA Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed'));
+            }
         });
+
+        // Load user name
+        async function loadUserName() {
+            try {
+                const response = await fetch('/api/user/name');
+                const data = await response.json();
+                document.getElementById('userName').textContent = data.first_name || 'User';
+                document.getElementById('welcomeUserName').textContent = data.first_name || 'User';
+            } catch (error) {
+                console.error('Error loading user name:', error);
+            }
+        }
+
+        // Load topics (copied from desktop)
+        async function loadTopics() {
+            try {
+                const response = await fetch('/api/topics');
+                const data = await response.json();
+                
+                const topicSelect = document.getElementById('topicSelect');
+                topicSelect.innerHTML = '<option value="">All Topics</option><option value="__new__">+ Create New Topic</option>';
+                
+                if (data.topics && data.topics.length > 0) {
+                    data.topics.forEach(topic => {
+                        const option = document.createElement('option');
+                        option.value = topic.name;
+                        option.textContent = topic.name;
+                        topicSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading topics:', error);
+            }
+        }
+
+        // Load conversations
+        async function loadConversations(reset = false) {
+            if (isLoadingConversations || (!hasMoreConversations && !reset)) return;
+            
+            isLoadingConversations = true;
+            
+            if (reset) {
+                currentOffset = 0;
+                hasMoreConversations = true;
+                conversations = [];
+            }
+            
+            try {
+                let url = `/api/conversations?limit=20&offset=${currentOffset}`;
+                
+                if (selectedTopic && selectedTopic !== '__new__') {
+                    url += `&topic=${encodeURIComponent(selectedTopic)}`;
+                }
+                
+                if (selectedSubtopic && selectedSubtopic !== '__new__') {
+                    url += `&sub_topic=${encodeURIComponent(selectedSubtopic)}`;
+                }
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const conversationsList = document.getElementById('conversationsList');
+                
+                if (reset) {
+                    conversationsList.innerHTML = '';
+                }
+                
+                if (data.conversations && data.conversations.length > 0) {
+                    data.conversations.forEach(conv => {
+                        const item = createConversationItem(conv);
+                        conversationsList.appendChild(item);
+                    });
+                    
+                    conversations = conversations.concat(data.conversations);
+                    currentOffset += data.conversations.length;
+                    hasMoreConversations = data.has_more;
+                } else if (reset) {
+                    conversationsList.innerHTML = '<div style="padding: 1rem; text-align: center; color: #9ca3af;">No conversations found</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+            } finally {
+                isLoadingConversations = false;
+            }
+        }
+
+        // Create conversation item
+        function createConversationItem(conv) {
+            const item = document.createElement('div');
+            item.className = 'conversation-item';
+            item.onclick = () => selectConversation(conv.id);
+            
+            let topicDisplay = '';
+            if (conv.topic) {
+                topicDisplay = `<div class="conversation-topic">${conv.topic}${conv.sub_topic ? ' > ' + conv.sub_topic : ''}</div>`;
+            }
+            
+            let previewDisplay = '';
+            if (conv.last_message) {
+                previewDisplay = `<div class="conversation-preview">${conv.last_message.substring(0, 80)}...</div>`;
+            }
+            
+            item.innerHTML = `
+                <div class="conversation-title">${conv.title}</div>
+                ${topicDisplay}
+                ${previewDisplay}
+                <div class="conversation-meta">${new Date(conv.updated_at).toLocaleDateString()}</div>
+            `;
+            
+            return item;
+        }
+
+        // Select conversation
+        async function selectConversation(conversationId) {
+            currentConversationId = conversationId;
+            
+            // Update UI
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Load messages
+            await loadMessages(conversationId);
+            
+            // Show chat area
+            document.getElementById('welcomeScreen').style.display = 'none';
+            document.getElementById('chatMessages').style.display = 'block';
+            
+            closeSidebar();
+        }
+
+        // Load messages
+        async function loadMessages(conversationId) {
+            try {
+                const response = await fetch(`/api/conversations/${conversationId}/messages`);
+                const data = await response.json();
+                
+                const chatMessages = document.getElementById('chatMessages');
+                chatMessages.innerHTML = '';
+                
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        addMessageToUI(msg.content, msg.message_type);
+                    });
+                }
+                
+                scrollToBottom();
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        // Add message to UI
+        function addMessageToUI(content, type) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type === 'user' ? 'user-message' : 'assistant-message'}`;
+            
+            if (type === 'assistant') {
+                messageDiv.innerHTML = marked.parse(content);
+            } else {
+                messageDiv.textContent = content;
+            }
+            
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Send message
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to UI
+            addMessageToUI(message, 'user');
+            messageInput.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Show chat area if not visible
+            document.getElementById('welcomeScreen').style.display = 'none';
+            document.getElementById('chatMessages').style.display = 'block';
+            
+            try {
+                const requestBody = {
+                    message: message,
+                    conversation_id: currentConversationId,
+                    web_search: webSearchEnabled
+                };
+                
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const data = await response.json();
+                
+                // Remove typing indicator
+                removeTypingIndicator();
+                
+                // Add AI response
+                addMessageToUI(data.response, 'assistant');
+                
+                // Update conversation ID
+                if (data.conversation_id) {
+                    currentConversationId = data.conversation_id;
+                    // Reload conversations to show new/updated conversation
+                    await loadConversations(true);
+                }
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                removeTypingIndicator();
+                addMessageToUI('Sorry, there was an error processing your message.', 'assistant');
+            }
+        }
+
+        // Show typing indicator
+        function showTypingIndicator() {
+            const chatMessages = document.getElementById('chatMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message assistant-message typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+            
+            chatMessages.appendChild(typingDiv);
+            scrollToBottom();
+        }
+
+        // Remove typing indicator
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // Scroll to bottom
+        function scrollToBottom() {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
         // Sidebar functions
         function toggleSidebar() {
@@ -268,156 +723,141 @@
             overlay.classList.remove('show');
         }
 
-        // Web search toggle function
-        function toggleWebSearch() {
-            webSearchEnabled = !webSearchEnabled;
-            const button = document.getElementById('webSearchButtonMobile');
-            button.classList.toggle('bg-indigo-600', webSearchEnabled);
-            button.classList.toggle('text-white', webSearchEnabled);
-            button.classList.toggle('bg-gray-200', !webSearchEnabled);
-            button.classList.toggle('text-gray-700', !webSearchEnabled);
-            button.title = webSearchEnabled ? 'Disable web search' : 'Enable web search';
-        }
-
-        // Auto-resize textarea with improved functionality
-        function setupAutoResize() {
-            const textarea = document.getElementById('messageInput');
+        // Setup event listeners
+        function setupEventListeners() {
+            const messageInput = document.getElementById('messageInput');
+            const fileBtn = document.getElementById('fileBtn');
+            const webSearchBtn = document.getElementById('webSearchBtn');
+            const fileInput = document.getElementById('fileInput');
             
-            // Auto-resize on input
-            textarea.addEventListener('input', function() {
+            // Auto-resize textarea
+            messageInput.addEventListener('input', function() {
                 this.style.height = 'auto';
-                const newHeight = Math.min(this.scrollHeight, 150);
-                this.style.height = newHeight + 'px';
-                
-                // Adjust input area padding if needed
-                const inputArea = document.querySelector('.input-area');
-                if (newHeight > 48) {
-                    inputArea.style.paddingBottom = '24px';
-                } else {
-                    inputArea.style.paddingBottom = '20px';
-                }
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
             });
-
-            // Send on Enter, new line on Shift+Enter
-            textarea.addEventListener('keydown', function(e) {
+            
+            // Send on Enter
+            messageInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     sendMessage();
                 }
             });
-
-            // Focus handling for better mobile experience
-            textarea.addEventListener('focus', function() {
-                setTimeout(() => {
-                    this.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 300);
+            
+            // File upload
+            fileBtn.addEventListener('click', () => fileInput.click());
+            
+            // Web search toggle
+            webSearchBtn.addEventListener('click', () => {
+                webSearchEnabled = !webSearchEnabled;
+                webSearchBtn.classList.toggle('active', webSearchEnabled);
+                webSearchBtn.title = webSearchEnabled ? 'Disable web search' : 'Enable web search';
+            });
+            
+            // Topic selection (copied from desktop)
+            document.getElementById('topicSelect').addEventListener('change', async function() {
+                selectedTopic = this.value;
+                
+                const subtopicSelect = document.getElementById('subtopicSelect');
+                subtopicSelect.innerHTML = '<option value="">All Sub-topics</option>';
+                subtopicSelect.disabled = true;
+                
+                if (selectedTopic === '__new__') {
+                    const newTopic = prompt('Enter new topic name:');
+                    if (newTopic && newTopic.trim()) {
+                        const success = await createTopicNow(newTopic);
+                        if (success) {
+                            selectedTopic = newTopic.toLowerCase().trim();
+                            this.value = selectedTopic;
+                            await loadTopics();
+                        } else {
+                            selectedTopic = '';
+                            this.value = '';
+                        }
+                    } else {
+                        selectedTopic = '';
+                        this.value = '';
+                    }
+                } else if (selectedTopic) {
+                    // Load sub-topics for selected topic
+                    await loadSubtopics(selectedTopic);
+                    subtopicSelect.disabled = false;
+                }
+                
+                // Reset and reload conversations
+                selectedSubtopic = '';
+                await loadConversations(true);
+            });
+            
+            document.getElementById('subtopicSelect').addEventListener('change', async function() {
+                selectedSubtopic = this.value;
+                
+                if (selectedSubtopic === '__new__') {
+                    const newSubtopic = prompt('Enter new sub-topic name:');
+                    if (newSubtopic && newSubtopic.trim()) {
+                        const success = await createSubtopicNow(selectedTopic, newSubtopic);
+                        if (success) {
+                            selectedSubtopic = newSubtopic.toLowerCase().trim();
+                            this.value = selectedSubtopic;
+                        } else {
+                            selectedSubtopic = '';
+                            this.value = '';
+                        }
+                    } else {
+                        selectedSubtopic = '';
+                        this.value = '';
+                    }
+                }
+                
+                // Reload conversations with new subtopic filter
+                await loadConversations(true);
             });
         }
 
-        // Load topics
-        async function loadTopics() {
+        // Create topic (copied from desktop)
+        async function createTopicNow(topicName) {
             try {
-                const response = await fetch('/api/topics');
-                const data = await response.json();
-                
-                const topicSelect = document.getElementById('topicSelect');
-                topicSelect.innerHTML = '<option value="">All Topics</option>';
-                
-                if (data.topics) {
-                    data.topics.forEach(topic => {
-                        const option = document.createElement('option');
-                        option.value = topic.name;
-                        option.textContent = topic.name;
-                        topicSelect.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading topics:', error);
-            }
-        }
-
-        // Load models
-        async function loadModels() {
-            try {
-                const response = await fetch('/api/models');
-                models = await response.json();
-                
-                const modelSelect = document.getElementById('modelSearch');
-                modelSelect.innerHTML = '';
-                
-                models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.id;
-                    option.textContent = model.name || model.id;
-                    modelSelect.appendChild(option);
+                const response = await fetch('/api/topics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: topicName })
                 });
+                
+                return response.ok;
             } catch (error) {
-                console.error('Error loading models:', error);
+                console.error('Error creating topic:', error);
+                return false;
             }
         }
 
-        // Load topics
-        async function loadTopics() {
+        // Create subtopic (copied from desktop)
+        async function createSubtopicNow(topicName, subtopicName) {
             try {
-                const response = await fetch('/api/topics');
-                const data = await response.json();
+                const response = await fetch(`/api/topics/${encodeURIComponent(topicName)}/subtopics`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: subtopicName })
+                });
                 
-                const topicSelect = document.getElementById('topicSelect');
-                topicSelect.innerHTML = '<option value="">Select topic...</option>';
-                
-                if (data.topics) {
-                    data.topics.forEach(topic => {
-                        const option = document.createElement('option');
-                        option.value = topic.name;
-                        option.textContent = topic.name;
-                        topicSelect.appendChild(option);
-                    });
-                }
+                return response.ok;
             } catch (error) {
-                console.error('Error loading topics:', error);
+                console.error('Error creating subtopic:', error);
+                return false;
             }
         }
 
-        // Topic change handler
-        async function onTopicChange() {
-            const topicSelect = document.getElementById('topicSelect');
-            const subtopicSelect = document.getElementById('subtopicSelect');
-            const selectedTopic = topicSelect.value;
-            
-            subtopicSelect.innerHTML = '<option value="">All Sub-topics</option>';
-            
-            if (selectedTopic) {
-                // Load sub-topics for selected topic
-                loadSubtopics(selectedTopic);
-            }
-            
-            // Reset conversation loading and reload with new topic filter
-            currentOffset = 0;
-            hasMoreConversations = true;
-            conversations = [];
-            await loadConversations();
-        }
-
-        // Subtopic change handler
-        async function onSubtopicChange() {
-            // Reset conversation loading and reload with new subtopic filter
-            currentOffset = 0;
-            hasMoreConversations = true;
-            conversations = [];
-            await loadConversations();
-        }
-
-        // Load subtopics
+        // Load subtopics (copied from desktop)
         async function loadSubtopics(topic) {
             try {
                 const response = await fetch('/api/topics');
                 const data = await response.json();
                 
                 const subtopicSelect = document.getElementById('subtopicSelect');
+                subtopicSelect.innerHTML = '<option value="">All Sub-topics</option><option value="__new__">+ Create New Sub-topic</option>';
                 
-                if (data.topics) {
+                if (data.topics && data.topics.length > 0) {
                     const topicData = data.topics.find(t => t.name === topic);
-                    if (topicData && topicData.subtopics) {
+                    if (topicData && topicData.subtopics && topicData.subtopics.length > 0) {
                         topicData.subtopics.forEach(subtopic => {
                             const option = document.createElement('option');
                             option.value = subtopic;
@@ -431,293 +871,16 @@
             }
         }
 
-        // Load conversations
-        async function loadConversations() {
-            if (isLoadingConversations || !hasMoreConversations) return;
-            
-            isLoadingConversations = true;
-            
-            try {
-                // Build query parameters for filtering
-                let url = `/api/conversations?limit=20&offset=${currentOffset}`;
-                
-                const selectedTopic = document.getElementById('topicSelect').value;
-                const selectedSubtopic = document.getElementById('subtopicSelect').value;
-                
-                if (selectedTopic && selectedTopic !== '__new__') {
-                    url += `&topic=${encodeURIComponent(selectedTopic)}`;
-                }
-                
-                if (selectedSubtopic && selectedSubtopic !== '__new__') {
-                    url += `&sub_topic=${encodeURIComponent(selectedSubtopic)}`;
-                }
-                
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                const conversationsList = document.getElementById('conversationsList');
-                
-                if (currentOffset === 0) {
-                    conversationsList.innerHTML = '';
-                }
-                
-                data.conversations.forEach(conv => {
-                    const item = createConversationItem(conv);
-                    conversationsList.appendChild(item);
-                });
-                
-                conversations = conversations.concat(data.conversations);
-                currentOffset += data.conversations.length;
-                hasMoreConversations = data.has_more;
-                
-                if (hasMoreConversations) {
-                    addLoadMoreButton();
-                }
-            } catch (error) {
-                console.error('Error loading conversations:', error);
-            } finally {
-                isLoadingConversations = false;
-            }
-        }
-
-        // Create conversation item
-        function createConversationItem(conv) {
-            const item = document.createElement('div');
-            item.className = 'conversation-item p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer';
-            item.onclick = () => selectConversation(conv.id);
-            
-            item.innerHTML = `
-                <div class="conversation-title font-medium text-gray-900">${conv.title}</div>
-                ${conv.topic ? `<div class="conversation-topic text-xs text-gray-500">${conv.topic}${conv.sub_topic ? ' > ' + conv.sub_topic : ''}</div>` : ''}
-                ${conv.last_message ? `<div class="conversation-preview text-sm text-gray-600 truncate">${conv.last_message.substring(0, 50)}...</div>` : ''}
-                <div class="conversation-meta text-xs text-gray-400 mt-1">${new Date(conv.updated_at).toLocaleDateString()}</div>
-            `;
-            
-            return item;
-        }
-
-        // Add load more button
-        function addLoadMoreButton() {
-            const conversationsList = document.getElementById('conversationsList');
-            
-            // Remove existing load more button
-            const existingBtn = conversationsList.querySelector('.load-more-conversations');
-            if (existingBtn) existingBtn.remove();
-            
-            const loadMoreDiv = document.createElement('div');
-            loadMoreDiv.className = 'load-more-conversations p-3 text-center';
-            loadMoreDiv.innerHTML = '<button class="load-more-btn bg-gray-200 hover:bg-gray-300 text-gray-700 py-1 px-4 rounded text-sm transition-colors" onclick="loadConversations()">Load More</button>';
-            
-            conversationsList.appendChild(loadMoreDiv);
-        }
-
-        // Select conversation
-        async function selectConversation(conversationId) {
-            currentConversationId = conversationId;
-            
-            // Update UI
+        // Start new chat
+        document.getElementById('newChatBtn').addEventListener('click', function() {
+            currentConversationId = null;
+            document.getElementById('welcomeScreen').style.display = 'flex';
+            document.getElementById('chatMessages').style.display = 'none';
             document.querySelectorAll('.conversation-item').forEach(item => {
-                item.classList.remove('bg-indigo-50', 'border-indigo-200');
+                item.classList.remove('active');
             });
-            event.currentTarget.classList.add('bg-indigo-50', 'border-indigo-200');
-            
-            // Load messages
-            await loadMessages(conversationId);
             closeSidebar();
-        }
-
-        // Load messages
-        async function loadMessages(conversationId) {
-            try {
-                const response = await fetch(`/api/conversations/${conversationId}/messages`);
-                const data = await response.json();
-                
-                const messagesArea = document.getElementById('messagesArea');
-                messagesArea.innerHTML = '';
-                
-                data.messages.forEach(msg => {
-                    addMessageToUI(msg.content, msg.message_type === 'user' ? 'user' : 'ai');
-                });
-                
-                scrollToBottom();
-            } catch (error) {
-                console.error('Error loading messages:', error);
-            }
-        }
-
-        // Create new conversation
-        async function createNewConversation() {
-            const topicSelect = document.getElementById('topicSelect');
-            const subtopicSelect = document.getElementById('subtopicSelect');
-            
-            const requestData = {};
-            
-            // Use sidebar topic selections
-            const selectedTopic = topicSelect.value;
-            const selectedSubtopic = subtopicSelect.value;
-            
-            if (selectedTopic) requestData.topic = selectedTopic;
-            if (selectedSubtopic) requestData.sub_topic = selectedSubtopic;
-            
-            try {
-                const response = await fetch('/api/conversations', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestData)
-                });
-                
-                const newConv = await response.json();
-                currentConversationId = newConv.id;
-                
-                // Clear messages
-                document.getElementById('messagesArea').innerHTML = '';
-                
-                // Update sidebar selections if needed
-                if (selectedTopic) {
-                    topicSelect.value = selectedTopic;
-                    await loadSubtopics(selectedTopic);
-                }
-                if (selectedSubtopic) {
-                    subtopicSelect.value = selectedSubtopic;
-                }
-                
-                // Reload conversations
-                currentOffset = 0;
-                hasMoreConversations = true;
-                conversations = [];
-                await loadConversations();
-                
-                closeSidebar();
-            } catch (error) {
-                console.error('Error creating conversation:', error);
-            }
-        }
-
-        // Send message
-        async function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const message = messageInput.value.trim();
-            
-            if (!message) return;
-            
-            const modelSelect = document.getElementById('modelSearch');
-            const selectedModel = modelSelect.value;
-            
-            // Add user message to UI
-            addMessageToUI(message, 'user');
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
-            
-            // Show typing indicator
-            showTypingIndicator();
-            
-            try {
-                const requestBody = {
-                    message: message,
-                    model: selectedModel,
-                    conversation_id: currentConversationId
-                };
-                
-                if (webSearchEnabled) {
-                    requestBody.web_search = true;
-                }
-                
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
-                });
-                
-                const data = await response.json();
-                
-                // Remove typing indicator
-                removeTypingIndicator();
-                
-                // Add AI response to UI
-                addMessageToUI(data.response, 'ai');
-                
-                // Update conversation ID
-                if (data.conversation_id) {
-                    currentConversationId = data.conversation_id;
-                }
-                
-            } catch (error) {
-                console.error('Error sending message:', error);
-                removeTypingIndicator();
-                addMessageToUI('Sorry, there was an error processing your message.', 'ai');
-            }
-        }
-
-        // Add message to UI
-        function addMessageToUI(content, type) {
-            const messagesArea = document.getElementById('messagesArea');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}-message p-3 rounded-lg max-w-[85%] ${type === 'user' ? 'bg-indigo-600 text-white ml-auto' : 'bg-gray-200 mr-auto'}`;
-            
-            if (type === 'ai') {
-                messageDiv.innerHTML = marked.parse(content);
-            } else {
-                messageDiv.textContent = content;
-            }
-            
-            messagesArea.appendChild(messageDiv);
-            scrollToBottom();
-        }
-
-        // Show typing indicator
-        function showTypingIndicator() {
-            const messagesArea = document.getElementById('messagesArea');
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message ai-message typing-indicator p-3 rounded-lg max-w-[85%] bg-gray-200 mr-auto';
-            typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
-            
-            messagesArea.appendChild(typingDiv);
-            scrollToBottom();
-        }
-
-        // Remove typing indicator
-        function removeTypingIndicator() {
-            const typingIndicator = document.getElementById('typingIndicator');
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
-        }
-
-        // Scroll to bottom
-        function scrollToBottom() {
-            const messagesArea = document.getElementById('messagesArea');
-            messagesArea.scrollTop = messagesArea.scrollHeight;
-        }
-
-        // Handle file upload
-        async function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            try {
-                const response = await fetch('/api/upload-file', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.message) {
-                    addMessageToUI(`📎 Uploaded: ${file.name}`, 'user');
-                    addMessageToUI(data.message, 'ai');
-                }
-            } catch (error) {
-                console.error('Error uploading file:', error);
-                addMessageToUI('Error uploading file.', 'ai');
-            }
-            
-            // Clear file input
-            event.target.value = '';
-        }
+        });
     </script>
 </body>
 </html>
