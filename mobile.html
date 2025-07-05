@@ -980,8 +980,8 @@
                 // Remove typing indicator
                 removeTypingIndicator();
                 
-                // Add AI response
-                addMessageToUI(data.response, 'assistant');
+                // Add AI response using PostgreSQL message ID
+                addMessageToUI(data.response, 'assistant', data.assistant_message_id);
                 
                 // Update conversation ID
                 if (data.conversation_id) {

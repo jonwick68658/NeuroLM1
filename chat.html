@@ -1767,8 +1767,8 @@
                     console.log('DEBUG: Deletion confirmation detected:', data.deletion_info);
                     showTopicDeleteModal(data.deletion_info);
                 } else {
-                    // Add assistant response to chat
-                    addMessage(data.response, 'assistant');
+                    // Add assistant response to chat using PostgreSQL message ID
+                    addMessage(data.response, 'assistant', null, data.assistant_message_id);
                 }
 
             } catch (error) {
@@ -1813,10 +1813,14 @@
         }
 
         // Add message to chat display
-        function addMessage(content, sender, info = null) {
+        function addMessage(content, sender, info = null, messageId = null) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}-message`;
-            const messageId = 'msg_' + Date.now();
+            
+            // Use provided messageId or generate one for user messages
+            if (!messageId) {
+                messageId = 'msg_' + Date.now();
+            }
             messageDiv.id = messageId;
             
             let messageHTML = '';

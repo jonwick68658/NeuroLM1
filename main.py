@@ -1123,6 +1123,7 @@ class ChatResponse(BaseModel):
     memory_stored: bool
     context_used: int
     conversation_id: str
+    assistant_message_id: Optional[str] = None
     deletion_info: Optional[Dict] = None
 
 # Slash command handler
@@ -2068,7 +2069,8 @@ Instructions:
             response=response_text,
             memory_stored=True,
             context_used=1 if context else 0,
-            conversation_id=conversation_id or ""
+            conversation_id=conversation_id or "",
+            assistant_message_id=str(assistant_message_id) if assistant_message_id else None
         )
         
     except Exception as e:
