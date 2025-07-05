@@ -279,6 +279,62 @@
             position: relative;
         }
 
+        /* Message Action Buttons */
+        .message-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            margin-top: 0.5rem;
+            align-items: center;
+        }
+
+        .action-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.4rem;
+            border-radius: 6px;
+            transition: background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .action-button svg {
+            width: 16px;
+            height: 16px;
+            fill: #9ca3af;
+            transition: fill 0.2s ease;
+        }
+
+        .action-button:hover svg {
+            fill: #ffffff;
+        }
+
+        .copy-button:hover svg {
+            fill: #10b981;
+        }
+
+        .like-button:hover svg {
+            fill: #10b981;
+        }
+
+        .like-button.active svg {
+            fill: #10b981;
+        }
+
+        .dislike-button:hover svg {
+            fill: #ef4444;
+        }
+
+        .dislike-button.active svg {
+            fill: #ef4444;
+        }
+
         .message-input {
             flex: 1;
             background: #2a2a2a;
@@ -709,7 +765,7 @@
                 
                 if (data.messages && data.messages.length > 0) {
                     data.messages.forEach(msg => {
-                        addMessageToUI(msg.content, msg.message_type);
+                        addMessageToUI(msg.content, msg.message_type, msg.id);
                     });
                 }
                 
@@ -720,19 +776,168 @@
         }
 
         // Add message to UI
-        function addMessageToUI(content, type) {
+        function addMessageToUI(content, type, messageId) {
             const chatMessages = document.getElementById('chatMessages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${type === 'user' ? 'user-message' : 'assistant-message'}`;
             
+            // Generate message ID if not provided
+            if (!messageId) {
+                messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            }
+            messageDiv.id = messageId;
+            
             if (type === 'assistant') {
                 messageDiv.innerHTML = marked.parse(content);
+                
+                // Add action buttons for assistant messages
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'message-actions';
+                actionsDiv.innerHTML = `
+                    <button class="action-button copy-button" onclick="copyToClipboard('${messageId}', this)" title="Copy message">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                    </button>
+                    <button class="action-button like-button" onclick="toggleFeedback('${messageId}', 'like', this)" title="Like this response">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/>
+                        </svg>
+                    </button>
+                    <button class="action-button dislike-button" onclick="toggleFeedback('${messageId}', 'dislike', this)" title="Dislike this response">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/>
+                        </svg>
+                    </button>
+                `;
+                messageDiv.appendChild(actionsDiv);
+                
+                // Apply localStorage feedback state
+                const feedbackKey = `feedback_${messageId}`;
+                const currentFeedback = localStorage.getItem(feedbackKey);
+                if (currentFeedback) {
+                    const buttonClass = currentFeedback === 'like' ? '.like-button' : '.dislike-button';
+                    const button = messageDiv.querySelector(buttonClass);
+                    if (button) button.classList.add('active');
+                }
             } else {
                 messageDiv.textContent = content;
             }
             
             chatMessages.appendChild(messageDiv);
             scrollToBottom();
+        }
+
+        // Copy message to clipboard
+        async function copyToClipboard(messageId, button) {
+            const messageElement = document.getElementById(messageId);
+            if (messageElement) {
+                // Clone the message element to avoid modifying the original
+                const clone = messageElement.cloneNode(true);
+                
+                // Remove elements we don't want to copy
+                const messageActions = clone.querySelector('.message-actions');
+                if (messageActions) messageActions.remove();
+                
+                // Get the remaining text content
+                const messageContent = clone.textContent.trim();
+                
+                navigator.clipboard.writeText(messageContent).then(() => {
+                    const originalTitle = button.title;
+                    button.title = 'Copied!';
+                    button.style.opacity = '0.7';
+                    setTimeout(() => {
+                        button.title = originalTitle;
+                        button.style.opacity = '1';
+                    }, 2000);
+                    
+                    // Send positive feedback to RIAI system for copy action
+                    sendImplicitFeedback(messageId, 'copy', 0.3);
+                    
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                });
+            }
+        }
+        
+        // Send implicit feedback to RIAI system
+        async function sendImplicitFeedback(messageId, actionType, score) {
+            try {
+                const response = await fetch('/api/feedback-implicit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message_id: messageId,
+                        action_type: actionType,
+                        feedback_score: score
+                    })
+                });
+                
+                if (response.ok) {
+                    console.log(`RIAI implicit feedback recorded: ${actionType} = ${score}`);
+                } else {
+                    console.log('Implicit feedback submission failed silently');
+                }
+            } catch (error) {
+                console.log('Implicit feedback error (continuing silently):', error);
+            }
+        }
+
+        // Toggle like/dislike feedback
+        async function toggleFeedback(messageId, feedbackType, button) {
+            // Get current feedback from localStorage
+            const feedbackKey = `feedback_${messageId}`;
+            let currentFeedback = localStorage.getItem(feedbackKey);
+            
+            // Find the message element to get both buttons
+            const messageElement = document.getElementById(messageId);
+            if (!messageElement) return;
+            
+            const likeButton = messageElement.querySelector('.like-button');
+            const dislikeButton = messageElement.querySelector('.dislike-button');
+            
+            // Clear previous active states (with null checks)
+            if (likeButton) likeButton.classList.remove('active');
+            if (dislikeButton) dislikeButton.classList.remove('active');
+            
+            // If clicking the same button that's already active, remove feedback
+            if (currentFeedback === feedbackType) {
+                localStorage.removeItem(feedbackKey);
+                // No active state needed, buttons return to default
+            } else {
+                // Set new feedback
+                localStorage.setItem(feedbackKey, feedbackType);
+                if (feedbackType === 'like' && likeButton) {
+                    likeButton.classList.add('active');
+                } else if (feedbackType === 'dislike' && dislikeButton) {
+                    dislikeButton.classList.add('active');
+                }
+                
+                // Send feedback to backend for RIAI H(t) function
+                try {
+                    const response = await fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message_id: messageId,
+                            feedback_type: feedbackType
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`RIAI feedback recorded: ${data.h_t_score}`);
+                    } else {
+                        console.error('Failed to submit feedback to RIAI system');
+                    }
+                } catch (error) {
+                    console.error('Error submitting feedback:', error);
+                }
+            }
         }
 
         // Send message
