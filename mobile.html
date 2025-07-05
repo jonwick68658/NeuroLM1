@@ -295,6 +295,7 @@
         .action-buttons {
             display: flex;
             gap: 0.5rem;
+            position: relative;
         }
 
         .action-btn {
@@ -316,16 +317,59 @@
             background: #404040;
         }
 
-        .action-btn.active {
-            background: #4f46e5;
-        }
-
         .send-btn {
             background: #4f46e5;
         }
 
         .send-btn:hover {
             background: #4338ca;
+        }
+
+        /* Plus menu styles */
+        .plus-menu {
+            position: absolute;
+            bottom: 60px;
+            left: 0;
+            background: #2a2a2a;
+            border: 1px solid #404040;
+            border-radius: 0.75rem;
+            padding: 0.5rem;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+            z-index: 10;
+        }
+
+        .plus-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .plus-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: #ffffff;
+            cursor: pointer;
+            border-radius: 0.5rem;
+            transition: background 0.2s ease;
+            white-space: nowrap;
+            font-size: 0.9rem;
+        }
+
+        .plus-menu-item:hover {
+            background: #404040;
+        }
+
+        .plus-menu-item.active {
+            background: #4f46e5;
+        }
+
+        .plus-menu-item span {
+            font-size: 1.1rem;
         }
 
         /* Typing indicator */
@@ -453,8 +497,17 @@
                 rows="1"
             ></textarea>
             <div class="action-buttons">
-                <button class="action-btn" id="fileBtn" title="Upload file">📎</button>
-                <button class="action-btn" id="webSearchBtn" title="Web search">🌐</button>
+                <button class="action-btn" id="plusBtn" title="Options">+</button>
+                <div class="plus-menu" id="plusMenu">
+                    <div class="plus-menu-item" id="fileMenuItem">
+                        <span>📎</span>
+                        Upload File
+                    </div>
+                    <div class="plus-menu-item" id="webSearchMenuItem">
+                        <span>🌐</span>
+                        Web Search
+                    </div>
+                </div>
                 <button class="action-btn send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
             </div>
         </div>
@@ -780,8 +833,10 @@
         // Setup event listeners
         function setupEventListeners() {
             const messageInput = document.getElementById('messageInput');
-            const fileBtn = document.getElementById('fileBtn');
-            const webSearchBtn = document.getElementById('webSearchBtn');
+            const plusBtn = document.getElementById('plusBtn');
+            const plusMenu = document.getElementById('plusMenu');
+            const fileMenuItem = document.getElementById('fileMenuItem');
+            const webSearchMenuItem = document.getElementById('webSearchMenuItem');
             const fileInput = document.getElementById('fileInput');
             
             // Auto-resize textarea
@@ -798,14 +853,33 @@
                 }
             });
             
+            // Plus button toggle
+            plusBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                plusMenu.classList.toggle('show');
+            });
+            
+            // Close menu when clicking outside
+            document.addEventListener('click', () => {
+                plusMenu.classList.remove('show');
+            });
+            
+            // Prevent menu from closing when clicking inside
+            plusMenu.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            
             // File upload
-            fileBtn.addEventListener('click', () => fileInput.click());
+            fileMenuItem.addEventListener('click', () => {
+                fileInput.click();
+                plusMenu.classList.remove('show');
+            });
             
             // Web search toggle
-            webSearchBtn.addEventListener('click', () => {
+            webSearchMenuItem.addEventListener('click', () => {
                 webSearchEnabled = !webSearchEnabled;
-                webSearchBtn.classList.toggle('active', webSearchEnabled);
-                webSearchBtn.title = webSearchEnabled ? 'Disable web search' : 'Enable web search';
+                webSearchMenuItem.classList.toggle('active', webSearchEnabled);
+                plusMenu.classList.remove('show');
             });
             
             // Topic selection (copied from desktop)
