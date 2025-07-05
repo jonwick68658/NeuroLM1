@@ -2,185 +2,93 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>NeuroLM Mobile</title>
     <link rel="manifest" href="/manifest.json">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="/static/mobile.css">
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="NeuroLM">
     <link rel="apple-touch-icon" href="/icon.svg">
-    <style>
-        /* Custom styles that can't be done with Tailwind */
-        .typing-indicator .typing-dot {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #6b7280;
-            margin: 0 2px;
-            animation: typing-dot 1.4s infinite ease-in-out;
-        }
-        .typing-indicator .typing-dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-        .typing-indicator .typing-dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-        @keyframes typing-dot {
-            0%, 60%, 100% { transform: translateY(0); }
-            30% { transform: translateY(-5px); }
-        }
-        .sidebar {
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-        }
-        .sidebar.open {
-            transform: translateX(0);
-        }
-        .sidebar-overlay {
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        .sidebar-overlay.show {
-            opacity: 0.5;
-            visibility: visible;
-        }
-        .message-input {
-            resize: none;
-            max-height: 150px;
-        }
-        .ai-message pre {
-            background-color: #1e293b;
-            color: #f8fafc;
-            padding: 12px;
-            border-radius: 6px;
-            overflow-x: auto;
-        }
-        .ai-message code {
-            background-color: #1e293b;
-            color: #f8fafc;
-            padding: 2px 4px;
-            border-radius: 4px;
-            font-family: monospace;
-        }
-
-        /* Dark mode styles */
-        .dark-mode body {
-            background-color: #111827;
-            color: #f3f4f6;
-        }
-        .dark-mode .input-area {
-            background-color: #1f2937;
-            border-color: #374151;
-        }
-        .dark-mode .sidebar {
-            background-color: #1f2937;
-        }
-        .dark-mode .conversation-item {
-            border-color: #374151;
-        }
-        .dark-mode .conversation-item:hover {
-            background-color: #374151;
-        }
-        .dark-mode .ai-message {
-            background-color: #374151;
-            color: #f3f4f6;
-        }
-        .dark-mode .message-input {
-            background-color: #1f2937;
-            border-color: #374151;
-            color: #f3f4f6;
-        }
-        .dark-mode .message-input:focus {
-            border-color: #6366f1;
-        }
-        .dark-mode .typing-indicator .typing-dot {
-            background-color: #9ca3af;
-        }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body class="bg-gray-100 text-gray-900 font-sans h-screen flex flex-col">
-    <!-- Header -->
-    <header class="bg-indigo-600 text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-10">
-        <button class="menu-button text-2xl" onclick="toggleSidebar()">☰</button>
-        <h1 class="text-xl font-bold">NeuroLM AI</h1>
-        <button class="dark-mode-toggle text-xl" onclick="toggleDarkMode()">🌙</button>
-    </header>
+<body>
+    <!-- Menu Button -->
+    <button class="menu-button" onclick="toggleSidebar()">☰</button>
 
-    <!-- Sidebar Overlay -->
-    <div class="sidebar-overlay fixed inset-0 bg-black z-20" id="sidebarOverlay" onclick="closeSidebar()"></div>
+    <!-- Header -->
+    <div class="header">
+        <h1>NeuroLM AI</h1>
+    </div>
 
     <!-- Sidebar -->
-    <div class="sidebar fixed top-0 left-0 h-full w-72 bg-white shadow-lg z-30" id="sidebar">
-        <div class="p-4 flex flex-col h-full">
-            <div class="flex flex-col space-y-3 mb-4">
-                <button class="new-chat-btn bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                        onclick="createNewConversation()">
-                    + New Chat
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="new-chat-btn" onclick="createNewConversation()">+ New Chat</button>
+            <div class="topic-selection">
+                <label>Topic:</label>
+                <select class="topic-select" id="topicSelect" onchange="onTopicChange()">
+                    <option value="">All Topics</option>
+                </select>
+                <label>Sub-topic:</label>
+                <select class="subtopic-select" id="subtopicSelect" onchange="onSubtopicChange()">
+                    <option value="">All Sub-topics</option>
+                </select>
+            </div>
+        </div>
+        <div class="conversations-list" id="conversationsList">
+            <!-- Conversations will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- Main Chat -->
+    <div class="chat-container">
+        <div class="messages-area" id="messagesArea">
+            <!-- Messages will appear here -->
+        </div>
+        
+        <div class="input-area">
+            <div class="model-selector">
+                <select id="modelSearch">
+                    <option value="cerebras/llama-4-scout-17b-16e-instruct">Cerebras Llama Scout</option>
+                </select>
+            </div>
+            
+            <!-- Quick Topic Selection -->
+            <div class="quick-topic-selection" id="quickTopicSelection">
+                <button class="topic-toggle-btn" onclick="toggleQuickTopics()">
+                    <span>Set Topic</span>
+                    <span id="topicToggleIcon">▼</span>
                 </button>
-                
-                <div class="model-selector">
-                    <select id="modelSearch" class="w-full p-2 border border-gray-300 rounded-md text-sm">
-                        <option value="cerebras/llama-4-scout-17b-16e-instruct">Cerebras Llama Scout</option>
+                <div class="topic-controls" id="topicControls">
+                    <select id="quickTopicSelect" onchange="onQuickTopicChange()">
+                        <option value="">Select topic...</option>
+                    </select>
+                    <select id="quickSubtopicSelect">
+                        <option value="">Select sub-topic...</option>
                     </select>
                 </div>
             </div>
             
-            <div class="topic-selection mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Topic:</label>
-                <select class="topic-select w-full p-2 border border-gray-300 rounded-md text-sm mb-2" 
-                        id="topicSelect" onchange="onTopicChange()">
-                    <option value="">All Topics</option>
-                </select>
-                
-                <label class="block text-sm font-medium text-gray-700 mb-1">Sub-topic:</label>
-                <select class="subtopic-select w-full p-2 border border-gray-300 rounded-md text-sm" 
-                        id="subtopicSelect" onchange="onSubtopicChange()">
-                    <option value="">All Sub-topics</option>
-                </select>
+            <div class="input-container">
+                <textarea class="message-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
             </div>
             
-            <div class="conversations-list flex-1 overflow-y-auto" id="conversationsList">
-                <!-- Conversations will be loaded here -->
+            <!-- Send button positioned at bottom-right -->
+            <button class="send-button" onclick="sendMessage()">▶</button>
+            
+            <!-- Floating action buttons -->
+            <div class="floating-buttons">
+                <button class="file-button" onclick="document.getElementById('fileInput').click()">📎</button>
+                <button class="web-search-button" id="webSearchButtonMobile" onclick="toggleWebSearch()" title="Enable web search">🌐</button>
             </div>
+            <input type="file" id="fileInput" style="display: none;" onchange="handleFileUpload(event)">
         </div>
     </div>
-
-    <!-- Main Chat Area -->
-    <main class="flex-1 flex flex-col overflow-hidden">
-        <div class="messages-area flex-1 overflow-y-auto p-4 space-y-4" id="messagesArea">
-            <!-- Messages will appear here -->
-        </div>
-        
-        <div class="input-area bg-white border-t border-gray-200 p-3 sticky bottom-0">
-            <!-- Input Container -->
-            <div class="input-container relative">
-                <textarea class="message-input w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-                          id="messageInput" placeholder="Type your message..." rows="1"></textarea>
-                
-                <!-- Floating action buttons -->
-                <div class="absolute right-2 bottom-2 flex space-x-1">
-                    <button class="file-button bg-gray-200 hover:bg-gray-300 text-gray-700 p-1 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                            onclick="document.getElementById('fileInput').click()">
-                        📎
-                    </button>
-                    <button class="web-search-button bg-gray-200 hover:bg-gray-300 text-gray-700 p-1 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                            id="webSearchButtonMobile" onclick="toggleWebSearch()" title="Enable web search">
-                        🌐
-                    </button>
-                    <button class="send-button bg-indigo-600 hover:bg-indigo-700 text-white p-1 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                            onclick="sendMessage()">
-                        ➤
-                    </button>
-                </div>
-                <input type="file" id="fileInput" style="display: none;" onchange="handleFileUpload(event)">
-            </div>
-        </div>
-    </main>
 
     <script>
         // PWA Service Worker Registration
@@ -201,26 +109,14 @@
         let isLoadingConversations = false;
         let webSearchEnabled = false;
 
-        // Dark mode functions
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark-mode');
-            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark-mode'));
-        }
-
-        function checkDarkModePreference() {
-            const darkMode = localStorage.getItem('darkMode') === 'true';
-            if (darkMode) {
-                document.documentElement.classList.add('dark-mode');
-            }
-        }
-
         // Initialize app
         document.addEventListener('DOMContentLoaded', async function() {
-            checkDarkModePreference();
             await loadModels();
             await loadTopics();
+            await loadQuickTopics();
             await loadConversations();
             setupAutoResize();
+            setupQuickTopics();
             
             // Check for install prompt
             window.addEventListener('beforeinstallprompt', (e) => {
@@ -252,10 +148,7 @@
         function toggleWebSearch() {
             webSearchEnabled = !webSearchEnabled;
             const button = document.getElementById('webSearchButtonMobile');
-            button.classList.toggle('bg-indigo-600', webSearchEnabled);
-            button.classList.toggle('text-white', webSearchEnabled);
-            button.classList.toggle('bg-gray-200', !webSearchEnabled);
-            button.classList.toggle('text-gray-700', !webSearchEnabled);
+            button.classList.toggle('active', webSearchEnabled);
             button.title = webSearchEnabled ? 'Disable web search' : 'Enable web search';
         }
 
@@ -294,25 +187,84 @@
             });
         }
 
-        // Load topics
-        async function loadTopics() {
+        // Quick topic selection functions
+        function setupQuickTopics() {
+            const topicControls = document.getElementById('topicControls');
+            topicControls.style.display = 'none'; // Initially hidden
+        }
+
+        function toggleQuickTopics() {
+            const topicControls = document.getElementById('topicControls');
+            const toggleIcon = document.getElementById('topicToggleIcon');
+            
+            if (topicControls.style.display === 'none') {
+                topicControls.style.display = 'flex';
+                toggleIcon.textContent = '▲';
+            } else {
+                topicControls.style.display = 'none';
+                toggleIcon.textContent = '▼';
+            }
+        }
+
+        async function loadQuickTopics() {
             try {
                 const response = await fetch('/api/topics');
                 const data = await response.json();
                 
-                const topicSelect = document.getElementById('topicSelect');
-                topicSelect.innerHTML = '<option value="">All Topics</option>';
+                const quickTopicSelect = document.getElementById('quickTopicSelect');
+                quickTopicSelect.innerHTML = '<option value="">Select topic...</option>';
                 
                 if (data.topics) {
                     data.topics.forEach(topic => {
                         const option = document.createElement('option');
                         option.value = topic.name;
                         option.textContent = topic.name;
-                        topicSelect.appendChild(option);
+                        quickTopicSelect.appendChild(option);
                     });
                 }
             } catch (error) {
-                console.error('Error loading topics:', error);
+                console.error('Error loading quick topics:', error);
+            }
+        }
+
+        function onQuickTopicChange() {
+            const quickTopicSelect = document.getElementById('quickTopicSelect');
+            const quickSubtopicSelect = document.getElementById('quickSubtopicSelect');
+            const selectedTopic = quickTopicSelect.value;
+            
+            quickSubtopicSelect.innerHTML = '<option value="">Select sub-topic...</option>';
+            
+            if (selectedTopic) {
+                loadQuickSubtopics(selectedTopic);
+                // Also update sidebar selections
+                const sidebarTopicSelect = document.getElementById('topicSelect');
+                if (sidebarTopicSelect) {
+                    sidebarTopicSelect.value = selectedTopic;
+                    onTopicChange();
+                }
+            }
+        }
+
+        async function loadQuickSubtopics(topic) {
+            try {
+                const response = await fetch('/api/topics');
+                const data = await response.json();
+                
+                const quickSubtopicSelect = document.getElementById('quickSubtopicSelect');
+                
+                if (data.topics) {
+                    const topicData = data.topics.find(t => t.name === topic);
+                    if (topicData && topicData.subtopics) {
+                        topicData.subtopics.forEach(subtopic => {
+                            const option = document.createElement('option');
+                            option.value = subtopic;
+                            option.textContent = subtopic;
+                            quickSubtopicSelect.appendChild(option);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading quick subtopics:', error);
             }
         }
 
@@ -463,14 +415,14 @@
         // Create conversation item
         function createConversationItem(conv) {
             const item = document.createElement('div');
-            item.className = 'conversation-item p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer';
+            item.className = 'conversation-item';
             item.onclick = () => selectConversation(conv.id);
             
             item.innerHTML = `
-                <div class="conversation-title font-medium text-gray-900">${conv.title}</div>
-                ${conv.topic ? `<div class="conversation-topic text-xs text-gray-500">${conv.topic}${conv.sub_topic ? ' > ' + conv.sub_topic : ''}</div>` : ''}
-                ${conv.last_message ? `<div class="conversation-preview text-sm text-gray-600 truncate">${conv.last_message.substring(0, 50)}...</div>` : ''}
-                <div class="conversation-meta text-xs text-gray-400 mt-1">${new Date(conv.updated_at).toLocaleDateString()}</div>
+                <div class="conversation-title">${conv.title}</div>
+                ${conv.topic ? `<div class="conversation-topic">${conv.topic}${conv.sub_topic ? ' > ' + conv.sub_topic : ''}</div>` : ''}
+                ${conv.last_message ? `<div class="conversation-preview">${conv.last_message.substring(0, 50)}...</div>` : ''}
+                <div class="conversation-meta">${new Date(conv.updated_at).toLocaleDateString()}</div>
             `;
             
             return item;
@@ -485,8 +437,8 @@
             if (existingBtn) existingBtn.remove();
             
             const loadMoreDiv = document.createElement('div');
-            loadMoreDiv.className = 'load-more-conversations p-3 text-center';
-            loadMoreDiv.innerHTML = '<button class="load-more-btn bg-gray-200 hover:bg-gray-300 text-gray-700 py-1 px-4 rounded text-sm transition-colors" onclick="loadConversations()">Load More</button>';
+            loadMoreDiv.className = 'load-more-conversations';
+            loadMoreDiv.innerHTML = '<button class="load-more-btn" onclick="loadConversations()">Load More</button>';
             
             conversationsList.appendChild(loadMoreDiv);
         }
@@ -497,9 +449,9 @@
             
             // Update UI
             document.querySelectorAll('.conversation-item').forEach(item => {
-                item.classList.remove('bg-indigo-50', 'border-indigo-200');
+                item.classList.remove('active');
             });
-            event.currentTarget.classList.add('bg-indigo-50', 'border-indigo-200');
+            event.currentTarget.classList.add('active');
             
             // Load messages
             await loadMessages(conversationId);
@@ -527,14 +479,17 @@
 
         // Create new conversation
         async function createNewConversation() {
+            // Try quick topic selections first, then fallback to sidebar
+            const quickTopicSelect = document.getElementById('quickTopicSelect');
+            const quickSubtopicSelect = document.getElementById('quickSubtopicSelect');
             const topicSelect = document.getElementById('topicSelect');
             const subtopicSelect = document.getElementById('subtopicSelect');
             
             const requestData = {};
             
-            // Use sidebar topic selections
-            const selectedTopic = topicSelect.value;
-            const selectedSubtopic = subtopicSelect.value;
+            // Use quick topic selection if available, otherwise use sidebar
+            const selectedTopic = quickTopicSelect.value || topicSelect.value;
+            const selectedSubtopic = quickSubtopicSelect.value || subtopicSelect.value;
             
             if (selectedTopic) requestData.topic = selectedTopic;
             if (selectedSubtopic) requestData.sub_topic = selectedSubtopic;
@@ -552,12 +507,15 @@
                 // Clear messages
                 document.getElementById('messagesArea').innerHTML = '';
                 
-                // Update sidebar selections if needed
+                // Sync selections between quick and sidebar
                 if (selectedTopic) {
+                    quickTopicSelect.value = selectedTopic;
                     topicSelect.value = selectedTopic;
+                    await loadQuickSubtopics(selectedTopic);
                     await loadSubtopics(selectedTopic);
                 }
                 if (selectedSubtopic) {
+                    quickSubtopicSelect.value = selectedSubtopic;
                     subtopicSelect.value = selectedSubtopic;
                 }
                 
@@ -632,7 +590,7 @@
         function addMessageToUI(content, type) {
             const messagesArea = document.getElementById('messagesArea');
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}-message p-3 rounded-lg max-w-[85%] ${type === 'user' ? 'bg-indigo-600 text-white ml-auto' : 'bg-gray-200 mr-auto'}`;
+            messageDiv.className = `message ${type}-message`;
             
             if (type === 'ai') {
                 messageDiv.innerHTML = marked.parse(content);
@@ -648,7 +606,7 @@
         function showTypingIndicator() {
             const messagesArea = document.getElementById('messagesArea');
             const typingDiv = document.createElement('div');
-            typingDiv.className = 'message ai-message typing-indicator p-3 rounded-lg max-w-[85%] bg-gray-200 mr-auto';
+            typingDiv.className = 'message ai-message typing-indicator';
             typingDiv.id = 'typingIndicator';
             typingDiv.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
             
