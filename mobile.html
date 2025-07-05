@@ -116,6 +116,28 @@
             font-size: 0.9rem;
         }
 
+        .model-selector {
+            margin-bottom: 1rem;
+        }
+
+        .model-selector label {
+            font-size: 0.9rem;
+            color: #ffffff;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .model-select {
+            background: #2a2a2a;
+            border: 1px solid #404040;
+            color: #ffffff;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
         .new-chat-btn {
             background: #4f46e5;
             color: #ffffff;
@@ -365,6 +387,13 @@
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
+            <div class="model-selector">
+                <label for="modelSelect">Model:</label>
+                <select class="model-select" id="modelSelect">
+                    <option value="openai/gpt-4o-mini">Loading models...</option>
+                </select>
+            </div>
+            
             <div class="topic-selection">
                 <label for="topicSelect">Topic:</label>
                 <select class="topic-select" id="topicSelect">
@@ -443,9 +472,32 @@
         let hasMoreConversations = true;
         let isLoadingConversations = false;
 
+        // Load models
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                const models = await response.json();
+                
+                const modelSelect = document.getElementById('modelSelect');
+                modelSelect.innerHTML = '';
+                
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.name || model.id;
+                    modelSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading models:', error);
+                const modelSelect = document.getElementById('modelSelect');
+                modelSelect.innerHTML = '<option value="openai/gpt-4o-mini">GPT-4o Mini (fallback)</option>';
+            }
+        }
+
         // Initialize app
         document.addEventListener('DOMContentLoaded', async function() {
             await loadUserName();
+            await loadModels();
             await loadTopics();
             await loadConversations();
             setupEventListeners();
@@ -474,19 +526,17 @@
         async function loadTopics() {
             try {
                 const response = await fetch('/api/topics');
-                const data = await response.json();
+                const allTopics = await response.json();
                 
                 const topicSelect = document.getElementById('topicSelect');
                 topicSelect.innerHTML = '<option value="">All Topics</option><option value="__new__">+ Create New Topic</option>';
                 
-                if (data.topics && data.topics.length > 0) {
-                    data.topics.forEach(topic => {
-                        const option = document.createElement('option');
-                        option.value = topic.name;
-                        option.textContent = topic.name;
-                        topicSelect.appendChild(option);
-                    });
-                }
+                Object.keys(allTopics).forEach(topic => {
+                    const option = document.createElement('option');
+                    option.value = topic;
+                    option.textContent = topic;
+                    topicSelect.appendChild(option);
+                });
             } catch (error) {
                 console.error('Error loading topics:', error);
             }
@@ -646,8 +696,12 @@
             document.getElementById('chatMessages').style.display = 'block';
             
             try {
+                const modelSelect = document.getElementById('modelSelect');
+                const selectedModel = modelSelect.value || 'openai/gpt-4o-mini';
+                
                 const requestBody = {
                     message: message,
+                    model: selectedModel,
                     conversation_id: currentConversationId,
                     web_search: webSearchEnabled
                 };
@@ -850,21 +904,18 @@
         async function loadSubtopics(topic) {
             try {
                 const response = await fetch('/api/topics');
-                const data = await response.json();
+                const allTopics = await response.json();
                 
                 const subtopicSelect = document.getElementById('subtopicSelect');
                 subtopicSelect.innerHTML = '<option value="">All Sub-topics</option><option value="__new__">+ Create New Sub-topic</option>';
                 
-                if (data.topics && data.topics.length > 0) {
-                    const topicData = data.topics.find(t => t.name === topic);
-                    if (topicData && topicData.subtopics && topicData.subtopics.length > 0) {
-                        topicData.subtopics.forEach(subtopic => {
-                            const option = document.createElement('option');
-                            option.value = subtopic;
-                            option.textContent = subtopic;
-                            subtopicSelect.appendChild(option);
-                        });
-                    }
+                if (allTopics[topic] && allTopics[topic].length > 0) {
+                    allTopics[topic].forEach(subtopic => {
+                        const option = document.createElement('option');
+                        option.value = subtopic;
+                        option.textContent = subtopic;
+                        subtopicSelect.appendChild(option);
+                    });
                 }
             } catch (error) {
                 console.error('Error loading subtopics:', error);
