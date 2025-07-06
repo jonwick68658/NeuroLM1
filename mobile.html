@@ -612,6 +612,7 @@
             await loadTopics();
             await loadConversations();
             setupEventListeners();
+            setupTouchGestures();
             
             // PWA Service Worker
             if ('serviceWorker' in navigator) {
@@ -1020,6 +1021,14 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
+        // Touch gesture variables
+        let touchStartX = 0;
+        let touchCurrentX = 0;
+        let touchStartY = 0;
+        let sidebarCurrentX = -320;
+        let isDragging = false;
+        let isVerticalScroll = false;
+
         // Sidebar functions
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -1035,6 +1044,110 @@
             
             sidebar.classList.remove('open');
             overlay.classList.remove('show');
+            sidebarCurrentX = -320;
+        }
+
+        function openSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            sidebar.classList.add('open');
+            overlay.classList.add('show');
+            sidebarCurrentX = 0;
+        }
+
+        // Touch gesture handlers
+        function handleTouchStart(e) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchCurrentX = touchStartX;
+            isDragging = false;
+            isVerticalScroll = false;
+        }
+
+        function handleTouchMove(e) {
+            if (e.touches.length !== 1) return;
+            
+            touchCurrentX = e.touches[0].clientX;
+            const touchCurrentY = e.touches[0].clientY;
+            const deltaX = touchCurrentX - touchStartX;
+            const deltaY = touchCurrentY - touchStartY;
+            
+            // Determine if this is a vertical scroll gesture
+            if (!isDragging && !isVerticalScroll) {
+                if (Math.abs(deltaY) > Math.abs(deltaX)) {
+                    isVerticalScroll = true;
+                    return;
+                } else if (Math.abs(deltaX) > 10) {
+                    isDragging = true;
+                }
+            }
+            
+            if (isVerticalScroll) return;
+            
+            // Only allow swipe from left edge or when sidebar is open
+            const isFromLeftEdge = touchStartX < 50;
+            const isSidebarOpen = document.getElementById('sidebar').classList.contains('open');
+            
+            if (!isFromLeftEdge && !isSidebarOpen) return;
+            
+            if (isDragging) {
+                e.preventDefault();
+                
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                
+                // Calculate new position
+                let newX = sidebarCurrentX + deltaX;
+                newX = Math.max(-320, Math.min(0, newX));
+                
+                // Apply transform
+                sidebar.style.transform = `translateX(${newX + 320}px)`;
+                sidebar.style.transition = 'none';
+                
+                // Update overlay opacity
+                const opacity = (newX + 320) / 320;
+                overlay.style.opacity = opacity;
+                overlay.style.visibility = opacity > 0 ? 'visible' : 'hidden';
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!isDragging || isVerticalScroll) {
+                isDragging = false;
+                isVerticalScroll = false;
+                return;
+            }
+            
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const deltaX = touchCurrentX - touchStartX;
+            
+            // Restore transition
+            sidebar.style.transition = 'left 0.3s ease';
+            
+            // Determine final state based on swipe distance and velocity
+            const threshold = 100;
+            const shouldOpen = deltaX > threshold || (sidebarCurrentX > -160 && deltaX > -threshold);
+            
+            if (shouldOpen) {
+                openSidebar();
+            } else {
+                closeSidebar();
+            }
+            
+            // Reset transform
+            sidebar.style.transform = '';
+            
+            isDragging = false;
+            isVerticalScroll = false;
+        }
+
+        // Setup touch gesture listeners
+        function setupTouchGestures() {
+            document.addEventListener('touchstart', handleTouchStart, { passive: false });
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', handleTouchEnd, { passive: false });
         }
 
         function showWelcomeScreen() {
