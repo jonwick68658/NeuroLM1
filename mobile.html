@@ -21,7 +21,6 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            padding-top: 80px; /* Account for fixed header */
         }
 
         /* Header */
@@ -32,11 +31,6 @@
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid #2a2a2a;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
         }
 
         .menu-button {
@@ -63,7 +57,7 @@
         /* Sidebar */
         .sidebar-overlay {
             position: fixed;
-            top: 80px; /* Start below fixed header */
+            top: 0;
             left: 0;
             right: 0;
             bottom: 0;
@@ -81,10 +75,10 @@
 
         .sidebar {
             position: fixed;
-            top: 80px; /* Start below fixed header */
+            top: 0;
             left: -320px;
             width: 320px;
-            height: calc(100vh - 80px); /* Account for header height */
+            height: 100vh;
             background: #000000;
             z-index: 999;
             transition: left 0.3s ease;
