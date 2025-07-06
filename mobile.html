@@ -47,21 +47,7 @@
             cursor: pointer;
         }
 
-        .home-button {
-            background: none;
-            border: none;
-            color: #ffffff;
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 0.3rem;
-            margin-right: 0.5rem;
-            border-radius: 4px;
-            transition: background 0.2s ease;
-        }
 
-        .home-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
 
         .header h1 {
             font-size: 1.2rem;
@@ -505,9 +491,8 @@
     <!-- Header -->
     <div class="header">
         <button class="menu-button" onclick="toggleSidebar()">☰</button>
-        <h1>NeuroLM</h1>
+        <h1 onclick="showWelcomeScreen()" style="cursor: pointer;">NeuroLM</h1>
         <div class="header-right">
-            <button class="home-button" onclick="showWelcomeScreen()" title="Return to Welcome Screen">🏠</button>
             <span id="userName">User</span>
         </div>
     </div>
