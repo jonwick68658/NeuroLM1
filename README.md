@@ -10,7 +10,7 @@ The world's first operational Recursive Intelligence AI (RIAI) system that learn
 - **📈 Intelligence Amplification**: Background evaluation system using cutting-edge reasoning models
 - **💡 Human-AI Feedback Loop**: Advanced feedback integration with proprietary weighting algorithms
 - **🎯 Quality-Boosted Memory**: Revolutionary retrieval system prioritizing mathematically superior responses
-- **🌐 Multi-Model AI Access**: Connect to 100+ premium AI models through integrated platform
+- **🌐 Multi-Model AI Access**: Connect to 300+ premium AI models through integrated platform
 - **🔍 Real-Time Web Intelligence**: Live web search integration for current information
 - **📱 Cross-Platform Experience**: Desktop web app and mobile PWA with offline capabilities
 - **📁 Intelligent File Processing**: Advanced document analysis and integration
