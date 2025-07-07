@@ -764,6 +764,33 @@
             flex-direction: column;
         }
 
+        .welcome-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .logo {
+            width: 360px;
+            height: 240px;
+            margin-bottom: 2rem;
+        }
+
+        .welcome-text h2 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            color: var(--light-text);
+        }
+
+        .welcome-text p {
+            font-size: 1.2rem;
+            color: var(--muted-text);
+        }
+
         .message {
             margin-bottom: 1rem;
             padding: 1rem;
@@ -1486,11 +1513,15 @@
                 </div>
             </div>
             <div class="chat-messages" id="chatMessages">
-            <div class="message assistant-message">
-                <div>Hello! I'm NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?</div>
-                <div class="message-info">Memory system active • Ready to learn</div>
+                <!-- Welcome Screen -->
+                <div class="welcome-screen" id="welcomeScreen">
+                    <img class="logo" src="/static/neural-brain-logo.png" alt="NeuroLM Neural Brain Logo" />
+                    <div class="welcome-text">
+                        <h2>Welcome Back</h2>
+                        <p id="welcomeUserName">User</p>
+                    </div>
+                </div>
             </div>
-        </div>
 
 
 
@@ -1875,6 +1906,12 @@
         async function sendMessage() {
             const message = chatInput.value.trim();
             if (!message) return;
+
+            // Hide welcome screen if visible
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            if (welcomeScreen) {
+                welcomeScreen.remove();
+            }
 
             // Disable input while processing
             chatInput.disabled = true;
@@ -3204,10 +3241,8 @@
                     if (currentConversationId === conversationToDelete) {
                         currentConversationId = null;
                         chatMessages.innerHTML = '';
-                        // Add welcome message back
-                        let greeting = userName ? `Hello, ${userName}!` : 'Hello!';
-                        let welcomeMessage = `${greeting} I'm NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?`;
-                        addMessage(welcomeMessage, 'assistant', 'Memory system active • Ready to learn');
+                        // Show welcome screen back
+                        showWelcomeScreen();
                         topicDisplayText.textContent = 'No topic assigned';
                     }
                     
@@ -3346,6 +3381,19 @@
             hideTopicDeleteModal();
         }
 
+        // Show welcome screen
+        function showWelcomeScreen() {
+            chatMessages.innerHTML = `
+                <div class="welcome-screen" id="welcomeScreen">
+                    <img class="logo" src="/static/neural-brain-logo.png" alt="NeuroLM Neural Brain Logo" />
+                    <div class="welcome-text">
+                        <h2>Welcome Back</h2>
+                        <p id="welcomeUserName">${userName || 'User'}</p>
+                    </div>
+                </div>
+            `;
+        }
+
         // Initialize app
         async function initializeApp() {
             await loadModels();
@@ -3377,12 +3425,9 @@
                 setTimeout(autoResizeTextarea, 0);
             });
             
-            // If no current conversation, start a new one
+            // If no current conversation, show welcome screen
             if (!currentConversationId) {
-                // Add initial welcome message without creating conversation yet
-                let greeting = userName ? `Hello, ${userName}!` : 'Hello!';
-                let welcomeMessage = `${greeting} I'm NeuroLM with an integrated memory system. I can remember our conversations and learn from them. What would you like to talk about?`;
-                addMessage(welcomeMessage, 'assistant', 'Memory system active • Ready to learn');
+                showWelcomeScreen();
             }
             
             // Initialize textarea height and focus input
