@@ -148,6 +148,7 @@ The application follows a FastAPI-based microservice architecture with the follo
 
 ## Changelog
 
+- July 7, 2025: **UX POLISH**: Added professional hover tooltip to UF Score badge explaining system purpose and upcoming rewards (crypto, rate limits, early access, premium features) - positioned below badge with smooth fade animation for desktop users
 - July 7, 2025: **GAMIFICATION COMPLETE**: Fixed UF Score system with simple Neo4j-based approach - users get +1 point per AI response (only once) while maintaining ability to change feedback types for RIAI learning, preventing score gaming through uf_score_awarded boolean flag
 - July 7, 2025: **UX ENHANCEMENT**: Implemented pill-style feedback buttons replacing like/dislike - users can now give specific feedback with "Great response", "That worked" (for code), and "Not helpful" buttons, with differential scoring system (-3 to +2.5) and mathematical precision in RIAI H(t) function
 - July 7, 2025: **DEPLOYMENT FIX**: Resolved deployment timeout issue by optimizing background RIAI service startup - switched from DeepSeek-R1-Distill to mistralai/mistral-small-3.2-24b-instruct for 8x faster processing and implemented non-blocking service startup with 45-second delay, eliminating port binding failures
