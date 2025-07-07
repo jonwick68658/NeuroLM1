@@ -121,28 +121,51 @@ class BackgroundRIAIService:
                     model="deepseek/deepseek-r1-distill-qwen-7b"
                 )
                 
-                # Extract numerical score
+                # Extract numerical score with improved parsing
                 score_text = response_text.strip()
                 try:
+                    # Try direct float conversion first
                     r_t_score = float(score_text)
-                    # Clamp to valid range
-                    r_t_score = max(1.0, min(10.0, r_t_score))
-                    
-                    # Store in cache
-                    await self.store_cached_score(response_hash, r_t_score)
-                    
-                    evaluation_results.append({
-                        'memory_id': memory['memory_id'],
-                        'user_id': memory['user_id'],
-                        'r_t_score': r_t_score,
-                        'cached': False
-                    })
-                    
-                    print(f"R(t) evaluation: {r_t_score}/10 for memory {memory['memory_id'][:8]}...")
-                    
                 except ValueError:
-                    print(f"Could not parse R(t) score: {score_text}")
-                    continue
+                    # Try parsing from various formats
+                    import re
+                    # Look for patterns like "Score: 9", "**Score: 9**", "9/10", etc.
+                    score_patterns = [
+                        r'\*\*Score:\s*(\d+(?:\.\d+)?)\*\*',  # **Score: 9**
+                        r'Score:\s*(\d+(?:\.\d+)?)',          # Score: 9
+                        r'(\d+(?:\.\d+)?)/10',                # 9/10
+                        r'(\d+(?:\.\d+)?)$',                  # Just number at end
+                        r'(\d+(?:\.\d+)?)',                   # Any number
+                    ]
+                    
+                    r_t_score = None
+                    for pattern in score_patterns:
+                        match = re.search(pattern, score_text)
+                        if match:
+                            try:
+                                r_t_score = float(match.group(1))
+                                break
+                            except ValueError:
+                                continue
+                    
+                    if r_t_score is None:
+                        print(f"Could not parse R(t) score: {score_text}")
+                        continue
+                
+                # Clamp to valid range
+                r_t_score = max(1.0, min(10.0, r_t_score))
+                
+                # Store in cache
+                await self.store_cached_score(response_hash, r_t_score)
+                
+                evaluation_results.append({
+                    'memory_id': memory['memory_id'],
+                    'user_id': memory['user_id'],
+                    'r_t_score': r_t_score,
+                    'cached': False
+                })
+                
+                print(f"R(t) evaluation: {r_t_score}/10 for memory {memory['memory_id'][:8]}...")
                     
             except Exception as e:
                 print(f"Error evaluating memory {memory['memory_id']}: {e}")
