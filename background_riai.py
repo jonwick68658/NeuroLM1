@@ -109,16 +109,16 @@ class BackgroundRIAIService:
                     })
                     continue
                 
-                # Evaluate using DeepSeek model
+                # Evaluate using Mistral model
                 messages = [
                     {"role": "system", "content": "You are an AI response quality evaluator. Rate the quality of AI responses on a scale of 1-10, where 1 is poor and 10 is excellent. Consider accuracy, helpfulness, clarity, and completeness. Respond with just the numerical score."},
                     {"role": "user", "content": f"Rate this AI response: {content}"}
                 ]
                 
-                # Use DeepSeek-R1-Distill for evaluation
+                # Use Mistral-Small for evaluation
                 response_text = await self.model_service.chat_completion(
                     messages=messages,
-                    model="deepseek/deepseek-r1-distill-qwen-7b"
+                    model="mistralai/mistral-small-3.2-24b-instruct"
                 )
                 
                 # Extract numerical score with improved parsing
