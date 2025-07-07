@@ -106,6 +106,70 @@
             align-items: center;
             gap: 4px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .uf-score-badge:hover {
+            transform: translateY(-1px);
+        }
+
+        .uf-score-tooltip {
+            position: absolute;
+            top: -10px;
+            right: 0;
+            transform: translateY(-100%);
+            background: #1f2937;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            width: 280px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+
+        .uf-score-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 12px;
+            border: 6px solid transparent;
+            border-top-color: #1f2937;
+        }
+
+        .uf-score-badge:hover .uf-score-tooltip {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .tooltip-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #60a5fa;
+        }
+
+        .tooltip-rewards {
+            margin-top: 8px;
+        }
+
+        .tooltip-rewards strong {
+            color: #fbbf24;
+        }
+
+        .tooltip-rewards ul {
+            margin: 4px 0 0 16px;
+            padding: 0;
+        }
+
+        .tooltip-rewards li {
+            margin: 2px 0;
+            color: #d1d5db;
         }
 
         .uf-score-badge .score-label {
@@ -1358,6 +1422,19 @@
         <div class="uf-score-badge" id="ufScoreBadge">
             <span class="score-label">UF Score:</span>
             <span class="score-value" id="ufScoreValue">0</span>
+            <div class="uf-score-tooltip">
+                <div class="tooltip-title">User Feedback Score</div>
+                <div>Earn UF Score points by providing feedback on AI responses. Your feedback helps improve the system and deliver better results.</div>
+                <div class="tooltip-rewards">
+                    <strong>Upcoming rewards:</strong>
+                    <ul>
+                        <li>Cryptocurrency rewards</li>
+                        <li>Higher rate limits</li>
+                        <li>Early access to new features</li>
+                        <li>Exclusive premium capabilities</li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 
