@@ -131,7 +131,7 @@ def get_authenticated_user(request: Request) -> Optional[Dict]:
 intelligent_memory_system = None
 try:
     from intelligent_memory import IntelligentMemorySystem
-    from background_riai import process_riai_batch
+    from background_riai import process_riai_batch, start_background_riai, stop_background_riai
     from tool_generator import ToolGenerator
     from tool_executor import ToolExecutor
     intelligent_memory_system = IntelligentMemorySystem()
@@ -144,6 +144,27 @@ except Exception as e:
     intelligent_memory_system = None
 
 # Memory summarizer removed - replaced by RIAI quality-boosted retrieval
+
+# FastAPI event handlers for background service
+@app.on_event("startup")
+async def startup_event():
+    """Initialize background services"""
+    if intelligent_memory_system is not None:
+        try:
+            await start_background_riai()
+            print("✅ Background RIAI service started")
+        except Exception as e:
+            print(f"❌ Failed to start background RIAI service: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up background services"""
+    if intelligent_memory_system is not None:
+        try:
+            await stop_background_riai()
+            print("✅ Background RIAI service stopped")
+        except Exception as e:
+            print(f"❌ Failed to stop background RIAI service: {e}")
 
 # Note: Sessions cleared on restart - users need to re-login
 
