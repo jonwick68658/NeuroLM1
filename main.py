@@ -10,6 +10,7 @@ import httpx
 import hashlib
 import uuid
 import psycopg2
+import asyncio
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
@@ -151,7 +152,7 @@ async def startup_event():
     """Initialize background services"""
     if intelligent_memory_system is not None:
         try:
-            await start_background_riai()
+            asyncio.create_task(start_background_riai())
             print("✅ Background RIAI service started")
         except Exception as e:
             print(f"❌ Failed to start background RIAI service: {e}")
