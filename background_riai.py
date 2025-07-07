@@ -233,6 +233,10 @@ class BackgroundRIAIService:
         self.is_running = True
         print("Background RIAI service started")
         
+        # Initial delay to allow server startup
+        print("Waiting 45 seconds before first batch processing...")
+        await asyncio.sleep(45)
+        
         while self.is_running:
             try:
                 start_time = time.time()
