@@ -2625,15 +2625,33 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
                 use_message_id=False  # Now using Neo4j node ID directly
             )
             
-            # Increment user feedback score by 1
+            # Increment user feedback score by 1 (only if not already awarded for this message)
             conn = get_db_connection()
             cursor = conn.cursor()
             try:
+                # First check if this message already awarded UF Score points
                 cursor.execute(
-                    "UPDATE users SET feedback_score = feedback_score + 1 WHERE id = %s",
-                    (user_id,)
+                    "SELECT uf_score_awarded FROM conversation_messages WHERE message_id = %s",
+                    (feedback_request.message_id,)
                 )
-                conn.commit()
+                result = cursor.fetchone()
+                
+                if result and not result[0]:  # If message exists and UF score not yet awarded
+                    # Award the UF Score point
+                    cursor.execute(
+                        "UPDATE users SET feedback_score = feedback_score + 1 WHERE id = %s",
+                        (user_id,)
+                    )
+                    # Mark this message as having awarded UF Score
+                    cursor.execute(
+                        "UPDATE conversation_messages SET uf_score_awarded = TRUE WHERE message_id = %s",
+                        (feedback_request.message_id,)
+                    )
+                    conn.commit()
+                    print(f"DEBUG: UF Score awarded for message {feedback_request.message_id}")
+                else:
+                    print(f"DEBUG: UF Score already awarded for message {feedback_request.message_id}, skipping increment")
+                
                 cursor.close()
                 conn.close()
             except Exception as e:
