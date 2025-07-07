@@ -8,25 +8,27 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
-            --primary-color: #4a6fa5;
-            --secondary-color: #6e9cd2;
+            --primary-color: #4f46e5;
+            --secondary-color: #4338ca;
             --accent-color: #ff7d4d;
-            --light-bg: #f5f7fa;
-            --dark-text: #333;
-            --light-text: #fff;
-            --border-color: #e0e0e0;
+            --dark-bg: #000000;
+            --darker-bg: #1a1a1a;
+            --card-bg: #2a2a2a;
+            --light-text: #ffffff;
+            --muted-text: #9ca3af;
+            --border-color: #404040;
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
         body {
-            background: linear-gradient(135deg, var(--light-bg), #ffffff);
-            color: var(--dark-text);
+            background: var(--dark-bg);
+            color: var(--light-text);
             height: 100vh;
             display: flex;
             flex-direction: column;
@@ -35,23 +37,22 @@
         }
 
         .header {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            background: var(--dark-bg);
             color: var(--light-text);
-            padding: 0.3rem 1rem;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
             position: relative;
-            min-height: 40px;
+            min-height: 60px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
         }
 
         .header h1 {
             font-size: 1.2rem;
-            margin: 0 1rem 0 0;
+            margin: 0;
             color: var(--light-text);
-            font-weight: bold;
+            font-weight: 600;
             display: inline-block;
         }
 
@@ -77,17 +78,17 @@
         .hamburger-btn {
             background: none;
             border: none;
-            color: white;
-            font-size: 1.2rem;
+            color: var(--light-text);
+            font-size: 1.5rem;
             cursor: pointer;
-            padding: 0.25rem;
+            padding: 0.5rem;
             border-radius: 4px;
             transition: background 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
         }
 
         .hamburger-btn:hover {
@@ -186,8 +187,8 @@
         }
 
         .sidebar {
-            width: 300px;
-            background: white;
+            width: 320px;
+            background: var(--dark-bg);
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
@@ -363,20 +364,21 @@
 
         .topic-selection label {
             display: block;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             margin-bottom: 0.3rem;
-            color: var(--dark-text);
+            color: var(--light-text);
             font-weight: 500;
         }
 
         .topic-select, .subtopic-select {
             width: 100%;
-            padding: 0.5rem;
+            padding: 0.75rem;
             border: 1px solid var(--border-color);
-            border-radius: 4px;
-            font-size: 0.8rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
             margin-bottom: 0.5rem;
-            background: white;
+            background: var(--card-bg);
+            color: var(--light-text);
         }
 
         .topic-select:focus, .subtopic-select:focus {
@@ -387,24 +389,25 @@
         .conversations-list {
             flex: 1;
             overflow-y: auto;
-            padding: 0.5rem;
+            padding: 1rem;
         }
 
         .conversation-item {
-            padding: 0.75rem;
-            margin: 0.25rem 0;
-            border-radius: 8px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 0.5rem;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: background 0.2s ease;
             border: 1px solid transparent;
             position: relative;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: var(--darker-bg);
         }
 
         .conversation-item:hover {
-            background: var(--light-bg);
+            background: var(--card-bg);
         }
 
         .conversation-item.active {
@@ -432,7 +435,7 @@
             background: none;
             border: none;
             font-size: 1.2rem;
-            color: #666;
+            color: var(--muted-text);
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 4px;
@@ -440,7 +443,7 @@
         }
 
         .menu-button:hover {
-            background: rgba(0,0,0,0.1);
+            background: rgba(255,255,255,0.1);
         }
 
         .conversation-item.active .menu-button {
@@ -455,7 +458,7 @@
             position: absolute;
             top: 100%;
             right: 0;
-            background: white;
+            background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -476,12 +479,12 @@
             width: 100%;
             text-align: left;
             font-size: 0.9rem;
-            color: var(--dark-text);
+            color: var(--light-text);
             transition: background 0.3s;
         }
 
         .dropdown-item:hover {
-            background: var(--light-bg);
+            background: var(--border-color);
         }
 
         .dropdown-item.delete {
@@ -633,7 +636,7 @@
 
         .chat-header {
             padding: 0.75rem 1rem;
-            background: #f8f9fa;
+            background: var(--darker-bg);
             border-bottom: 1px solid var(--border-color);
             border-radius: 10px 10px 0 0;
         }
@@ -646,7 +649,7 @@
 
         #topicDisplayText {
             font-size: 0.9rem;
-            color: var(--dark-text);
+            color: var(--light-text);
             font-weight: 500;
         }
 
@@ -683,12 +686,13 @@
         }
 
         .topic-modal-content {
-            background: white;
+            background: var(--card-bg);
             padding: 2rem;
             border-radius: 10px;
             width: 90%;
             max-width: 400px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            color: var(--light-text);
         }
 
         .topic-modal h3 {
@@ -745,26 +749,30 @@
             max-width: none;
             margin: 0;
             width: 100%;
-            padding: 0.5rem;
+            padding: 0;
             overflow: hidden;
+            background: var(--dark-bg);
         }
 
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 1rem 1.5rem 120px 1.5rem;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.05);
-            height: calc(100vh - 120px);
+            padding: 1rem;
+            background: var(--dark-bg);
+            height: calc(100vh - 160px);
+            display: flex;
+            flex-direction: column;
         }
 
         .message {
             margin-bottom: 1rem;
             padding: 1rem;
-            border-radius: 10px;
-            max-width: 70%;
+            border-radius: 1rem;
+            max-width: 85%;
             word-wrap: break-word;
+            font-size: 16px;
+            line-height: 1.5;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .user-message {
@@ -772,12 +780,14 @@
             color: var(--light-text);
             margin-left: auto;
             text-align: right;
+            align-self: flex-end;
         }
 
         .assistant-message {
-            background: var(--light-bg);
-            color: var(--dark-text);
-            border-left: 4px solid var(--secondary-color);
+            background: var(--card-bg);
+            color: var(--light-text);
+            align-self: flex-start;
+            margin-right: auto;
         }
 
         .message-info {
@@ -803,14 +813,15 @@
             left: -20px;
             right: -20px;
             height: 60px;
-            background: linear-gradient(transparent, rgba(248, 249, 250, 0.9));
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
             pointer-events: none;
             z-index: -1;
         }
 
         .input-wrapper {
             position: relative;
-            background: white;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
             border-radius: 24px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             transition: all 0.2s ease;
@@ -839,6 +850,11 @@
             overflow-wrap: break-word;
             overflow-y: auto;
             transition: height 0.2s ease;
+            color: var(--light-text);
+        }
+
+        .chat-input::placeholder {
+            color: var(--muted-text);
         }
 
         .input-controls {
@@ -853,7 +869,7 @@
 
 
         .send-button {
-            background: #374151;
+            background: var(--primary-color);
             color: white;
             border: none;
             padding: 6px 12px;
@@ -868,7 +884,7 @@
         }
 
         .send-button:hover {
-            background: #1f2937;
+            background: var(--secondary-color);
         }
 
         .send-button:disabled {
@@ -887,7 +903,7 @@
             align-items: center;
             gap: 4px;
             background: transparent;
-            color: #6b7280;
+            color: var(--muted-text);
             border: none;
             padding: 6px 8px;
             border-radius: 16px;
