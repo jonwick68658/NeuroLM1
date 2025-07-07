@@ -387,6 +387,28 @@
             color: #991b1b;
         }
 
+        .uf-score-badge {
+            background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            margin-left: 8px;
+        }
+
+        .uf-score-badge .score-label {
+            opacity: 0.9;
+        }
+
+        .uf-score-badge .score-value {
+            font-size: 0.8rem;
+        }
+
         .message-input {
             flex: 1;
             background: #2a2a2a;
@@ -537,6 +559,10 @@
         <h1 onclick="showWelcomeScreen()" style="cursor: pointer;">NeuroLM</h1>
         <div class="header-right">
             <span id="userName">User</span>
+            <div class="uf-score-badge" id="ufScoreBadge">
+                <span class="score-label">UF:</span>
+                <span class="score-value" id="ufScoreValue">0</span>
+            </div>
         </div>
     </div>
 
@@ -672,6 +698,12 @@
                 const data = await response.json();
                 document.getElementById('userName').textContent = data.first_name || 'User';
                 document.getElementById('welcomeUserName').textContent = data.first_name || 'User';
+                
+                // Update UF Score badge
+                const ufScoreValue = document.getElementById('ufScoreValue');
+                if (ufScoreValue && data.feedback_score !== undefined) {
+                    ufScoreValue.textContent = data.feedback_score;
+                }
             } catch (error) {
                 console.error('Error loading user name:', error);
             }
@@ -966,6 +998,9 @@
                     if (response.ok) {
                         const data = await response.json();
                         console.log(`RIAI feedback recorded: ${data.h_t_score}`);
+                        
+                        // Refresh UF Score after successful feedback submission
+                        await loadUserName();
                     } else {
                         console.error('Failed to submit feedback to RIAI system');
                     }

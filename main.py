@@ -2205,7 +2205,23 @@ async def get_user_name_endpoint(request: Request):
         user_id = user_data['user_id']
         
         first_name = get_user_first_name(user_id)
-        return {"first_name": first_name}
+        
+        # Get user feedback score
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT feedback_score FROM users WHERE id = %s", (user_id,))
+            result = cursor.fetchone()
+            feedback_score = result[0] if result else 0
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"ERROR: Failed to get user feedback score: {e}")
+            feedback_score = 0
+            cursor.close()
+            conn.close()
+        
+        return {"first_name": first_name, "feedback_score": feedback_score}
     except HTTPException:
         raise
     except Exception as e:
@@ -2608,6 +2624,23 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
                 user_id=user_id,
                 use_message_id=False  # Now using Neo4j node ID directly
             )
+            
+            # Increment user feedback score by 1
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE users SET feedback_score = feedback_score + 1 WHERE id = %s",
+                    (user_id,)
+                )
+                conn.commit()
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                print(f"ERROR: Failed to update user feedback score: {e}")
+                cursor.close()
+                conn.close()
+                # Don't fail the entire request for score update issues
             
             return {
                 "status": "success",

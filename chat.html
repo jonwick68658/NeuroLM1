@@ -94,6 +94,28 @@
             background: rgba(255,255,255,0.1);
         }
 
+        .uf-score-badge {
+            background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .uf-score-badge .score-label {
+            opacity: 0.9;
+        }
+
+        .uf-score-badge .score-value {
+            font-size: 0.8rem;
+        }
+
         .main-container {
             flex: 1;
             display: flex;
@@ -1332,6 +1354,11 @@
                 <div class="file-dropdown" id="fileDropdown"></div>
             </div>
         </div>
+        
+        <div class="uf-score-badge" id="ufScoreBadge">
+            <span class="score-label">UF Score:</span>
+            <span class="score-value" id="ufScoreValue">0</span>
+        </div>
     </div>
 
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -2033,6 +2060,9 @@
                     if (response.ok) {
                         const data = await response.json();
                         console.log(`RIAI feedback recorded: ${data.h_t_score}`);
+                        
+                        // Refresh UF Score after successful feedback submission
+                        await loadUserName();
                     } else {
                         console.error('Failed to submit feedback to RIAI system');
                     }
@@ -2855,6 +2885,12 @@
                 if (response.ok) {
                     const data = await response.json();
                     userName = data.first_name || '';
+                    
+                    // Update UF Score badge
+                    const ufScoreValue = document.getElementById('ufScoreValue');
+                    if (ufScoreValue && data.feedback_score !== undefined) {
+                        ufScoreValue.textContent = data.feedback_score;
+                    }
                 }
             } catch (error) {
                 console.error('Error loading user name:', error);
