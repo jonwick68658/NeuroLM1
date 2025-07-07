@@ -1440,7 +1440,7 @@
         <div class="header-left">
             <button id="sidebarToggle" class="hamburger-btn">☰</button>
             <div class="header-title">
-                <h1>NeuroLM Chat</h1>
+                <h1 onclick="showWelcomeScreen()" style="cursor: pointer;">NeuroLM Chat</h1>
                 <p>AI chat with integrated memory system</p>
             </div>
         </div>
@@ -1906,12 +1906,6 @@
         async function sendMessage() {
             const message = chatInput.value.trim();
             if (!message) return;
-
-            // Hide welcome screen if visible
-            const welcomeScreen = document.getElementById('welcomeScreen');
-            if (welcomeScreen) {
-                welcomeScreen.remove();
-            }
 
             // Disable input while processing
             chatInput.disabled = true;
@@ -2832,7 +2826,7 @@
             await loadConversations(true);
         });
 
-        newChatBtn.addEventListener('click', startNewChat);
+        newChatBtn.addEventListener('click', showWelcomeScreen);
 
         // Topic modal functionality
         function openTopicModal() {
@@ -3005,7 +2999,7 @@
             }
         });
 
-        newChatBtn.addEventListener('click', startNewChat);
+        newChatBtn.addEventListener('click', showWelcomeScreen);
 
         // User management functions
         async function loadUserName() {
@@ -3383,6 +3377,7 @@
 
         // Show welcome screen
         function showWelcomeScreen() {
+            currentConversationId = null;
             chatMessages.innerHTML = `
                 <div class="welcome-screen" id="welcomeScreen">
                     <img class="logo" src="/static/neural-brain-logo.png" alt="NeuroLM Neural Brain Logo" />
@@ -3392,6 +3387,14 @@
                     </div>
                 </div>
             `;
+            
+            // Update active conversation state
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Update topic display
+            topicDisplayText.textContent = 'No topic assigned';
         }
 
         // Initialize app
