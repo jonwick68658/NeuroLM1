@@ -133,7 +133,7 @@ class IntelligentMemorySystem:
         self.scorer = ImportanceScorer()
         
         # RIAI Configuration
-        self.evaluation_model = "deepseek/deepseek-r1-distill-qwen-7b"
+        self.evaluation_model = "mistralai/mistral-small-3.2-24b-instruct"
         
         # Neo4j connection (reuse existing)
         neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -148,7 +148,7 @@ class IntelligentMemorySystem:
         self._setup_vector_index()
     
     async def evaluate_response(self, user_query: str, ai_response: str) -> Optional[float]:
-        """Evaluate AI response quality using DeepSeek-R1-Distill model (R(t) function)"""
+        """Evaluate AI response quality using Mistral model (R(t) function)"""
         try:
             from model_service import ModelService
             model_service = ModelService()
