@@ -378,7 +378,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
             return False
     
     def calculate_final_quality_score(self, r_t_score: Optional[float], h_t_score: Optional[float]) -> Optional[float]:
-        """Calculate final quality score using f(R(t), H(t)) intelligence refinement function"""
+        """Calculate final quality score using f(R(t), H(t)) intelligence refinement function with differential scoring"""
         if r_t_score is None:
             # If no R(t) score yet, use neutral baseline if H(t) feedback exists
             if h_t_score is not None:
@@ -386,17 +386,15 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
             else:
                 return None  # Wait for background R(t) evaluation
         
-        # Human feedback weight factor (amplifies human signals)
-        human_weight = 1.5
-        
         if h_t_score is not None:
-            # Combine R(t) and H(t) with weighted human feedback
-            final_score = r_t_score + (h_t_score * human_weight)
-            # Clamp between 1-10 range
-            return max(1.0, min(10.0, final_score))
+            # Apply direct adjustment from human feedback (differential scoring)
+            final_score = r_t_score + h_t_score
         else:
-            # No human feedback, use R(t) only - still apply clamping
-            return max(1.0, min(10.0, r_t_score))
+            # No human feedback indicates mild satisfaction (slightly above baseline)
+            final_score = r_t_score + 0.1
+        
+        # Clamp between 1-10 range
+        return max(1.0, min(10.0, final_score))
     
     async def update_final_quality_score(self, memory_id: str, user_id: str, use_message_id: bool = False) -> bool:
         """Update final quality score for a memory using f(R(t), H(t))"""

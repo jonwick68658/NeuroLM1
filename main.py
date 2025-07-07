@@ -2563,7 +2563,7 @@ async def test_riai_scoring(request: Request):
 # Human feedback endpoint for RIAI H(t) function
 class FeedbackRequest(BaseModel):
     message_id: str
-    feedback_type: str  # 'like' or 'dislike'
+    feedback_type: str  # 'great_response', 'that_worked', 'not_helpful' (legacy: 'like', 'dislike')
 
 @app.post("/api/feedback")
 async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
@@ -2575,14 +2575,22 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
         user_id = user_data['user_id']
         
         # Validate feedback type
-        if feedback_request.feedback_type not in ['like', 'dislike']:
-            raise HTTPException(status_code=400, detail="Invalid feedback type. Must be 'like' or 'dislike'")
+        valid_feedback_types = ['great_response', 'that_worked', 'not_helpful', 'like', 'dislike']
+        if feedback_request.feedback_type not in valid_feedback_types:
+            raise HTTPException(status_code=400, detail=f"Invalid feedback type. Must be one of: {valid_feedback_types}")
         
         if not intelligent_memory_system:
             raise HTTPException(status_code=500, detail="Memory system not available")
         
-        # Convert feedback to H(t) score
-        feedback_score = 2.0 if feedback_request.feedback_type == 'like' else -2.0
+        # Convert feedback to H(t) score using new differential scoring system
+        feedback_scores = {
+            'not_helpful': -3.0,      # Severe negative feedback
+            'like': 1.5,              # Legacy positive feedback  
+            'great_response': 1.5,    # Good response
+            'that_worked': 2.5,       # Highest score for practical success
+            'dislike': -3.0           # Legacy negative feedback
+        }
+        feedback_score = feedback_scores[feedback_request.feedback_type]
         
         # Update memory with human feedback using Neo4j node ID directly
         print(f"DEBUG: Feedback endpoint called with message_id={feedback_request.message_id}, type={feedback_request.feedback_type}, user_id={user_id}")

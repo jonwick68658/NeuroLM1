@@ -338,6 +338,55 @@
             fill: #ef4444;
         }
 
+        /* New feedback pill buttons */
+        .feedback-buttons {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+
+        .feedback-pill {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #6b7280;
+            text-decoration: none;
+        }
+
+        .feedback-pill:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .feedback-pill.active {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1d4ed8;
+        }
+
+        .feedback-pill.great-response.active {
+            background: #dcfce7;
+            border-color: #16a34a;
+            color: #166534;
+        }
+
+        .feedback-pill.that-worked.active {
+            background: #fef3c7;
+            border-color: #d97706;
+            color: #92400e;
+        }
+
+        .feedback-pill.not-helpful.active {
+            background: #fee2e2;
+            border-color: #dc2626;
+            color: #991b1b;
+        }
+
         .message-input {
             flex: 1;
             background: #2a2a2a;
@@ -791,26 +840,32 @@
                             <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                         </svg>
                     </button>
-                    <button class="action-button like-button" onclick="toggleFeedback('${messageId}', 'like', this)" title="Like this response">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/>
-                        </svg>
-                    </button>
-                    <button class="action-button dislike-button" onclick="toggleFeedback('${messageId}', 'dislike', this)" title="Dislike this response">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/>
-                        </svg>
-                    </button>
+                    <div class="feedback-buttons">
+                        <button class="feedback-pill great-response" onclick="submitFeedback('${messageId}', 'great_response', this)" title="Great response">Great response</button>
+                        ${content.includes('```') ? '<button class="feedback-pill that-worked" onclick="submitFeedback(\'' + messageId + '\', \'that_worked\', this)" title="That worked">That worked</button>' : ''}
+                        <button class="feedback-pill not-helpful" onclick="submitFeedback('${messageId}', 'not_helpful', this)" title="Not helpful at all">Not helpful</button>
+                    </div>
                 `;
                 messageDiv.appendChild(actionsDiv);
                 
-                // Apply localStorage feedback state
+                // Apply localStorage feedback state to pill buttons
                 const feedbackKey = `feedback_${messageId}`;
                 const currentFeedback = localStorage.getItem(feedbackKey);
                 if (currentFeedback) {
-                    const buttonClass = currentFeedback === 'like' ? '.like-button' : '.dislike-button';
-                    const button = messageDiv.querySelector(buttonClass);
-                    if (button) button.classList.add('active');
+                    // Map feedback types to button classes
+                    const feedbackClasses = {
+                        'great_response': '.great-response',
+                        'that_worked': '.that-worked',
+                        'not_helpful': '.not-helpful',
+                        'like': '.great-response',      // Legacy mapping
+                        'dislike': '.not-helpful'       // Legacy mapping
+                    };
+                    
+                    const buttonClass = feedbackClasses[currentFeedback];
+                    if (buttonClass) {
+                        const button = messageDiv.querySelector(buttonClass);
+                        if (button) button.classList.add('active');
+                    }
                 }
             } else {
                 messageDiv.textContent = content;
@@ -877,35 +932,23 @@
             }
         }
 
-        // Toggle like/dislike feedback
-        async function toggleFeedback(messageId, feedbackType, button) {
-            // Get current feedback from localStorage
+        // Submit feedback using pill buttons
+        async function submitFeedback(messageId, feedbackType, buttonElement) {
+            const feedbackButtons = buttonElement.parentElement;
             const feedbackKey = `feedback_${messageId}`;
-            let currentFeedback = localStorage.getItem(feedbackKey);
+            const currentFeedback = localStorage.getItem(feedbackKey);
             
-            // Find the message element to get both buttons
-            const messageElement = document.getElementById(messageId);
-            if (!messageElement) return;
-            
-            const likeButton = messageElement.querySelector('.like-button');
-            const dislikeButton = messageElement.querySelector('.dislike-button');
-            
-            // Clear previous active states (with null checks)
-            if (likeButton) likeButton.classList.remove('active');
-            if (dislikeButton) dislikeButton.classList.remove('active');
-            
-            // If clicking the same button that's already active, remove feedback
             if (currentFeedback === feedbackType) {
+                // Remove feedback (toggle off)
                 localStorage.removeItem(feedbackKey);
-                // No active state needed, buttons return to default
+                feedbackButtons.querySelectorAll('.feedback-pill').forEach(btn => btn.classList.remove('active'));
             } else {
                 // Set new feedback
                 localStorage.setItem(feedbackKey, feedbackType);
-                if (feedbackType === 'like' && likeButton) {
-                    likeButton.classList.add('active');
-                } else if (feedbackType === 'dislike' && dislikeButton) {
-                    dislikeButton.classList.add('active');
-                }
+                
+                // Clear all active states, then activate the clicked button
+                feedbackButtons.querySelectorAll('.feedback-pill').forEach(btn => btn.classList.remove('active'));
+                buttonElement.classList.add('active');
                 
                 // Send feedback to backend for RIAI H(t) function
                 try {
