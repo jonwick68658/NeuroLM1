@@ -2626,39 +2626,47 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
             )
             
             # Increment user feedback score by 1 (only if not already awarded for this message)
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            try:
-                # First check if this message already awarded UF Score points
-                cursor.execute(
-                    "SELECT uf_score_awarded FROM conversation_messages WHERE message_id = %s",
-                    (feedback_request.message_id,)
-                )
-                result = cursor.fetchone()
-                
-                if result and not result[0]:  # If message exists and UF score not yet awarded
-                    # Award the UF Score point
-                    cursor.execute(
-                        "UPDATE users SET feedback_score = feedback_score + 1 WHERE id = %s",
-                        (user_id,)
-                    )
-                    # Mark this message as having awarded UF Score
-                    cursor.execute(
-                        "UPDATE conversation_messages SET uf_score_awarded = TRUE WHERE message_id = %s",
-                        (feedback_request.message_id,)
-                    )
-                    conn.commit()
-                    print(f"DEBUG: UF Score awarded for message {feedback_request.message_id}")
-                else:
-                    print(f"DEBUG: UF Score already awarded for message {feedback_request.message_id}, skipping increment")
-                
-                cursor.close()
-                conn.close()
-            except Exception as e:
-                print(f"ERROR: Failed to update user feedback score: {e}")
-                cursor.close()
-                conn.close()
-                # Don't fail the entire request for score update issues
+            if intelligent_memory_system:
+                try:
+                    # Check if UF Score already awarded for this Neo4j node
+                    with intelligent_memory_system.driver.session() as session:
+                        result = session.run("""
+                            MATCH (m:IntelligentMemory {id: $node_id, user_id: $user_id})
+                            RETURN m.uf_score_awarded AS awarded
+                        """, {
+                            'node_id': feedback_request.message_id,
+                            'user_id': user_id
+                        })
+                        
+                        record = result.single()
+                        if record and not record['awarded']:
+                            # Award the UF Score point
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                "UPDATE users SET feedback_score = feedback_score + 1 WHERE id = %s",
+                                (user_id,)
+                            )
+                            conn.commit()
+                            cursor.close()
+                            conn.close()
+                            
+                            # Mark this Neo4j node as having awarded UF Score
+                            session.run("""
+                                MATCH (m:IntelligentMemory {id: $node_id, user_id: $user_id})
+                                SET m.uf_score_awarded = true
+                            """, {
+                                'node_id': feedback_request.message_id,
+                                'user_id': user_id
+                            })
+                            
+                            print(f"DEBUG: UF Score awarded for node {feedback_request.message_id}")
+                        else:
+                            print(f"DEBUG: UF Score already awarded for node {feedback_request.message_id}, skipping increment")
+                            
+                except Exception as e:
+                    print(f"ERROR: Failed to update user feedback score: {e}")
+                    # Don't fail the entire request for score update issues
             
             return {
                 "status": "success",

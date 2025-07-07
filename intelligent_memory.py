@@ -256,6 +256,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                         human_feedback_timestamp: null,
                         final_quality_score: null,
                         final_score_timestamp: null,
+                        uf_score_awarded: false,
                         timestamp: datetime(),
                         created_at: datetime()
                     })
