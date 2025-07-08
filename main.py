@@ -33,8 +33,7 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 # Mount static files for PWA
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Global session storage (in production, use Redis or database)
-user_sessions = {}
+# Session management now uses database only (migrated July 2, 2025)
 
 # Database session management functions
 def create_session(user_id: str, username: str) -> Optional[str]:
@@ -1813,11 +1812,7 @@ async def login_user(
         </script>
         """)
     
-    # Also store in memory for backward compatibility during transition
-    user_sessions[session_id] = {
-        'user_id': user_id,
-        'username': username
-    }
+
     
     # Redirect to chat with session
     response = RedirectResponse(url="/", status_code=302)
