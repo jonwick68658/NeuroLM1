@@ -1522,7 +1522,7 @@
             <div class="chat-messages" id="chatMessages">
                 <!-- Welcome Screen -->
                 <div class="welcome-screen" id="welcomeScreen">
-                    <img class="logo" src="/static/neural-brain-logo.png" alt="NeuroLM Neural Brain Logo" />
+                    <img class="welcome-image" src="/static/neurolm-welcome-image.png" alt="NeuroLM Welcome" />
                     <div class="welcome-text">
                         <h2>Welcome Back</h2>
                         <p id="welcomeUserName">User</p>
@@ -3388,6 +3388,10 @@
             chatMessages.innerHTML = `
                 <div class="welcome-screen" id="welcomeScreen">
                     <img class="welcome-image" src="/static/neurolm-welcome-image.png" alt="NeuroLM Welcome" />
+                    <div class="welcome-text">
+                        <h2>Welcome Back</h2>
+                        <p id="welcomeUserName">${userName || 'User'}</p>
+                    </div>
                 </div>
             `;
             
