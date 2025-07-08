@@ -36,14 +36,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Session management now uses database only (migrated July 2, 2025)
 
 # Database session management functions
-def create_session(user_id: str, username: str) -> Optional[str]:
+def create_session(user_id: str, username: str, extended: bool = False) -> Optional[str]:
     """Create a new session in the database and return session_id"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
         session_id = str(uuid.uuid4())
-        expires_at = datetime.now() + timedelta(hours=24)  # 24 hour expiry
+        # Extended session for 30 days if remember me is checked, otherwise 24 hours
+        if extended:
+            expires_at = datetime.now() + timedelta(days=30)
+        else:
+            expires_at = datetime.now() + timedelta(hours=24)
         
         cursor.execute('''
             INSERT INTO sessions (session_id, user_id, username, expires_at)
@@ -1505,22 +1509,50 @@ async def register_page():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>NeuroLM - Register</title>
         <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
             body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #000000;
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                margin: 0;
+                position: relative;
+                overflow: hidden;
             }
-            .register-container {
-                background: white;
-                padding: 2rem;
-                border-radius: 15px;
-                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            
+            .background-pattern {
+                position: absolute;
+                top: 0;
+                left: 0;
                 width: 100%;
-                max-width: 400px;
+                height: 100%;
+                background-image: url('/static/neural-brain-logo.png');
+                background-size: 40%;
+                background-position: center;
+                background-repeat: no-repeat;
+                opacity: 0.05;
+                filter: blur(1px);
+                z-index: 0;
+            }
+            
+            .register-container {
+                background: rgba(26, 26, 26, 0.95);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(102, 126, 234, 0.3);
+                border-radius: 20px;
+                padding: 2.5rem;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+                width: 100%;
+                max-width: 420px;
+                position: relative;
+                z-index: 1;
+                transition: all 0.3s ease;
             }
             .logo {
                 text-align: center;
@@ -1686,81 +1718,197 @@ async def login_page():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>NeuroLM - Login</title>
         <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
             body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #000000;
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                margin: 0;
+                position: relative;
+                overflow: hidden;
             }
-            .login-container {
-                background: white;
-                padding: 2rem;
-                border-radius: 15px;
-                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            
+            /* Subtle brain pattern background */
+            .background-pattern {
+                position: absolute;
+                top: 0;
+                left: 0;
                 width: 100%;
-                max-width: 400px;
+                height: 100%;
+                background-image: url('/static/neural-brain-logo.png');
+                background-size: 40%;
+                background-position: center;
+                background-repeat: no-repeat;
+                opacity: 0.05;
+                filter: blur(1px);
+                z-index: 0;
             }
+            
+            /* Floating login card */
+            .login-container {
+                background: rgba(26, 26, 26, 0.95);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(102, 126, 234, 0.3);
+                border-radius: 20px;
+                padding: 2.5rem;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+                width: 100%;
+                max-width: 420px;
+                position: relative;
+                z-index: 1;
+                transition: all 0.3s ease;
+            }
+            
+            .login-container:hover {
+                border-color: rgba(102, 126, 234, 0.5);
+                box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+            }
+            
             .logo {
                 text-align: center;
-                margin-bottom: 2rem;
+                margin-bottom: 2.5rem;
             }
+            
             .logo h1 {
-                color: #4a6fa5;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
                 margin: 0;
-                font-size: 2rem;
+                font-size: 2.5rem;
                 font-weight: 700;
+                letter-spacing: -0.025em;
             }
+            
+            .logo p {
+                color: #9ca3af;
+                margin-top: 0.5rem;
+                font-size: 1rem;
+            }
+            
             .form-group {
                 margin-bottom: 1.5rem;
             }
+            
             label {
                 display: block;
                 margin-bottom: 0.5rem;
-                color: #333;
+                color: #e5e7eb;
                 font-weight: 500;
+                font-size: 0.9rem;
             }
+            
             input[type="text"], input[type="password"] {
                 width: 100%;
-                padding: 0.75rem;
-                border: 2px solid #e1e5e9;
-                border-radius: 8px;
+                padding: 0.875rem 1rem;
+                background: rgba(42, 42, 42, 0.8);
+                border: 1px solid #404040;
+                border-radius: 12px;
                 font-size: 1rem;
-                transition: border-color 0.3s;
+                color: #ffffff;
+                transition: all 0.3s ease;
                 box-sizing: border-box;
             }
+            
             input[type="text"]:focus, input[type="password"]:focus {
                 outline: none;
-                border-color: #4a6fa5;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                background: rgba(42, 42, 42, 1);
             }
+            
+            input[type="text"]::placeholder, input[type="password"]::placeholder {
+                color: #6b7280;
+            }
+            
+            .remember-me {
+                display: flex;
+                align-items: center;
+                margin-bottom: 1.5rem;
+                gap: 0.5rem;
+            }
+            
+            .remember-me input[type="checkbox"] {
+                width: auto;
+                margin: 0;
+                accent-color: #667eea;
+            }
+            
+            .remember-me label {
+                margin: 0;
+                font-size: 0.875rem;
+                color: #9ca3af;
+                cursor: pointer;
+            }
+            
             .submit-btn {
                 width: 100%;
-                padding: 0.75rem;
-                background: #4a6fa5;
+                padding: 0.875rem;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
                 border: none;
-                border-radius: 8px;
+                border-radius: 12px;
                 font-size: 1rem;
                 font-weight: 600;
                 cursor: pointer;
-                transition: background 0.3s;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
             }
+            
             .submit-btn:hover {
-                background: #3a5a95;
+                transform: translateY(-1px);
+                box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
             }
+            
+            .submit-btn:active {
+                transform: translateY(0);
+            }
+            
             .register-link {
                 text-align: center;
-                margin-top: 1.5rem;
+                margin-top: 2rem;
+                padding-top: 1.5rem;
+                border-top: 1px solid rgba(64, 64, 64, 0.5);
             }
+            
+            .register-link p {
+                color: #9ca3af;
+                font-size: 0.9rem;
+            }
+            
             .register-link a {
-                color: #4a6fa5;
+                color: #667eea;
                 text-decoration: none;
+                font-weight: 500;
+                transition: color 0.3s ease;
+            }
+            
+            .register-link a:hover {
+                color: #764ba2;
+            }
+            
+            /* Mobile responsiveness */
+            @media (max-width: 480px) {
+                .login-container {
+                    margin: 1rem;
+                    padding: 2rem;
+                }
+                
+                .logo h1 {
+                    font-size: 2rem;
+                }
             }
         </style>
     </head>
     <body>
+        <div class="background-pattern"></div>
         <div class="login-container">
             <div class="logo">
                 <h1>NeuroLM</h1>
@@ -1768,12 +1916,16 @@ async def login_page():
             </div>
             <form action="/login" method="post">
                 <div class="form-group">
-                    <label for="username">Username:</label>
-                    <input type="text" id="username" name="username" required>
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required>
                 </div>
                 <div class="form-group">
-                    <label for="password">Password:</label>
-                    <input type="password" id="password" name="password" required>
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+                <div class="remember-me">
+                    <input type="checkbox" id="remember_me" name="remember_me">
+                    <label for="remember_me">Keep me signed in for 30 days</label>
                 </div>
                 <button type="submit" class="submit-btn">Sign In</button>
             </form>
@@ -1788,7 +1940,8 @@ async def login_page():
 @app.post("/login")
 async def login_user(
     username: str = Form(...),
-    password: str = Form(...)
+    password: str = Form(...),
+    remember_me: bool = Form(False)
 ):
     """Handle user login"""
     user_id = verify_user_login(username, password)
@@ -1801,8 +1954,8 @@ async def login_user(
         </script>
         """)
     
-    # Create session in database
-    session_id = create_session(user_id, username)
+    # Create session in database with extended duration if remember me is checked
+    session_id = create_session(user_id, username, extended=remember_me)
     
     if not session_id:
         return HTMLResponse("""
@@ -1812,11 +1965,18 @@ async def login_user(
         </script>
         """)
     
-
-    
     # Redirect to chat with session
     response = RedirectResponse(url="/", status_code=302)
-    response.set_cookie(key="session_id", value=session_id, httponly=True)
+    
+    # Set cookie with extended max_age if remember me is checked
+    if remember_me:
+        # 30 days in seconds
+        max_age = 30 * 24 * 60 * 60
+        response.set_cookie(key="session_id", value=session_id, httponly=True, max_age=max_age)
+    else:
+        # Session cookie (expires when browser closes)
+        response.set_cookie(key="session_id", value=session_id, httponly=True)
+    
     return response
 
 # Serve the chat interface as the main page
