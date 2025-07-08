@@ -1927,54 +1927,90 @@ async def login_page():
             
             .submit-btn {
                 width: 100%;
-                padding: 0.875rem;
+                padding: 1rem 2rem;
                 background: linear-gradient(135deg, 
-                    rgba(102, 126, 234, 0.3) 0%, 
-                    rgba(118, 75, 162, 0.3) 50%, 
-                    rgba(168, 85, 247, 0.3) 100%);
-                backdrop-filter: blur(10px);
+                    rgba(20, 30, 60, 0.4) 0%, 
+                    rgba(40, 50, 100, 0.3) 50%, 
+                    rgba(20, 30, 60, 0.4) 100%);
+                backdrop-filter: blur(20px);
                 border: 2px solid transparent;
-                border-radius: 12px;
-                font-size: 1rem;
+                border-radius: 50px;
+                font-size: 1.1rem;
                 font-weight: 600;
                 cursor: pointer;
-                color: white;
+                color: #ffffff;
                 position: relative;
                 overflow: hidden;
-                transition: all 0.3s ease;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 box-shadow: 
-                    0 4px 15px rgba(102, 126, 234, 0.3),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                    0 0 0 1px rgba(0, 255, 255, 0.3),
+                    0 0 0 2px rgba(138, 43, 226, 0.2),
+                    0 0 0 3px rgba(0, 255, 127, 0.1),
+                    0 4px 20px rgba(0, 255, 255, 0.2),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+                background-clip: padding-box;
             }
             
             .submit-btn::before {
                 content: '';
                 position: absolute;
                 top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
+                left: 0;
+                right: 0;
+                bottom: 0;
                 background: linear-gradient(90deg, 
-                    transparent, 
-                    rgba(255, 255, 255, 0.3), 
-                    transparent);
-                transition: left 0.6s;
+                    rgba(0, 255, 255, 0.6) 0%,
+                    rgba(138, 43, 226, 0.6) 25%,
+                    rgba(0, 255, 127, 0.6) 50%,
+                    rgba(0, 191, 255, 0.6) 75%,
+                    rgba(0, 255, 255, 0.6) 100%);
+                background-size: 300% 300%;
+                border-radius: 50px;
+                padding: 2px;
+                mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+                mask-composite: exclude;
+                -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+                -webkit-mask-composite: source-out;
+                animation: iridescent-border 3s linear infinite;
+                z-index: -1;
             }
             
-            .submit-btn:hover::before {
-                left: 100%;
+            .submit-btn::after {
+                content: '';
+                position: absolute;
+                top: 20%;
+                left: 10%;
+                right: 10%;
+                height: 1px;
+                background: linear-gradient(90deg, 
+                    transparent, 
+                    rgba(255, 255, 255, 0.4), 
+                    transparent);
+                border-radius: 1px;
+                z-index: 1;
+            }
+            
+            @keyframes iridescent-border {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
             }
             
             .submit-btn:hover {
-                transform: translateY(-2px);
+                transform: translateY(-1px) scale(1.02);
                 box-shadow: 
-                    0 6px 20px rgba(102, 126, 234, 0.4),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-                border-color: rgba(102, 126, 234, 0.5);
+                    0 0 0 1px rgba(0, 255, 255, 0.5),
+                    0 0 0 2px rgba(138, 43, 226, 0.4),
+                    0 0 0 3px rgba(0, 255, 127, 0.3),
+                    0 6px 30px rgba(0, 255, 255, 0.3),
+                    0 0 40px rgba(138, 43, 226, 0.2),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                    inset 0 -1px 0 rgba(255, 255, 255, 0.2);
             }
             
             .submit-btn:active {
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
             
             .register-link {
