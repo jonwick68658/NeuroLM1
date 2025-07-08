@@ -550,6 +550,65 @@
                 font-size: 1rem;
             }
         }
+
+        /* Code styling for mobile */
+        pre {
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            position: relative;
+            color: #e5e7eb;
+        }
+
+        code {
+            background: #2a2a2a;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #e5e7eb;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e5e7eb;
+        }
+
+        .code-copy-button {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .code-copy-button:hover {
+            background: rgba(0,0,0,0.9);
+        }
+
+        .code-language-indicator {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            z-index: 10;
+            font-family: 'Courier New', monospace;
+        }
     </style>
 </head>
 <body>
@@ -863,6 +922,9 @@
             if (type === 'assistant') {
                 messageDiv.innerHTML = marked.parse(content);
                 
+                // Add code copy buttons and language indicators
+                addCodeCopyButtons(messageDiv);
+                
                 // Add action buttons for assistant messages
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'message-actions';
@@ -1008,6 +1070,88 @@
                     console.error('Error submitting feedback:', error);
                 }
             }
+        }
+
+        // Add code copy buttons and language indicators
+        function addCodeCopyButtons(container) {
+            const codeBlocks = container.querySelectorAll('pre');
+            codeBlocks.forEach((pre) => {
+                // Add copy button
+                const button = document.createElement('button');
+                button.className = 'code-copy-button';
+                button.textContent = 'Copy';
+                button.onclick = () => copyCodeBlock(pre, button);
+                pre.style.position = 'relative';
+                pre.appendChild(button);
+
+                // Add language indicator
+                const code = pre.querySelector('code');
+                if (code) {
+                    const language = detectLanguage(code);
+                    if (language) {
+                        const languageIndicator = document.createElement('div');
+                        languageIndicator.className = 'code-language-indicator';
+                        languageIndicator.textContent = language;
+                        pre.appendChild(languageIndicator);
+                    }
+                }
+            });
+        }
+
+        function detectLanguage(codeElement) {
+            // Try to detect language from class names (markdown syntax highlighting)
+            const classList = codeElement.classList;
+            for (let className of classList) {
+                if (className.startsWith('language-')) {
+                    return className.replace('language-', '');
+                }
+                if (className.startsWith('hljs-')) {
+                    return className.replace('hljs-', '');
+                }
+            }
+
+            // Simple heuristic-based detection
+            const code = codeElement.textContent;
+            if (code.includes('def ') || code.includes('import ') || code.includes('print(')) {
+                return 'python';
+            }
+            if (code.includes('function ') || code.includes('const ') || code.includes('let ')) {
+                return 'javascript';
+            }
+            if (code.includes('<!DOCTYPE') || code.includes('<html>')) {
+                return 'html';
+            }
+            if (code.includes('{') && code.includes('}') && (code.includes('"') || code.includes("'"))) {
+                return 'json';
+            }
+            if (code.includes('SELECT') || code.includes('FROM') || code.includes('WHERE')) {
+                return 'sql';
+            }
+            if (code.includes('#include') || code.includes('int main')) {
+                return 'cpp';
+            }
+            if (code.includes('public class') || code.includes('System.out')) {
+                return 'java';
+            }
+            if (code.includes('<?php') || code.includes('echo ')) {
+                return 'php';
+            }
+
+            return null; // Unknown language
+        }
+
+        function copyCodeBlock(codeElement, button) {
+            const code = codeElement.querySelector('code');
+            const text = code ? code.textContent : codeElement.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                button.textContent = 'Copied!';
+                setTimeout(() => {
+                    button.textContent = 'Copy';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
         }
 
         // Send message
