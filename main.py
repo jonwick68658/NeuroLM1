@@ -1523,7 +1523,8 @@ async def register_page():
                 align-items: center;
                 justify-content: center;
                 position: relative;
-                overflow: hidden;
+                overflow-y: auto;
+                padding: 1rem 0;
             }
             
             .background-pattern {
@@ -1587,21 +1588,25 @@ async def register_page():
             label {
                 display: block;
                 margin-bottom: 0.5rem;
-                color: #333;
+                color: #e5e7eb;
                 font-weight: 500;
             }
             input[type="text"], input[type="email"], input[type="password"] {
                 width: 100%;
-                padding: 0.75rem;
-                border: 2px solid #e1e5e9;
-                border-radius: 8px;
+                padding: 0.875rem 1rem;
+                background: rgba(42, 42, 42, 0.8);
+                border: 1px solid #404040;
+                border-radius: 12px;
                 font-size: 1rem;
-                transition: border-color 0.3s;
+                color: #ffffff;
+                transition: all 0.3s ease;
                 box-sizing: border-box;
             }
             input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus {
                 outline: none;
-                border-color: #4a6fa5;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                background: rgba(42, 42, 42, 1);
             }
             .submit-btn {
                 width: 100%;
@@ -1784,7 +1789,8 @@ async def login_page():
                 align-items: center;
                 justify-content: center;
                 position: relative;
-                overflow: hidden;
+                overflow-y: auto;
+                padding: 1rem 0;
             }
             
             /* Subtle brain pattern background */
