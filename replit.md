@@ -148,6 +148,7 @@ The application follows a FastAPI-based microservice architecture with the follo
 
 ## Changelog
 
+- July 8, 2025: **CODE DISPLAY ENHANCEMENT**: Implemented dark theme for code blocks with language indicators - black/dark gray backgrounds with white text, automatic language detection (python, javascript, json, etc.), and proper padding to prevent overlap between language badges and code content in both desktop and mobile interfaces
 - July 7, 2025: **UX POLISH**: Added professional hover tooltip to UF Score badge explaining system purpose and upcoming rewards (crypto, rate limits, early access, premium features) - positioned below badge with smooth fade animation for desktop users
 - July 7, 2025: **GAMIFICATION COMPLETE**: Fixed UF Score system with simple Neo4j-based approach - users get +1 point per AI response (only once) while maintaining ability to change feedback types for RIAI learning, preventing score gaming through uf_score_awarded boolean flag
 - July 7, 2025: **UX ENHANCEMENT**: Implemented pill-style feedback buttons replacing like/dislike - users can now give specific feedback with "Great response", "That worked" (for code), and "Not helpful" buttons, with differential scoring system (-3 to +2.5) and mathematical precision in RIAI H(t) function
