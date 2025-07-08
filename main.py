@@ -1559,10 +1559,27 @@ async def register_page():
                 margin-bottom: 2rem;
             }
             .logo h1 {
-                color: #4a6fa5;
+                background: linear-gradient(135deg, 
+                    #667eea 0%, 
+                    #764ba2 25%, 
+                    #667eea 50%, 
+                    #a855f7 75%, 
+                    #667eea 100%);
+                background-size: 200% 200%;
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
                 margin: 0;
                 font-size: 2rem;
                 font-weight: 700;
+                animation: iridescent 3s ease-in-out infinite;
+                filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.3));
+                text-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+            }
+            
+            @keyframes iridescent {
+                0%, 100% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
             }
             .form-group {
                 margin-bottom: 1.5rem;
@@ -1589,14 +1606,49 @@ async def register_page():
             .submit-btn {
                 width: 100%;
                 padding: 0.75rem;
-                background: #4a6fa5;
-                color: white;
-                border: none;
-                border-radius: 8px;
+                background: linear-gradient(135deg, 
+                    rgba(102, 126, 234, 0.3) 0%, 
+                    rgba(118, 75, 162, 0.3) 50%, 
+                    rgba(168, 85, 247, 0.3) 100%);
+                backdrop-filter: blur(10px);
+                border: 2px solid transparent;
+                border-radius: 12px;
                 font-size: 1rem;
                 font-weight: 600;
                 cursor: pointer;
-                transition: background 0.3s;
+                color: white;
+                position: relative;
+                overflow: hidden;
+                transition: all 0.3s ease;
+                box-shadow: 
+                    0 4px 15px rgba(102, 126, 234, 0.3),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            }
+            
+            .submit-btn::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, 
+                    transparent, 
+                    rgba(255, 255, 255, 0.3), 
+                    transparent);
+                transition: left 0.6s;
+            }
+            
+            .submit-btn:hover::before {
+                left: 100%;
+            }
+            
+            .submit-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 
+                    0 6px 20px rgba(102, 126, 234, 0.4),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                border-color: rgba(102, 126, 234, 0.5);
             }
             .submit-btn:hover {
                 background: #3a5a95;
@@ -1753,12 +1805,23 @@ async def login_page():
             
             /* Floating login card */
             .login-container {
-                background: rgba(26, 26, 26, 0.95);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(102, 126, 234, 0.3);
+                background: linear-gradient(135deg, 
+                    rgba(26, 26, 26, 0.85) 0%, 
+                    rgba(40, 40, 40, 0.85) 50%, 
+                    rgba(26, 26, 26, 0.85) 100%);
+                backdrop-filter: blur(20px);
+                border: 2px solid;
+                border-image: linear-gradient(135deg, 
+                    rgba(102, 126, 234, 0.6) 0%, 
+                    rgba(118, 75, 162, 0.6) 25%, 
+                    rgba(168, 85, 247, 0.6) 50%, 
+                    rgba(102, 126, 234, 0.6) 100%) 1;
                 border-radius: 20px;
                 padding: 2.5rem;
-                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+                box-shadow: 
+                    0 20px 40px rgba(0, 0, 0, 0.4),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                    0 0 0 1px rgba(102, 126, 234, 0.3);
                 width: 100%;
                 max-width: 420px;
                 position: relative;
