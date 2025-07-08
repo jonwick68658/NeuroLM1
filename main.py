@@ -1840,7 +1840,13 @@ async def login_page():
             }
             
             .logo h1 {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, 
+                    #667eea 0%, 
+                    #764ba2 25%, 
+                    #667eea 50%, 
+                    #a855f7 75%, 
+                    #667eea 100%);
+                background-size: 200% 200%;
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 background-clip: text;
@@ -1848,6 +1854,14 @@ async def login_page():
                 font-size: 2.5rem;
                 font-weight: 700;
                 letter-spacing: -0.025em;
+                animation: iridescent 3s ease-in-out infinite;
+                filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.3));
+                text-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+            }
+            
+            @keyframes iridescent {
+                0%, 100% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
             }
             
             .logo p {
@@ -1914,20 +1928,49 @@ async def login_page():
             .submit-btn {
                 width: 100%;
                 padding: 0.875rem;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
+                background: linear-gradient(135deg, 
+                    rgba(102, 126, 234, 0.3) 0%, 
+                    rgba(118, 75, 162, 0.3) 50%, 
+                    rgba(168, 85, 247, 0.3) 100%);
+                backdrop-filter: blur(10px);
+                border: 2px solid transparent;
                 border-radius: 12px;
                 font-size: 1rem;
                 font-weight: 600;
                 cursor: pointer;
+                color: white;
+                position: relative;
+                overflow: hidden;
                 transition: all 0.3s ease;
-                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+                box-shadow: 
+                    0 4px 15px rgba(102, 126, 234, 0.3),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            }
+            
+            .submit-btn::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, 
+                    transparent, 
+                    rgba(255, 255, 255, 0.3), 
+                    transparent);
+                transition: left 0.6s;
+            }
+            
+            .submit-btn:hover::before {
+                left: 100%;
             }
             
             .submit-btn:hover {
-                transform: translateY(-1px);
-                box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+                transform: translateY(-2px);
+                box-shadow: 
+                    0 6px 20px rgba(102, 126, 234, 0.4),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                border-color: rgba(102, 126, 234, 0.5);
             }
             
             .submit-btn:active {
