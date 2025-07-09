@@ -1687,7 +1687,7 @@ async def register_page():
     <body>
         <div class="register-container">
             <div class="logo">
-                <img src="/static/neurolm-welcome-image.png" alt="NeuroLM" style="max-width: 280px; height: auto; mix-blend-mode: screen; filter: brightness(1.2) contrast(1.1);">
+                <img src="/static/neurolm-glass-logo.png" alt="NeuroLM" style="max-width: 240px; height: auto; filter: brightness(1.1) contrast(1.05);">
                 <p>Create Your Account</p>
             </div>
             <form action="/register" method="post" onsubmit="return validateForm()">
@@ -2070,7 +2070,7 @@ async def login_page():
         <div class="background-pattern"></div>
         <div class="login-container">
             <div class="logo">
-                <img src="/static/neurolm-welcome-image.png" alt="NeuroLM" style="max-width: 280px; height: auto; mix-blend-mode: screen; filter: brightness(1.2) contrast(1.1);">
+                <img src="/static/neurolm-glass-logo.png" alt="NeuroLM" style="max-width: 240px; height: auto; filter: brightness(1.1) contrast(1.05);">
                 <p>Sign in to your account</p>
             </div>
             <form action="/login" method="post">
