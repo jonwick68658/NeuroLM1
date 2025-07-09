@@ -1577,6 +1577,13 @@ async def register_page():
                 filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.3));
                 text-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
             }
+            .logo p {
+                color: #ffffff;
+                font-size: 1.2rem;
+                font-weight: 500;
+                margin-top: 0.5rem;
+                margin-bottom: 0;
+            }
             
             @keyframes iridescent {
                 0%, 100% { background-position: 0% 50%; }
