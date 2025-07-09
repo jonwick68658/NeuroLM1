@@ -1578,7 +1578,7 @@ async def register_page():
                 text-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
             }
             .logo p {
-                color: #ffffff;
+                color: #ffffff !important;
                 font-size: 1.2rem;
                 font-weight: 500;
                 margin-top: 0.5rem;
@@ -1669,8 +1669,12 @@ async def register_page():
                 text-align: center;
                 margin-top: 1.5rem;
             }
+            .login-link p {
+                color: #e5e7eb;
+                font-size: 0.9rem;
+            }
             .login-link a {
-                color: #4a6fa5;
+                color: #667eea;
                 text-decoration: none;
             }
             .error {
