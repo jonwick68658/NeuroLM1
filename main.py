@@ -1543,7 +1543,7 @@ async def register_page():
             }
             
             .register-container {
-                background: rgba(26, 26, 26, 0.95);
+                background: rgba(0, 0, 0, 0.95);
                 backdrop-filter: blur(10px);
                 border: 1px solid rgba(102, 126, 234, 0.3);
                 border-radius: 20px;
@@ -1687,7 +1687,7 @@ async def register_page():
     <body>
         <div class="register-container">
             <div class="logo">
-                <img src="/static/neurolm-glass-logo.png" alt="NeuroLM" style="max-width: 240px; height: auto; filter: brightness(1.1) contrast(1.05);">
+                <img src="/static/neurolm-glass-logo.png" alt="NeuroLM" style="max-width: 240px; height: auto;">
                 <p>Create Your Account</p>
             </div>
             <form action="/register" method="post" onsubmit="return validateForm()">
@@ -1822,10 +1822,7 @@ async def login_page():
             
             /* Floating login card */
             .login-container {
-                background: linear-gradient(135deg, 
-                    rgba(26, 26, 26, 0.85) 0%, 
-                    rgba(40, 40, 40, 0.85) 50%, 
-                    rgba(26, 26, 26, 0.85) 100%);
+                background: rgba(0, 0, 0, 0.95);
                 backdrop-filter: blur(20px);
                 border: 2px solid;
                 border-image: linear-gradient(135deg, 
@@ -2070,7 +2067,7 @@ async def login_page():
         <div class="background-pattern"></div>
         <div class="login-container">
             <div class="logo">
-                <img src="/static/neurolm-glass-logo.png" alt="NeuroLM" style="max-width: 240px; height: auto; filter: brightness(1.1) contrast(1.05);">
+                <img src="/static/neurolm-glass-logo.png" alt="NeuroLM" style="max-width: 240px; height: auto;">
                 <p>Sign in to your account</p>
             </div>
             <form action="/login" method="post">
