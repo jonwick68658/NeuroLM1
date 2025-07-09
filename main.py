@@ -2135,6 +2135,12 @@ async def login_user(
     
     return response
 
+# Landing page
+@app.get("/landing")
+async def serve_landing():
+    """Serve the landing page"""
+    return FileResponse("landing.html")
+
 # Serve the chat interface as the main page
 @app.get("/")
 async def serve_chat(request: Request):
