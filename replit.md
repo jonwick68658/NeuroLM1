@@ -98,8 +98,9 @@ The application follows a FastAPI-based microservice architecture with the follo
 ### API Keys Required
 - `OPENROUTER_API_KEY`: Access to AI models through OpenRouter
 - `OPENAI_API_KEY`: Text embedding generation
-- `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`: Neo4j database connection
+- `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`: Neo4j database connection
 - `DATABASE_URL`: PostgreSQL connection string
+- `SECRET_KEY`: FastAPI session security key
 
 ## Deployment Strategy
 
