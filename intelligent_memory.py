@@ -206,7 +206,14 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
         """Setup Neo4j vector index for fast semantic search"""
         try:
             with self.driver.session() as session:
-                # Create vector index for memory nodes
+                # Drop existing index if it exists with wrong dimensions
+                try:
+                    session.run("DROP INDEX memory_embedding_index IF EXISTS")
+                    print("🔄 Dropped existing vector index")
+                except:
+                    pass
+                
+                # Create vector index for memory nodes with correct dimensions
                 session.run("""
                     CREATE VECTOR INDEX memory_embedding_index IF NOT EXISTS
                     FOR (m:IntelligentMemory) ON (m.embedding)
@@ -215,7 +222,7 @@ Return only the numeric score as a decimal (e.g., 7.5):"""
                         `vector.similarity_function`: 'cosine'
                     }}
                 """)
-                print("✅ Vector index created successfully")
+                print("✅ Vector index created successfully with 1536 dimensions")
         except Exception as e:
             print(f"❌ Vector index setup failed: {e}")
     
