@@ -10,10 +10,8 @@ import httpx
 import hashlib
 import uuid
 import psycopg2
-import psycopg2.pool
 import asyncio
 from typing import Optional, List, Dict, Any
-import threading
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 
@@ -23,71 +21,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize password context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Simple Database Connection Pool
-class DatabaseConnectionPool:
-    """Simple connection pool for PostgreSQL connections"""
-    
-    def __init__(self, min_connections=2, max_connections=10):
-        self.database_url = os.getenv("DATABASE_URL")
-        self.min_connections = min_connections
-        self.max_connections = max_connections
-        self.pool = None
-        self.lock = threading.Lock()
-        self._initialize_pool()
-    
-    def _initialize_pool(self):
-        """Initialize the connection pool"""
-        try:
-            self.pool = psycopg2.pool.ThreadedConnectionPool(
-                self.min_connections,
-                self.max_connections,
-                self.database_url
-            )
-            print(f"✅ Database connection pool initialized ({self.min_connections}-{self.max_connections} connections)")
-        except Exception as e:
-            print(f"❌ Failed to initialize connection pool: {e}")
-            self.pool = None
-    
-    def get_connection(self):
-        """Get a connection from the pool"""
-        if not self.pool:
-            # Fallback to direct connection if pool failed
-            return psycopg2.connect(self.database_url)
-        
-        try:
-            with self.lock:
-                return self.pool.getconn()
-        except Exception as e:
-            print(f"Warning: Pool connection failed, using direct connection: {e}")
-            return psycopg2.connect(self.database_url)
-    
-    def return_connection(self, conn):
-        """Return a connection to the pool"""
-        if not self.pool:
-            # Direct connection, just close it
-            conn.close()
-            return
-        
-        try:
-            with self.lock:
-                self.pool.putconn(conn)
-        except Exception as e:
-            print(f"Warning: Failed to return connection to pool: {e}")
-            conn.close()
-    
-    def close_pool(self):
-        """Close all connections in the pool"""
-        if self.pool:
-            try:
-                with self.lock:
-                    self.pool.closeall()
-                    print("✅ Database connection pool closed")
-            except Exception as e:
-                print(f"Error closing connection pool: {e}")
-
-# Initialize global connection pool
-db_pool = DatabaseConnectionPool()
 
 # Create FastAPI application
 app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
@@ -240,22 +173,8 @@ async def shutdown_event():
 # Note: Sessions cleared on restart - users need to re-login
 
 def get_db_connection():
-    """Get PostgreSQL database connection from pool"""
-    return db_pool.get_connection()
-
-class DatabaseConnection:
-    """Context manager for database connections"""
-    
-    def __init__(self):
-        self.conn = None
-    
-    def __enter__(self):
-        self.conn = db_pool.get_connection()
-        return self.conn
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.conn:
-            db_pool.return_connection(self.conn)
+    """Get PostgreSQL database connection"""
+    return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 def init_file_storage():
     """Initialize all database tables"""
