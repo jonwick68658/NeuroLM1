@@ -1,0 +1,36 @@
+ryan_todd@cloudshell:~/neurolm-gcp/neurolm_replit_files_original (neurolm)$ pwd
+/home/ryan_todd/neurolm-gcp/neurolm_replit_files_original
+ryan_todd@cloudshell:~/neurolm-gcp/neurolm_replit_files_original (neurolm)$ ls -la
+total 380
+drwxr-xr-x 3 ryan_todd ryan_todd   4096 Jul 11 15:20 .
+drwxrwxr-x 3 ryan_todd ryan_todd   4096 Jul 11 15:20 ..
+-rw-r--r-- 1 ryan_todd ryan_todd  12370 Jul 11 15:20 background_riai.py
+-rw-r--r-- 1 ryan_todd ryan_todd 128687 Jul 11 15:20 chat.html
+-rw-r--r-- 1 ryan_todd ryan_todd    913 Jul 11 15:20 cloudbuild.yaml
+-rw-r--r-- 1 ryan_todd ryan_todd    436 Jul 11 15:20 Dockerfile.gcp
+-rw-r--r-- 1 ryan_todd ryan_todd   5219 Jul 11 15:20 intelligent_memory_dual.py
+-rw-r--r-- 1 ryan_todd ryan_todd   3631 Jul 11 15:20 main_gcp.py
+-rw-r--r-- 1 ryan_todd ryan_todd 123604 Jul 11 15:20 main.py
+-rw-r--r-- 1 ryan_todd ryan_todd  55993 Jul 11 15:20 mobile.html
+-rw-r--r-- 1 ryan_todd ryan_todd   4585 Jul 11 15:20 model_service.py
+-rw-r--r-- 1 ryan_todd ryan_todd  16217 Jul 11 15:20 postgresql_memory_adapter.py
+drwxr-xr-x 2 ryan_todd ryan_todd   4096 Jul 11 15:20 static
+ryan_todd@cloudshell:~/neurolm-gcp/neurolm_replit_files_original (neurolm)$ ^C
+ryan_todd@cloudshell:~/neurolm-gcp/neurolm_replit_files_original (neurolm)$ cd neurolm-gcp
+-bash: cd: neurolm-gcp: No such file or directory
+ryan_todd@cloudshell:~/neurolm-gcp/neurolm_replit_files_original (neurolm)$ ls -la
+total 380
+drwxr-xr-x 3 ryan_todd ryan_todd   4096 Jul 11 15:20 .
+drwxrwxr-x 3 ryan_todd ryan_todd   4096 Jul 11 15:20 ..
+-rw-r--r-- 1 ryan_todd ryan_todd  12370 Jul 11 15:20 background_riai.py
+-rw-r--r-- 1 ryan_todd ryan_todd 128687 Jul 11 15:20 chat.html
+-rw-r--r-- 1 ryan_todd ryan_todd    913 Jul 11 15:20 cloudbuild.yaml
+-rw-r--r-- 1 ryan_todd ryan_todd    436 Jul 11 15:20 Dockerfile.gcp
+-rw-r--r-- 1 ryan_todd ryan_todd   5219 Jul 11 15:20 intelligent_memory_dual.py
+-rw-r--r-- 1 ryan_todd ryan_todd   3631 Jul 11 15:20 main_gcp.py
+-rw-r--r-- 1 ryan_todd ryan_todd 123604 Jul 11 15:20 main.py
+-rw-r--r-- 1 ryan_todd ryan_todd  55993 Jul 11 15:20 mobile.html
+-rw-r--r-- 1 ryan_todd ryan_todd   4585 Jul 11 15:20 model_service.py
+-rw-r--r-- 1 ryan_todd ryan_todd  16217 Jul 11 15:20 postgresql_memory_adapter.py
+drwxr-xr-x 2 ryan_todd ryan_todd   4096 Jul 11 15:20 static
+ryan_todd@cloudshell:~/neurolm-gcp/neurolm_replit_files_original (neurolm)$ 
