@@ -39,7 +39,9 @@
 - [x] GCP project created and configured
 - [x] Required APIs enabled (Cloud SQL, Cloud Run, Cloud Build, Artifact Registry, Cloud Storage, Compute Engine)
 - [x] Billing account linked
-- [ ] Cloud SQL instance running with pgvector
+- [x] Cloud SQL instance running with pgvector
+- [x] Database schema created with vector support
+- [x] pgvector extension installed and tested
 - [ ] Cloud Run service deployed
 - [ ] Environment variables configured
 - [ ] Basic connectivity tests passing
@@ -51,6 +53,9 @@
 - Status: ✅ Cloud SQL instance created and running
 - Database: neurolm database created
 - User: neurolm_user created
+- Schema: All tables created with vector support
+- Extensions: pgvector installed and functioning
+- Indexes: HNSW vector index created for similarity search
 
 ### Phase 2: Database Migration & Code Adaptation (Days 4-7)
 **Status**: 🟡 Not Started
