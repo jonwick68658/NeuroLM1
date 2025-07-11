@@ -56,6 +56,7 @@
 - Schema: All tables created with vector support
 - Extensions: pgvector installed and functioning
 - Indexes: HNSW vector index created for similarity search
+- Vector test: Corrected syntax for PostgreSQL vector format ([1,2,3] not 1,2,3)
 
 ### Phase 2: Database Migration & Code Adaptation (Days 4-7)
 **Status**: 🟡 Not Started
