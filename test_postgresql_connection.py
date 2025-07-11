@@ -11,8 +11,19 @@ from openai import OpenAI
 async def test_postgresql_connection():
     """Test PostgreSQL connection and vector operations"""
     
-    # Replace with your actual connection details
-    DATABASE_URL = "postgresql://neurolm_user:YOUR_PASSWORD@34.44.233.216:5432/neurolm"
+    # GCP Cloud SQL database URL
+    GCP_DATABASE_URL = "postgresql://neurolm_user:YOUR_PASSWORD@34.44.233.216:5432/neurolm"
+    
+    print("⚠️  Please replace YOUR_PASSWORD with your actual neurolm_user password")
+    print("⚠️  This test connects to your GCP Cloud SQL database, not local Replit DB")
+    print()
+    
+    # Ask user for database URL
+    if "YOUR_PASSWORD" in GCP_DATABASE_URL:
+        print("❌ Please set your GCP database password in the script first")
+        return False
+    
+    DATABASE_URL = GCP_DATABASE_URL
     
     print("Testing PostgreSQL connection...")
     
@@ -25,9 +36,20 @@ async def test_postgresql_connection():
         result = await conn.fetchval("SELECT version()")
         print(f"✅ PostgreSQL version: {result}")
         
-        # Test pgvector
-        result = await conn.fetchval("SELECT '[1,2,3]'::vector <-> '[1,2,4]'::vector")
-        print(f"✅ pgvector working: cosine distance = {result}")
+        # Check current database
+        db_name = await conn.fetchval("SELECT current_database()")
+        print(f"📊 Connected to database: {db_name}")
+        
+        # Check if pgvector extension exists
+        ext_check = await conn.fetchval("SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector'")
+        print(f"📊 pgvector extension installed: {ext_check > 0}")
+        
+        if ext_check > 0:
+            # Test pgvector
+            result = await conn.fetchval("SELECT '[1,2,3]'::vector <-> '[1,2,4]'::vector")
+            print(f"✅ pgvector working: cosine distance = {result}")
+        else:
+            print("❌ pgvector extension not found in this database")
         
         # Test table existence
         tables = await conn.fetch("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
