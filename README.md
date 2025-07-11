@@ -21,8 +21,7 @@ The world's first operational Recursive Intelligence AI (RIAI) system that learn
 ### Prerequisites
 
 - Python 3.11+
-- PostgreSQL database
-- Neo4j graph database
+- PostgreSQL database with pgvector extension
 - OpenRouter API access
 - OpenAI API key
 
@@ -39,10 +38,9 @@ The world's first operational Recursive Intelligence AI (RIAI) system that learn
    ```env
    OPENROUTER_API_KEY=your_key_here
    OPENAI_API_KEY=your_key_here
-   NEO4J_URI=your_neo4j_connection
-   NEO4J_USER=neo4j
-   NEO4J_PASSWORD=your_password
    DATABASE_URL=your_postgresql_url
+   USE_POSTGRESQL=true
+   SECRET_KEY=your_secret_key
    ```
 
 3. **Launch**
@@ -59,7 +57,7 @@ The world's first operational Recursive Intelligence AI (RIAI) system that learn
 ### Core Components
 
 - **Intelligence Engine**: RIAI mathematical framework for continuous learning
-- **Memory Graph**: Neo4j-powered semantic memory with vector embeddings
+- **Memory System**: PostgreSQL with pgvector for semantic memory and vector embeddings
 - **User Management**: PostgreSQL-based authentication and data persistence
 - **AI Gateway**: Multi-provider access through OpenRouter integration
 - **Tool Factory**: Autonomous function generation and secure execution
@@ -159,8 +157,7 @@ neurolm/
 ### Key Technologies
 
 - **RIAI Framework**: Proprietary self-improvement mathematics
-- **Neo4j**: Graph database for semantic memory
-- **PostgreSQL**: User data and session management  
+- **PostgreSQL + pgvector**: Vector database for semantic memory and user management
 - **FastAPI**: High-performance web framework
 - **OpenRouter**: Multi-provider AI model access
 - **Progressive Web App**: Mobile-first experience
@@ -196,7 +193,7 @@ Optimized for one-click Replit deployment:
 - **Horizontal Scaling**: Stateless architecture for cloud deployment
 - **Security**: All credentials externalized to environment variables
 - **Monitoring**: Comprehensive logging and error handling
-- **Database**: Compatible with managed PostgreSQL and Neo4j Aura
+- **Database**: Compatible with managed PostgreSQL with pgvector extension
 
 ## 📈 Recent Breakthroughs
 
@@ -228,6 +225,6 @@ MIT License - Open source with commercial use permitted.
 
 **NeuroLM: Where artificial intelligence becomes truly intelligent.**
 
-*Built with FastAPI, Neo4j, proprietary RIAI mathematics, and OpenRouter AI*
+*Built with FastAPI, PostgreSQL + pgvector, proprietary RIAI mathematics, and OpenRouter AI*
 
 🔗 **Coming Soon: API access for developers to build the next generation of autonomous agents**
