@@ -1,6 +1,6 @@
 """
-Dual Backend Intelligent Memory System
-Supports both Neo4j (current) and PostgreSQL (new) backends
+PostgreSQL Intelligent Memory System
+PostgreSQL backend for NeuroLM memory management
 """
 
 import os
@@ -19,14 +19,14 @@ class DualIntelligentMemorySystem:
     """PostgreSQL-based intelligent memory system (formerly dual backend)"""
     
     def __init__(self):
-        # Always use PostgreSQL - Neo4j support removed
+        # PostgreSQL backend
         self.backend = MemoryBackend.POSTGRESQL
         self.postgresql_system = PostgreSQLMemorySystem()
         self.active_system = self.postgresql_system
     
     def _determine_backend(self) -> MemoryBackend:
         """Determine which backend to use based on environment"""
-        # Always use PostgreSQL - Neo4j support removed
+        # PostgreSQL backend
         return MemoryBackend.POSTGRESQL
     
     async def store_memory(self, content: str, user_id: str, conversation_id: Optional[str], 

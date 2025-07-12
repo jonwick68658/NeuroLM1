@@ -1,6 +1,6 @@
 """
 NeuroLM Main Application - GCP Version
-Supports both Neo4j and PostgreSQL backends based on environment variables
+Uses PostgreSQL backend for memory management
 """
 
 import os
@@ -22,7 +22,7 @@ from intelligent_memory_dual import DualIntelligentMemorySystem
 
 # Override the intelligent memory system with dual backend
 print("🚀 Starting NeuroLM GCP version...")
-print(f"🔧 Backend mode: {'PostgreSQL' if os.getenv('USE_POSTGRESQL') == 'true' else 'Neo4j'}")
+print(f"🔧 Backend mode: PostgreSQL")
 
 # Replace the global intelligent memory system
 intelligent_memory_system = DualIntelligentMemorySystem()

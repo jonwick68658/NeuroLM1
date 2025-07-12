@@ -1,6 +1,6 @@
 """
 PostgreSQL Memory Adapter for NeuroLM
-Replaces Neo4j with PostgreSQL + pgvector for intelligent memory storage
+PostgreSQL + pgvector for intelligent memory storage
 """
 
 import os

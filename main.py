@@ -1003,7 +1003,7 @@ def get_subtopic_deletion_info(user_id: str, topic: str, subtopic: str) -> Dict:
         return {'exists': False}
 
 def delete_topic_and_data(user_id: str, topic: str) -> bool:
-    """Delete a topic and all associated data from both PostgreSQL and Neo4j"""
+    """Delete a topic and all associated data from PostgreSQL"""
     try:
         topic = topic.lower().strip()
         
@@ -1046,21 +1046,14 @@ def delete_topic_and_data(user_id: str, topic: str) -> bool:
                 WHERE user_id = %s AND topic = %s
             ''', (user_id, topic))
             
+            # 4. Delete related intelligent memories
+            cursor.execute('''
+                DELETE FROM intelligent_memories
+                WHERE user_id = %s AND conversation_id = ANY(%s)
+            ''', (user_id, conversation_ids))
+            
             # Commit PostgreSQL transaction
             conn.commit()
-            
-            # Delete from Neo4j - memories associated with these conversations
-            from intelligent_memory import IntelligentMemorySystem
-            memory_system = IntelligentMemorySystem()
-            
-            with memory_system.driver.session() as session:
-                for conv_id in conversation_ids:
-                    session.run("""
-                        MATCH (m:IntelligentMemory {user_id: $user_id, conversation_id: $conversation_id})
-                        DELETE m
-                    """, {'user_id': user_id, 'conversation_id': conv_id})
-            
-            memory_system.close()
             
             cursor.close()
             conn.close()
@@ -1079,7 +1072,7 @@ def delete_topic_and_data(user_id: str, topic: str) -> bool:
         return False
 
 def delete_subtopic_and_data(user_id: str, topic: str, subtopic: str) -> bool:
-    """Delete a subtopic and all associated data from both PostgreSQL and Neo4j"""
+    """Delete a subtopic and all associated data from PostgreSQL"""
     try:
         topic = topic.lower().strip()
         subtopic = subtopic.lower().strip()
@@ -1117,21 +1110,14 @@ def delete_subtopic_and_data(user_id: str, topic: str, subtopic: str) -> bool:
                 WHERE user_id = %s AND topic = %s AND sub_topic = %s
             ''', (user_id, topic, subtopic))
             
+            # 3. Delete related intelligent memories
+            cursor.execute('''
+                DELETE FROM intelligent_memories
+                WHERE user_id = %s AND conversation_id = ANY(%s)
+            ''', (user_id, conversation_ids))
+            
             # Commit PostgreSQL transaction
             conn.commit()
-            
-            # Delete from Neo4j - memories associated with these conversations
-            from intelligent_memory import IntelligentMemorySystem
-            memory_system = IntelligentMemorySystem()
-            
-            with memory_system.driver.session() as session:
-                for conv_id in conversation_ids:
-                    session.run("""
-                        MATCH (m:IntelligentMemory {user_id: $user_id, conversation_id: $conversation_id})
-                        DELETE m
-                    """, {'user_id': user_id, 'conversation_id': conv_id})
-            
-            memory_system.close()
             
             cursor.close()
             conn.close()
@@ -1419,7 +1405,7 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 def create_user_in_db(first_name: str, username: str, email: str, password_hash: str) -> bool:
-    """Create user in both PostgreSQL and Neo4j databases"""
+    """Create user in PostgreSQL database"""
     user_id = str(uuid.uuid4())
     
     try:
@@ -1441,7 +1427,7 @@ def create_user_in_db(first_name: str, username: str, email: str, password_hash:
         cursor.close()
         conn.close()
         
-        # Neo4j user creation removed - handled by intelligent_memory when needed
+        # User creation completed in PostgreSQL
         
         return True
         
@@ -2658,32 +2644,15 @@ async def delete_conversation(conversation_id: str, request: Request):
         if not conversation_exists:
             raise HTTPException(status_code=404, detail="Conversation not found")
         
-        # Delete from Neo4j intelligent memory system
-        try:
-            if intelligent_memory_system:
-                with intelligent_memory_system.driver.session() as session:
-                    result = session.run("""
-                        MATCH (m:IntelligentMemory)
-                        WHERE m.conversation_id = $conversation_id AND m.user_id = $user_id
-                        DELETE m
-                        RETURN count(*) as deleted_count
-                    """, {
-                        'conversation_id': conversation_id,
-                        'user_id': user_id
-                    })
-                    memory_result = result.single()
-                    deleted_memories = memory_result['deleted_count'] if memory_result else 0
-                    print(f"Deleted {deleted_memories} memories from Neo4j")
-        except Exception as e:
-            print(f"Error deleting memories from Neo4j: {e}")
-            # Continue with PostgreSQL deletion even if Neo4j fails
-        
-        # Delete from PostgreSQL
+        # Delete from PostgreSQL memory system and conversations
         conn = get_db_connection()
         cursor = conn.cursor()
         
         # Delete conversation messages first (foreign key constraint)
         cursor.execute("DELETE FROM conversation_messages WHERE conversation_id = %s", (conversation_id,))
+        
+        # Delete related intelligent memories
+        cursor.execute("DELETE FROM intelligent_memories WHERE conversation_id = %s AND user_id = %s", (conversation_id, user_id))
         
         # Delete the conversation
         cursor.execute("DELETE FROM conversations WHERE id = %s AND user_id = %s", (conversation_id, user_id))
@@ -2703,13 +2672,19 @@ async def delete_conversation(conversation_id: str, request: Request):
 # Clear database endpoint
 @app.post("/api/clear-memory")
 async def clear_memory_database():
-    """Clear all data from Neo4j database"""
+    """Clear all data from PostgreSQL memory database"""
     try:
-        from intelligent_memory import intelligent_memory
-        with intelligent_memory.driver.session() as session:
-            # Delete all nodes and relationships
-            session.run("MATCH (n) DETACH DELETE n")
-            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Clear all intelligent memories
+        cursor.execute("DELETE FROM intelligent_memories")
+        cursor.execute("DELETE FROM memory_quality_cache")
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
         return {"status": "success", "message": "All memory data cleared from database"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error clearing database: {str(e)}")
@@ -2932,7 +2907,7 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
         }
         feedback_score = feedback_scores[feedback_request.feedback_type]
         
-        # Update memory with human feedback using Neo4j node ID directly
+        # Update memory with human feedback using PostgreSQL memory ID
         print(f"DEBUG: Feedback endpoint called with message_id={feedback_request.message_id}, type={feedback_request.feedback_type}, user_id={user_id}")
         success = await intelligent_memory_system.update_human_feedback_by_node_id(
             node_id=feedback_request.message_id,
@@ -2945,52 +2920,44 @@ async def submit_feedback(feedback_request: FeedbackRequest, request: Request):
             # Calculate final quality score using f(R(t), H(t))
             await intelligent_memory_system.update_final_quality_score(
                 memory_id=feedback_request.message_id,
-                user_id=user_id,
-                use_message_id=False  # Now using Neo4j node ID directly
+                user_id=user_id
             )
             
             # Increment user feedback score by 1 (only if not already awarded for this message)
-            if intelligent_memory_system:
-                try:
-                    # Check if UF Score already awarded for this Neo4j node
-                    with intelligent_memory_system.driver.session() as session:
-                        result = session.run("""
-                            MATCH (m:IntelligentMemory {id: $node_id, user_id: $user_id})
-                            RETURN m.uf_score_awarded AS awarded
-                        """, {
-                            'node_id': feedback_request.message_id,
-                            'user_id': user_id
-                        })
-                        
-                        record = result.single()
-                        if record and not record['awarded']:
-                            # Award the UF Score point
-                            conn = get_db_connection()
-                            cursor = conn.cursor()
-                            cursor.execute(
-                                "UPDATE users SET feedback_score = feedback_score + 1 WHERE id = %s",
-                                (user_id,)
-                            )
-                            conn.commit()
-                            cursor.close()
-                            conn.close()
-                            
-                            # Mark this Neo4j node as having awarded UF Score
-                            session.run("""
-                                MATCH (m:IntelligentMemory {id: $node_id, user_id: $user_id})
-                                SET m.uf_score_awarded = true
-                            """, {
-                                'node_id': feedback_request.message_id,
-                                'user_id': user_id
-                            })
-                            
-                            print(f"DEBUG: UF Score awarded for node {feedback_request.message_id}")
-                        else:
-                            print(f"DEBUG: UF Score already awarded for node {feedback_request.message_id}, skipping increment")
-                            
-                except Exception as e:
-                    print(f"ERROR: Failed to update user feedback score: {e}")
-                    # Don't fail the entire request for score update issues
+            try:
+                # Check if UF Score already awarded for this PostgreSQL memory
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT uf_score_awarded FROM intelligent_memories 
+                    WHERE id = %s AND user_id = %s
+                """, (feedback_request.message_id, user_id))
+                
+                result = cursor.fetchone()
+                if result and not result[0]:
+                    # Award the UF Score point
+                    cursor.execute(
+                        "UPDATE users SET feedback_score = feedback_score + 1 WHERE id = %s",
+                        (user_id,)
+                    )
+                    
+                    # Mark this PostgreSQL memory as having awarded UF Score
+                    cursor.execute("""
+                        UPDATE intelligent_memories 
+                        SET uf_score_awarded = true 
+                        WHERE id = %s AND user_id = %s
+                    """, (feedback_request.message_id, user_id))
+                    
+                    conn.commit()
+                    print(f"DEBUG: UF Score awarded for memory {feedback_request.message_id}")
+                else:
+                    print(f"DEBUG: UF Score already awarded for memory {feedback_request.message_id}, skipping increment")
+                
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                print(f"ERROR: Failed to update user feedback score: {e}")
+                # Don't fail the entire request for score update issues
             
             return {
                 "status": "success",
