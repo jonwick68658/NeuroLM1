@@ -213,7 +213,7 @@ class BackgroundRIAIService:
                 """, (memory_id,))
                 
                 h_t_result = cursor.fetchone()
-                h_t_score = h_t_result[0] if h_t_result else None
+                h_t_score = h_t_result[0] if h_t_result and h_t_result[0] is not None else None
                 
                 # Calculate final quality score using f(R(t), H(t))
                 final_quality_score = self.calculate_final_quality_score(r_t_score, h_t_score)
