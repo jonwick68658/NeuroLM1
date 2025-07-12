@@ -74,8 +74,8 @@ An advanced AI chat system featuring recursive intelligence, unlimited context m
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/neurolm.git
-   cd neurolm
+   git clone https://github.com/jonwick68658/NeuroLM1.git
+   cd NeuroLM1
    ```
 
 2. **Install dependencies**
