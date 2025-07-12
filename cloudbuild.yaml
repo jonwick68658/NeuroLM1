@@ -34,5 +34,20 @@ steps:
       - '--update-secrets'
       - 'DATABASE_URL=db-password:latest' # THE SECURE WAY: Use the secret we just created
 
+  # Ensure public access is explicitly set (fixes "Forbidden" error)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'services'
+      - 'add-iam-policy-binding'
+      - 'neuro-lm'
+      - '--region'
+      - 'us-central1'
+      - '--member'
+      - 'allUsers'
+      - '--role'
+      - 'roles/run.invoker'
+
 images:
   - 'gcr.io/$PROJECT_ID/neuro-lm:$COMMIT_SHA'
