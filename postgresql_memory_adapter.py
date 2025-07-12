@@ -140,13 +140,13 @@ class PostgreSQLMemorySystem:
             await self.initialize_pool()
             
             async with self.pool.acquire() as conn:
-                # Insert memory
+                # Insert memory with proper vector format
                 memory_id = await conn.fetchval("""
                     INSERT INTO intelligent_memories 
                     (user_id, conversation_id, message_id, content, message_type, embedding, importance, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    VALUES ($1, $2, $3, $4, $5, $6::vector, $7, $8)
                     RETURNING id
-                """, user_id, conversation_id, message_id, content, message_type, embedding, importance, datetime.now())
+                """, user_id, conversation_id, message_id, content, message_type, str(embedding), importance, datetime.now())
                 
                 print(f"✅ Memory stored: {memory_id}")
                 return str(memory_id)
@@ -178,19 +178,19 @@ class PostgreSQLMemorySystem:
                 # Search memories with quality-boosted scoring
                 memories = await conn.fetch("""
                     SELECT content, 
-                           1 - (embedding <=> $1) as similarity,
+                           1 - (embedding <=> $1::vector) as similarity,
                            final_quality_score,
                            CASE 
                                WHEN final_quality_score IS NOT NULL 
-                               THEN final_quality_score * 0.2 + (1 - (embedding <=> $1)) * 0.8
-                               ELSE 1 - (embedding <=> $1)
+                               THEN final_quality_score * 0.2 + (1 - (embedding <=> $1::vector)) * 0.8
+                               ELSE 1 - (embedding <=> $1::vector)
                            END as boosted_score
                     FROM intelligent_memories 
                     WHERE user_id = $2 
-                    AND (1 - (embedding <=> $1)) > 0.3
+                    AND (1 - (embedding <=> $1::vector)) > 0.3
                     ORDER BY boosted_score DESC 
                     LIMIT $3
-                """, query_embedding, user_id, limit)
+                """, str(query_embedding), user_id, limit)
                 
                 memory_texts = []
                 for record in memories:

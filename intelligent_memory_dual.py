@@ -9,26 +9,20 @@ from typing import List, Dict, Optional, Union
 from enum import Enum
 from datetime import datetime, timedelta
 
-# Import memory systems
-# from intelligent_memory import IntelligentMemorySystem as Neo4jMemorySystem  # Removed - Neo4j deprecated
+# Import memory systems - PostgreSQL only
 from postgresql_memory_adapter import PostgreSQLMemorySystem
 
 class MemoryBackend(Enum):
-    NEO4J = "neo4j"
     POSTGRESQL = "postgresql"
 
 class DualIntelligentMemorySystem:
-    """Dual backend memory system for seamless migration"""
+    """PostgreSQL-based intelligent memory system (formerly dual backend)"""
     
     def __init__(self):
-        self.backend = self._determine_backend()
-        self.neo4j_system = None
-        self.postgresql_system = None
-        
         # Always use PostgreSQL - Neo4j support removed
+        self.backend = MemoryBackend.POSTGRESQL
         self.postgresql_system = PostgreSQLMemorySystem()
         self.active_system = self.postgresql_system
-        self.backend = MemoryBackend.POSTGRESQL
     
     def _determine_backend(self) -> MemoryBackend:
         """Determine which backend to use based on environment"""
@@ -37,27 +31,17 @@ class DualIntelligentMemorySystem:
     
     async def store_memory(self, content: str, user_id: str, conversation_id: Optional[str], 
                           message_type: str = "user", message_id: Optional[int] = None) -> Optional[str]:
-        """Store memory using the active backend"""
-        if self.backend == MemoryBackend.POSTGRESQL:
-            return await self.active_system.store_memory(
-                content, user_id, conversation_id, message_type, message_id
-            )
-        else:
-            return await self.active_system.store_memory(
-                content, user_id, conversation_id, message_type, message_id
-            )
+        """Store memory using PostgreSQL backend"""
+        return await self.active_system.store_memory(
+            content, user_id, conversation_id, message_type, message_id
+        )
     
     async def retrieve_memory(self, query: str, user_id: str, conversation_id: Optional[str], 
                             limit: int = 5) -> str:
-        """Retrieve memory using the active backend"""
-        if self.backend == MemoryBackend.POSTGRESQL:
-            return await self.active_system.retrieve_memory(
-                query, user_id, conversation_id, limit
-            )
-        else:
-            return await self.active_system.retrieve_memory(
-                query, user_id, conversation_id, limit
-            )
+        """Retrieve memory using PostgreSQL backend"""
+        return await self.active_system.retrieve_memory(
+            query, user_id, conversation_id, limit
+        )
     
     async def update_memory_quality_score(self, memory_id: str, quality_score: float) -> bool:
         """Update memory quality score using the active backend"""
@@ -72,13 +56,8 @@ class DualIntelligentMemorySystem:
     
     async def update_final_quality_score(self, memory_id: str, user_id: str, 
                                        use_message_id: bool = False) -> bool:
-        """Update final quality score using the active backend"""
-        if self.backend == MemoryBackend.POSTGRESQL:
-            return await self.active_system.update_final_quality_score(memory_id, user_id)
-        else:
-            return await self.active_system.update_final_quality_score(
-                memory_id, user_id, use_message_id
-            )
+        """Update final quality score using PostgreSQL backend"""
+        return await self.active_system.update_final_quality_score(memory_id, user_id)
     
     async def get_unscored_memories(self, user_id: str, limit: int = 10) -> List[Dict]:
         """Get unscored memories using the active backend"""

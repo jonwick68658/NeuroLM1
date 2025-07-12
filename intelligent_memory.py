@@ -1,7 +1,11 @@
 """
-Intelligent Memory System - Core Implementation
-Replaces the existing memory system with intelligent routing and fast retrieval
+Intelligent Memory System - Legacy Neo4j Implementation
+THIS FILE IS DEPRECATED - USE postgresql_memory_adapter.py INSTEAD
+Kept for reference only during migration phase
 """
+
+# THIS FILE IS NO LONGER USED - SYSTEM NOW USES POSTGRESQL
+# Remove this file after migration is complete
 
 import re
 import json
@@ -9,7 +13,7 @@ import asyncio
 from typing import List, Dict, Optional, Tuple
 from enum import Enum
 from datetime import datetime, timedelta
-from neo4j import GraphDatabase
+# from neo4j import GraphDatabase  # REMOVED - Neo4j no longer used
 import openai
 import os
 # Embedding generation function

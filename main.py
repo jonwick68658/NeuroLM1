@@ -875,8 +875,8 @@ def remove_topic_links(current_topic: str, linked_topic: str, user_id: str) -> b
             WHERE linked_topic = %s AND user_id = %s
             AND source_memory_id IN (
                 SELECT DISTINCT m.id FROM conversations c
-                JOIN messages msg ON c.id = msg.conversation_id
-                JOIN neo4j_memories m ON m.user_id = %s
+                JOIN conversation_messages msg ON c.id = msg.conversation_id
+                JOIN intelligent_memories m ON m.user_id = %s
                 WHERE c.topic = %s
             )
         ''', (linked_topic.lower(), user_id, user_id, current_topic.lower()))
