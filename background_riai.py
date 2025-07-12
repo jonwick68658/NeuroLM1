@@ -1,24 +1,29 @@
 """
-Background RIAI Evaluation Service
+Background RIAI Evaluation Service - PostgreSQL Version
 Processes unscored memories for R(t) evaluation without blocking user responses
 """
 
 import asyncio
 import hashlib
 import time
+import os
+import psycopg2
 from typing import List, Dict, Optional
-from intelligent_memory import IntelligentMemorySystem
 from model_service import ModelService
 
 class BackgroundRIAIService:
     """Service for background R(t) evaluation with batching and caching"""
     
     def __init__(self):
-        self.memory_system = IntelligentMemorySystem()
         self.model_service = ModelService()
         self.is_running = False
         self.batch_size = 20
         self.process_interval = 1800  # 30 minutes
+        self.db_url = os.getenv("DATABASE_URL")
+        
+    def get_db_connection(self):
+        """Get PostgreSQL database connection"""
+        return psycopg2.connect(self.db_url)
         
     def generate_response_hash(self, content: str) -> str:
         """Generate hash for response content to enable caching"""
@@ -27,14 +32,19 @@ class BackgroundRIAIService:
     async def get_cached_score(self, response_hash: str) -> Optional[float]:
         """Check if we have a cached R(t) score for this response"""
         try:
-            with self.memory_system.driver.session() as session:
-                result = session.run("""
-                    MATCH (c:ResponseCache {response_hash: $response_hash})
-                    RETURN c.r_t_score AS score
-                """, {'response_hash': response_hash})
-                
-                record = result.single()
-                return record['score'] if record else None
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT r_t_score FROM memory_quality_cache 
+                WHERE response_hash = %s
+            """, (response_hash,))
+            
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            return result[0] if result else None
                 
         except Exception as e:
             print(f"Error checking cache: {e}")
@@ -43,15 +53,19 @@ class BackgroundRIAIService:
     async def store_cached_score(self, response_hash: str, r_t_score: float):
         """Store R(t) score in cache for future use"""
         try:
-            with self.memory_system.driver.session() as session:
-                session.run("""
-                    MERGE (c:ResponseCache {response_hash: $response_hash})
-                    SET c.r_t_score = $r_t_score,
-                        c.cached_at = datetime()
-                """, {
-                    'response_hash': response_hash,
-                    'r_t_score': r_t_score
-                })
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO memory_quality_cache (response_hash, r_t_score)
+                VALUES (%s, %s)
+                ON CONFLICT (response_hash) 
+                DO UPDATE SET r_t_score = EXCLUDED.r_t_score
+            """, (response_hash, r_t_score))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
                 
         except Exception as e:
             print(f"Error storing cache: {e}")
@@ -59,30 +73,31 @@ class BackgroundRIAIService:
     async def get_unscored_memories(self, limit: int = 20) -> List[Dict]:
         """Get memories that need R(t) evaluation"""
         try:
-            with self.memory_system.driver.session() as session:
-                result = session.run("""
-                    MATCH (m:IntelligentMemory)
-                    WHERE m.message_type = 'assistant'
-                    AND m.quality_score IS NULL
-                    AND m.content IS NOT NULL
-                    RETURN m.id AS memory_id,
-                           m.content AS content,
-                           m.user_id AS user_id,
-                           m.timestamp AS timestamp
-                    ORDER BY m.timestamp ASC
-                    LIMIT $limit
-                """, {'limit': limit})
-                
-                memories = []
-                for record in result:
-                    memories.append({
-                        'memory_id': record['memory_id'],
-                        'content': record['content'],
-                        'user_id': record['user_id'],
-                        'timestamp': record['timestamp']
-                    })
-                
-                return memories
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id, content, user_id, created_at
+                FROM intelligent_memories
+                WHERE message_type = 'assistant'
+                AND r_t_score IS NULL
+                AND content IS NOT NULL
+                ORDER BY created_at ASC
+                LIMIT %s
+            """, (limit,))
+            
+            memories = []
+            for record in cursor.fetchall():
+                memories.append({
+                    'memory_id': record[0],
+                    'content': record[1],
+                    'user_id': record[2],
+                    'timestamp': record[3]
+                })
+            
+            cursor.close()
+            conn.close()
+            return memories
                 
         except Exception as e:
             print(f"Error getting unscored memories: {e}")
@@ -181,16 +196,62 @@ class BackgroundRIAIService:
                 user_id = result['user_id']
                 r_t_score = result['r_t_score']
                 
+                # Update R(t) score in PostgreSQL
+                conn = self.get_db_connection()
+                cursor = conn.cursor()
+                
                 # Update R(t) score
-                await self.memory_system.update_memory_quality_score(memory_id, r_t_score)
+                cursor.execute("""
+                    UPDATE intelligent_memories 
+                    SET r_t_score = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (r_t_score, memory_id))
+                
+                # Get current H(t) score to calculate final quality score
+                cursor.execute("""
+                    SELECT h_t_score FROM intelligent_memories WHERE id = %s
+                """, (memory_id,))
+                
+                h_t_result = cursor.fetchone()
+                h_t_score = h_t_result[0] if h_t_result else None
                 
                 # Calculate final quality score using f(R(t), H(t))
-                await self.memory_system.update_final_quality_score(memory_id, user_id)
+                final_quality_score = self.calculate_final_quality_score(r_t_score, h_t_score)
                 
-                print(f"Updated memory {memory_id[:8]}... with R(t)={r_t_score}")
+                # Update final quality score
+                cursor.execute("""
+                    UPDATE intelligent_memories 
+                    SET final_quality_score = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (final_quality_score, memory_id))
+                
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
+                print(f"Updated memory {str(memory_id)[:8]}... with R(t)={r_t_score}, final={final_quality_score}")
                 
             except Exception as e:
                 print(f"Error updating memory scores: {e}")
+    
+    def calculate_final_quality_score(self, r_t_score: Optional[float], h_t_score: Optional[float]) -> Optional[float]:
+        """Calculate final quality score using f(R(t), H(t)) intelligence refinement function"""
+        if r_t_score is None:
+            return None
+        
+        # Base score from R(t) evaluation
+        base_score = r_t_score
+        
+        # Apply human feedback with 1.5x weighting if available
+        if h_t_score is not None:
+            # Weighted average with human feedback having 1.5x weight
+            total_weight = 1.0 + 1.5  # R(t) weight + H(t) weight
+            final_score = (base_score * 1.0 + h_t_score * 1.5) / total_weight
+        else:
+            final_score = base_score
+        
+        # Ensure score is in valid range
+        return max(1.0, min(10.0, final_score))
     
     async def process_batch(self) -> Dict[str, int]:
         """Process a batch of unscored memories"""
@@ -265,7 +326,6 @@ class BackgroundRIAIService:
     def close(self):
         """Close connections"""
         self.stop_background_service()
-        self.memory_system.close()
 
 # Global instance for background service
 background_riai_service = None

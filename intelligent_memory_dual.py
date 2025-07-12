@@ -9,8 +9,8 @@ from typing import List, Dict, Optional, Union
 from enum import Enum
 from datetime import datetime, timedelta
 
-# Import both memory systems
-from intelligent_memory import IntelligentMemorySystem as Neo4jMemorySystem
+# Import memory systems
+# from intelligent_memory import IntelligentMemorySystem as Neo4jMemorySystem  # Removed - Neo4j deprecated
 from postgresql_memory_adapter import PostgreSQLMemorySystem
 
 class MemoryBackend(Enum):
@@ -25,19 +25,15 @@ class DualIntelligentMemorySystem:
         self.neo4j_system = None
         self.postgresql_system = None
         
-        if self.backend == MemoryBackend.NEO4J:
-            self.neo4j_system = Neo4jMemorySystem()
-            self.active_system = self.neo4j_system
-        else:
-            self.postgresql_system = PostgreSQLMemorySystem()
-            self.active_system = self.postgresql_system
+        # Always use PostgreSQL - Neo4j support removed
+        self.postgresql_system = PostgreSQLMemorySystem()
+        self.active_system = self.postgresql_system
+        self.backend = MemoryBackend.POSTGRESQL
     
     def _determine_backend(self) -> MemoryBackend:
         """Determine which backend to use based on environment"""
-        if os.getenv("USE_POSTGRESQL", "false").lower() == "true":
-            return MemoryBackend.POSTGRESQL
-        else:
-            return MemoryBackend.NEO4J
+        # Always use PostgreSQL - Neo4j support removed
+        return MemoryBackend.POSTGRESQL
     
     async def store_memory(self, content: str, user_id: str, conversation_id: Optional[str], 
                           message_type: str = "user", message_id: Optional[int] = None) -> Optional[str]:

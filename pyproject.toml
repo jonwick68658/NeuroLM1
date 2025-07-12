@@ -5,7 +5,7 @@ description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
     "openai>=1.0.0",
-    "neo4j>=5.0.0",
+    # "neo4j>=5.0.0",  # Removed - migrated to PostgreSQL
     "python-dotenv>=1.0.0",
     "requests>=2.32.3",
     "pydantic>=2.11.5",
