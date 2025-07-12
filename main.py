@@ -15,6 +15,13 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Use environment variables
 SECRET_KEY = os.getenv("SECRET_KEY", "default-secret")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -131,17 +138,23 @@ def get_authenticated_user(request: Request) -> Optional[Dict]:
     # Use database session only
     return get_session(session_id)
 
-# Initialize intelligent memory system globally
+# Initialize intelligent memory system globally with dual backend
 intelligent_memory_system = None
 try:
-    from intelligent_memory import IntelligentMemorySystem
+    # Force PostgreSQL backend for cloud deployment
+    os.environ["USE_POSTGRESQL"] = "true"
+    
+    from intelligent_memory_dual import DualIntelligentMemorySystem
     from background_riai import process_riai_batch, start_background_riai, stop_background_riai
     from tool_generator import ToolGenerator
     from tool_executor import ToolExecutor
-    intelligent_memory_system = IntelligentMemorySystem()
+    intelligent_memory_system = DualIntelligentMemorySystem()
     tool_generator = ToolGenerator()
     tool_executor = ToolExecutor()
-    print("✅ Intelligent memory system initialized")
+    
+    # Get backend information
+    backend_info = intelligent_memory_system.get_backend_info()
+    print(f"✅ Intelligent memory system initialized - Backend: {backend_info['backend']}")
     print("✅ Tool generation system initialized")
 except Exception as e:
     print(f"❌ Failed to initialize intelligent memory: {e}")
