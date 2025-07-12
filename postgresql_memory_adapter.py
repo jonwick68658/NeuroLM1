@@ -232,9 +232,9 @@ class PostgreSQLMemorySystem:
             async with self.pool.acquire() as conn:
                 result = await conn.execute("""
                     UPDATE intelligent_memories 
-                    SET quality_score = $1, evaluation_timestamp = $2
+                    SET r_t_score = $1, updated_at = $2
                     WHERE id = $3
-                """, quality_score, datetime.now(), memory_id)
+                """, quality_score, datetime.now(), int(memory_id))
                 
                 return result == "UPDATE 1"
                 
@@ -251,11 +251,10 @@ class PostgreSQLMemorySystem:
             async with self.pool.acquire() as conn:
                 result = await conn.execute("""
                     UPDATE intelligent_memories 
-                    SET human_feedback_score = $1, 
-                        human_feedback_type = $2, 
-                        human_feedback_timestamp = $3
-                    WHERE id = $4 AND user_id = $5
-                """, feedback_score, feedback_type, datetime.now(), node_id, user_id)
+                    SET h_t_score = $1, 
+                        updated_at = $2
+                    WHERE id = $3 AND user_id = $4
+                """, feedback_score, datetime.now(), int(node_id), user_id)
                 
                 return result == "UPDATE 1"
                 
@@ -286,16 +285,16 @@ class PostgreSQLMemorySystem:
             async with self.pool.acquire() as conn:
                 # Get current R(t) and H(t) scores
                 record = await conn.fetchrow("""
-                    SELECT quality_score, human_feedback_score
+                    SELECT r_t_score, h_t_score
                     FROM intelligent_memories
                     WHERE id = $1 AND user_id = $2
-                """, memory_id, user_id)
+                """, int(memory_id), user_id)
                 
                 if not record:
                     return False
                 
-                r_t_score = record['quality_score']
-                h_t_score = record['human_feedback_score']
+                r_t_score = record['r_t_score']
+                h_t_score = record['h_t_score']
                 
                 # Calculate final quality score
                 final_score = self.calculate_final_quality_score(r_t_score, h_t_score)
@@ -303,9 +302,9 @@ class PostgreSQLMemorySystem:
                 if final_score is not None:
                     result = await conn.execute("""
                         UPDATE intelligent_memories
-                        SET final_quality_score = $1, final_score_timestamp = $2
+                        SET final_quality_score = $1, updated_at = $2
                         WHERE id = $3 AND user_id = $4
-                    """, final_score, datetime.now(), memory_id, user_id)
+                    """, final_score, datetime.now(), int(memory_id), user_id)
                     
                     return result == "UPDATE 1"
                 
@@ -325,7 +324,7 @@ class PostgreSQLMemorySystem:
                     SELECT id, content
                     FROM intelligent_memories
                     WHERE user_id = $1 
-                    AND quality_score IS NULL
+                    AND r_t_score IS NULL
                     AND message_type = 'assistant'
                     ORDER BY created_at DESC
                     LIMIT $2
