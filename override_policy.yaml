@@ -1,0 +1,10 @@
+constraint: constraints/iam.allowedPolicyMemberDomains
+etag: ""
+spec:
+  rules:
+  - enforce: false
+  - condition:
+      title: "Allow Cloud Run public access"
+      description: "Allow unauthenticated access to Cloud Run services"
+      expression: 'resource.service == "run.googleapis.com"'
+    enforce: false
