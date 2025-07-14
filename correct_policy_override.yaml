@@ -1,0 +1,4 @@
+name: projects/neurolm-830566/policies/constraints/iam.allowedPolicyMemberDomains
+spec:
+  rules:
+    - enforce: false
