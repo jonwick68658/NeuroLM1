@@ -1,0 +1,9 @@
+constraint: constraints/iam.allowedPolicyMemberDomains
+spec:
+  rules:
+  - enforce: false
+  - allowAll: true
+    condition:
+      title: "Allow public access for Cloud Run"
+      description: "Override domain restriction for Cloud Run services"
+      expression: 'resource.service == "run.googleapis.com"'
