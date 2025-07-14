@@ -7,20 +7,15 @@ import os
 import sys
 import asyncio
 from typing import Dict, Optional
+from contextlib import asynccontextmanager
 
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Import your existing main app
-from main import app, create_user_in_db, verify_user_login, get_user_first_name
-from main import get_session, create_session, delete_session, cleanup_expired_sessions
-from main import get_authenticated_user, init_file_storage, get_db_connection
-from main import store_user_tool, get_user_tools, update_tool_usage
-
 # Import the dual memory system
 from intelligent_memory_dual import DualIntelligentMemorySystem
 
-# Override the intelligent memory system with dual backend
+# Initialize the memory system
 print("🚀 Starting NeuroLM GCP version...")
 print(f"🔧 Backend mode: PostgreSQL")
 
@@ -44,11 +39,15 @@ async def startup_event():
     
     # Initialize PostgreSQL connection pool if using PostgreSQL
     if backend_info['backend'] == 'postgresql':
-        await intelligent_memory_system.active_system.initialize_pool()
-        print("✅ PostgreSQL connection pool initialized")
+        try:
+            await intelligent_memory_system.active_system.initialize_pool()
+            print("✅ PostgreSQL connection pool initialized")
+        except Exception as e:
+            print(f"⚠️  PostgreSQL connection pool: {e}")
     
     # Initialize database tables
     try:
+        from main import init_file_storage
         init_file_storage()
         print("✅ Database tables initialized")
     except Exception as e:
@@ -75,15 +74,7 @@ async def shutdown_event():
         intelligent_memory_system.close()
         print("✅ Memory system closed")
 
-# Override the startup/shutdown events
-from main import app as original_app
-
-# Remove existing event handlers
-original_app.router.lifespan = None
-
-# Add new lifespan handler
-from contextlib import asynccontextmanager
-
+# Use proper lifespan context manager
 @asynccontextmanager
 async def lifespan(app):
     # Startup
@@ -92,18 +83,9 @@ async def lifespan(app):
     # Shutdown
     await shutdown_event()
 
+# Import the main app and set lifespan properly
+from main import app
 app.router.lifespan = lifespan
-
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for Cloud Run"""
-    backend_info = intelligent_memory_system.get_backend_info()
-    return {
-        "status": "healthy",
-        "backend": backend_info['backend'],
-        "version": "gcp-1.0"
-    }
 
 if __name__ == "__main__":
     import uvicorn
