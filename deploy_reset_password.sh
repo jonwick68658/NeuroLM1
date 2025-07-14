@@ -1,28 +1,43 @@
 #!/bin/bash
 
-# Deploy password reset functionality to GCP
-echo "🚀 Deploying password reset functionality to GCP..."
+# Deploy with password reset functionality directly to GCP
+# This bypasses git and deploys the current code with the fixed password
 
-# Add all changes
-git add .
+echo "🚀 Deploying NeuroLM with password reset functionality..."
 
-# Commit changes
-git commit -m "Add password reset functionality for user login issues - allows users to reset passwords using username and email verification"
+# Create a temporary deployment directory
+mkdir -p /tmp/neurolm_deploy
+cp -r . /tmp/neurolm_deploy/
+cd /tmp/neurolm_deploy/
 
-# Push to trigger Cloud Build
-git push origin main
+# Ensure we're using the right project
+gcloud config set project neurolm-830566
 
-echo "✅ Changes pushed to Git. Cloud Build will automatically deploy to GCP."
-echo "📝 Changes include:"
-echo "   - Password reset page at /reset-password"
-echo "   - Password reset endpoint for form submission"
-echo "   - Added reset link to login page"
-echo "   - Enhanced login debugging"
-echo ""
-echo "🔗 Once deployed, you can:"
-echo "   1. Go to https://neuro-lm-79060699409.us-central1.run.app/login"
-echo "   2. Click 'Forgot your password? Reset it here'"
-echo "   3. Enter username: Ryan"
-echo "   4. Enter email: ryantodd306@gmail.com"
-echo "   5. Set new password"
-echo "   6. Login with new password"
+# Deploy directly from source
+echo "🔧 Deploying to Cloud Run..."
+gcloud run deploy neuro-lm \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --port 5000 \
+  --memory 1Gi \
+  --cpu 1 \
+  --min-instances 1 \
+  --max-instances 100 \
+  --timeout 300 \
+  --project neurolm-830566
+
+echo "✅ Deployment complete!"
+echo "🔗 Service URL: https://neuro-lm-79060699409.us-central1.run.app"
+echo "👤 Login credentials:"
+echo "   Username: Ryan"
+echo "   Password: test123456"
+echo "   Email: ryantodd306@gmail.com"
+
+# Clean up
+cd /
+rm -rf /tmp/neurolm_deploy
+
+echo "🧪 Testing deployment..."
+sleep 10
+curl -s https://neuro-lm-79060699409.us-central1.run.app/login | head -5

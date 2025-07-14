@@ -25,7 +25,7 @@ def reset_password():
     """Reset password for Ryan's account"""
     username = "Ryan"
     email = "ryantodd306@gmail.com"
-    new_password = "test123"  # Temporary password - change after login
+    new_password = "test123456"  # Temporary password - change after login
     
     try:
         conn = get_db_connection()
