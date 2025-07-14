@@ -1,0 +1,4 @@
+name: organizations/823516224385/policies/iam.allowedPolicyMemberDomains
+spec:
+  rules:
+    - enforce: false
