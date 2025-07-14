@@ -2485,12 +2485,21 @@ async def reset_password_page():
             input[type="text"], input[type="email"], input[type="password"] {
                 width: 100%;
                 padding: 0.75rem;
-                background: rgba(17, 24, 39, 0.8);
+                background: rgba(17, 24, 39, 0.8) !important;
                 border: 1px solid rgba(102, 126, 234, 0.3);
                 border-radius: 10px;
-                color: #f3f4f6;
+                color: #f3f4f6 !important;
                 font-size: 1rem;
                 transition: all 0.3s ease;
+            }
+            
+            /* Override browser autocomplete styles */
+            input:-webkit-autofill,
+            input:-webkit-autofill:hover,
+            input:-webkit-autofill:focus,
+            input:-webkit-autofill:active {
+                -webkit-box-shadow: 0 0 0 30px rgba(17, 24, 39, 0.8) inset !important;
+                -webkit-text-fill-color: #f3f4f6 !important;
             }
             
             input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus {
