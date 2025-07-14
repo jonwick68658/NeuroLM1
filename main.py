@@ -2080,7 +2080,7 @@ async def login_page():
                 <img src="/static/neurolm-glass-logo.png" alt="NeuroLM" style="max-width: 240px; height: auto;">
                 <p>Sign in to your account</p>
             </div>
-            <form action="/login" method="post">
+            <form action="/login" method="post" id="loginForm">
                 <div class="form-group">
                     <label for="username">Username</label>
                     <input type="text" id="username" name="username" placeholder="Enter your username" required>
@@ -2089,16 +2089,79 @@ async def login_page():
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" placeholder="Enter your password" required>
                 </div>
-                <div class="remember-me">
+                
+                <!-- Password reset fields (hidden by default) -->
+                <div id="resetFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" placeholder="Enter your email address">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_password">New Password</label>
+                        <input type="password" id="new_password" name="new_password" placeholder="Enter new password">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm New Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm new password">
+                    </div>
+                </div>
+                
+                <div class="remember-me" id="rememberMe">
                     <input type="checkbox" id="remember_me" name="remember_me">
                     <label for="remember_me">Keep me signed in for 30 days</label>
                 </div>
-                <button type="submit" class="submit-btn">Sign In</button>
+                
+                <input type="hidden" id="reset_password" name="reset_password" value="false">
+                
+                <button type="submit" class="submit-btn" id="submitBtn">Sign In</button>
+                <button type="button" class="reset-btn" id="resetBtn" onclick="toggleResetMode()">Forgot Password?</button>
             </form>
             <div class="register-link">
                 <p>Don't have an account? <a href="/register">Create one here</a></p>
-                <p>Forgot your password? <a href="/reset-password">Reset it here</a></p>
             </div>
+            
+            <script>
+                function toggleResetMode() {
+                    const resetFields = document.getElementById('resetFields');
+                    const rememberMe = document.getElementById('rememberMe');
+                    const submitBtn = document.getElementById('submitBtn');
+                    const resetBtn = document.getElementById('resetBtn');
+                    const resetPassword = document.getElementById('reset_password');
+                    const passwordField = document.getElementById('password');
+                    
+                    if (resetFields.style.display === 'none') {
+                        // Switch to reset mode
+                        resetFields.style.display = 'block';
+                        rememberMe.style.display = 'none';
+                        submitBtn.textContent = 'Reset Password';
+                        resetBtn.textContent = 'Back to Login';
+                        resetPassword.value = 'true';
+                        passwordField.required = false;
+                        passwordField.style.display = 'none';
+                        passwordField.parentElement.style.display = 'none';
+                        
+                        // Make reset fields required
+                        document.getElementById('email').required = true;
+                        document.getElementById('new_password').required = true;
+                        document.getElementById('confirm_password').required = true;
+                    } else {
+                        // Switch back to login mode
+                        resetFields.style.display = 'none';
+                        rememberMe.style.display = 'block';
+                        submitBtn.textContent = 'Sign In';
+                        resetBtn.textContent = 'Forgot Password?';
+                        resetPassword.value = 'false';
+                        passwordField.required = true;
+                        passwordField.style.display = 'block';
+                        passwordField.parentElement.style.display = 'block';
+                        
+                        // Make reset fields not required
+                        document.getElementById('email').required = false;
+                        document.getElementById('new_password').required = false;
+                        document.getElementById('confirm_password').required = false;
+                    }
+                }
+            </script>
         </div>
     </body>
     </html>
@@ -2108,11 +2171,88 @@ async def login_page():
 async def login_user(
     username: str = Form(...),
     password: str = Form(...),
-    remember_me: bool = Form(False)
+    remember_me: bool = Form(False),
+    reset_password: bool = Form(False),
+    email: str = Form(None),
+    new_password: str = Form(None),
+    confirm_password: str = Form(None)
 ):
-    """Handle user login"""
-    print(f"DEBUG: Login attempt - Username: '{username}', Password length: {len(password)}")
+    """Handle user login and password reset"""
+    print(f"DEBUG: Login attempt - Username: '{username}', Password length: {len(password)}, Reset mode: {reset_password}")
     
+    # Handle password reset
+    if reset_password:
+        print(f"DEBUG: Password reset attempt - Username: '{username}', Email: '{email}'")
+        
+        if not email or not new_password or not confirm_password:
+            return HTMLResponse("""
+            <script>
+                alert('Please fill in all fields for password reset.');
+                window.location.href = '/login';
+            </script>
+            """)
+        
+        if new_password != confirm_password:
+            return HTMLResponse("""
+            <script>
+                alert('New passwords do not match.');
+                window.location.href = '/login';
+            </script>
+            """)
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Find user by username AND email
+            cursor.execute(
+                "SELECT id, first_name FROM users WHERE username = %s AND email = %s",
+                (username, email)
+            )
+            result = cursor.fetchone()
+            
+            if not result:
+                print(f"DEBUG: User not found for password reset: {username} / {email}")
+                return HTMLResponse("""
+                <script>
+                    alert('User not found. Please check your username and email.');
+                    window.location.href = '/login';
+                </script>
+                """)
+            
+            user_id, first_name = result
+            
+            # Hash new password
+            new_password_hash = hash_password(new_password)
+            
+            # Update password
+            cursor.execute(
+                "UPDATE users SET password_hash = %s WHERE id = %s",
+                (new_password_hash, user_id)
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            print(f"DEBUG: Password reset successful for user: {username}")
+            
+            return HTMLResponse("""
+            <script>
+                alert('Password reset successful! You can now log in with your new password.');
+                window.location.href = '/login';
+            </script>
+            """)
+            
+        except Exception as e:
+            print(f"DEBUG: Password reset error: {e}")
+            return HTMLResponse("""
+            <script>
+                alert('Password reset failed. Please try again.');
+                window.location.href = '/login';
+            </script>
+            """)
+    
+    # Handle normal login
     user_id = verify_user_login(username, password)
     
     if not user_id:
