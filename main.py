@@ -1414,8 +1414,10 @@ def create_user_in_db(first_name: str, username: str, email: str, password_hash:
         # First, check if user exists in PostgreSQL
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", (username, email))
-        if cursor.fetchone():
+        cursor.execute("SELECT id, username, email FROM users WHERE username = %s OR email = %s", (username, email))
+        existing_user = cursor.fetchone()
+        if existing_user:
+            print(f"Registration failed: User already exists - ID: {existing_user[0]}, Username: {existing_user[1]}, Email: {existing_user[2]}")
             cursor.close()
             conn.close()
             return False  # User already exists
@@ -1429,7 +1431,7 @@ def create_user_in_db(first_name: str, username: str, email: str, password_hash:
         cursor.close()
         conn.close()
         
-        # User creation completed in PostgreSQL
+        print(f"User created successfully - ID: {user_id}, Username: {username}, Email: {email}")
         
         return True
         
@@ -1448,19 +1450,24 @@ def verify_user_login(username: str, password: str) -> Optional[str]:
         )
         result = cursor.fetchone()
         if not result:
+            print(f"Login failed: User '{username}' not found")
             cursor.close()
             conn.close()
             return None
         
         user_id, stored_hash = result
+        print(f"Login attempt for user '{username}' - hash type: {'BCrypt' if stored_hash.startswith('$2b$') else 'Legacy SHA256'}")
         
         # Check if this is a BCrypt hash (starts with $2b$)
         if stored_hash.startswith('$2b$'):
             # Use BCrypt verification
             if pwd_context.verify(password, stored_hash):
+                print(f"Login successful for user '{username}'")
                 cursor.close()
                 conn.close()
                 return user_id
+            else:
+                print(f"Login failed: Invalid password for user '{username}'")
         else:
             # Legacy SHA256 hash - verify and migrate if successful
             legacy_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -1476,6 +1483,8 @@ def verify_user_login(username: str, password: str) -> Optional[str]:
                 conn.close()
                 print(f"Migrated user {username} to BCrypt")
                 return user_id
+            else:
+                print(f"Login failed: Invalid password for user '{username}' (legacy SHA256)")
         
         cursor.close()
         conn.close()
@@ -3042,6 +3051,39 @@ async def submit_implicit_feedback(feedback_request: ImplicitFeedbackRequest, re
 async def health_check():
     """System health check"""
     return {"status": "healthy", "service": "NeuroLM Memory System"}
+
+# Debug endpoint for authentication testing
+@app.get("/debug/auth-test")
+async def debug_auth_test():
+    """Debug endpoint to test authentication system"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get user count
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+        
+        # Get recent users
+        cursor.execute("SELECT username, email, created_at FROM users ORDER BY created_at DESC LIMIT 5")
+        recent_users = cursor.fetchall()
+        
+        # Check sessions
+        cursor.execute("SELECT COUNT(*) FROM sessions WHERE expires_at > NOW()")
+        active_sessions = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            "database_connected": True,
+            "user_count": user_count,
+            "recent_users": [{"username": u[0], "email": u[1], "created_at": u[2].isoformat()} for u in recent_users],
+            "active_sessions": active_sessions,
+            "auth_system": "BCrypt + Legacy SHA256 migration"
+        }
+    except Exception as e:
+        return {"database_connected": False, "error": str(e)}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
