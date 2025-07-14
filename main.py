@@ -2037,6 +2037,33 @@ async def login_page():
                 transform: translateY(0) scale(1);
             }
             
+            .reset-btn {
+                background: transparent;
+                border: none;
+                color: #667eea;
+                font-size: 0.9rem;
+                font-weight: 500;
+                cursor: pointer;
+                padding: 0.5rem 1rem;
+                margin-top: 1rem;
+                border-radius: 8px;
+                transition: all 0.3s ease;
+                text-decoration: none;
+                display: inline-block;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .reset-btn:hover {
+                color: #764ba2;
+                background: rgba(102, 126, 234, 0.1);
+                transform: translateY(-1px);
+            }
+            
+            .reset-btn:active {
+                transform: translateY(0);
+            }
+            
             .register-link {
                 text-align: center;
                 margin-top: 2rem;
