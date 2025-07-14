@@ -1,7 +1,7 @@
 steps:
-  # Build the container image using your specific Dockerfile
+  # Build the container image using your specific Dockerfile (force clean build)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/neuro-lm:$COMMIT_SHA', '-f', 'Dockerfile.gcp', '.']
+    args: ['build', '--no-cache', '-t', 'gcr.io/$PROJECT_ID/neuro-lm:$COMMIT_SHA', '-f', 'Dockerfile.gcp', '.']
   
   # Push the container image to Container Registry with a unique tag
   - name: 'gcr.io/cloud-builders/docker'
