@@ -1,0 +1,38 @@
+ryan_todd@cloudshell:~ (neurolm)$ # Create the policy override file
+cat > policy_fix.yaml << 'EOF'
+constraint: constraints/iam.allowedPolicyMemberDomains
+spec:
+  rules:
+  - enforce: false
+  - allowAll: true
+    condition:
+      title: "Allow public access for Cloud Run"
+      description: "Override domain restriction for Cloud Run services"
+      expression: 'resource.service == "run.googleapis.com"'
+EOF
+
+# Apply the organization policy override
+gcloud resource-manager org-policies describe constraints/iam.allowedPolicyMemberDomains --project=neurolm-830566
+ERROR: (gcloud.resource-manager.org-policies.set-policy) INVALID_ARGUMENT: Invalid JSON payload received. Unknown name "spec" at 'policy': Cannot find field.
+- '@type': type.googleapis.com/google.rpc.BadRequest
+  fieldViolations:
+  - description: "Invalid JSON payload received. Unknown name \"spec\" at 'policy':\
+      \ Cannot find field."
+    field: policy
+ERROR: (gcloud.run.services.update) unrecognized arguments: --allow-unauthenticated 
+
+To search the help text of gcloud commands, run:
+  gcloud help -- SEARCH_TERMS
+ERROR: (gcloud.run.services.add-iam-policy-binding) PERMISSION_DENIED: Permission denied on resource project neurolm-830566. This command is authenticated as Ryan_Todd@pythagorix.com which is the active account specified by the [core/account] property.
+Permission denied on resource project neurolm-830566.
+Google developers console
+https://console.developers.google.com
+- '@type': type.googleapis.com/google.rpc.ErrorInfo
+  domain: googleapis.com
+  metadata:
+    consumer: projects/neurolm-830566
+    containerInfo: neurolm-830566
+    service: run.googleapis.com
+  reason: CONSUMER_INVALID
+ERROR: (gcloud.resource-manager.org-policies.describe) [Ryan_Todd@pythagorix.com] does not have permission to access projects instance [neurolm-830566:getOrgPolicy] (or it may not exist): The caller does not have permission. This command is authenticated as Ryan_Todd@pythagorix.com which is the active account specified by the [core/account] property
+ryan_todd@cloudshell:~ (neurolm)$ 
