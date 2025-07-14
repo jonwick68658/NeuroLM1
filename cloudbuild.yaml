@@ -13,7 +13,7 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'neuro-lm'                     # Switched to our working service name
+      - 'neurolm1'                     # Correct service name that matches repository
       - '--image'
       - 'gcr.io/$PROJECT_ID/neuro-lm:$COMMIT_SHA'
       - '--region'
@@ -41,7 +41,7 @@ steps:
       - 'run'
       - 'services'
       - 'add-iam-policy-binding'
-      - 'neuro-lm'
+      - 'neurolm1'
       - '--region'
       - 'us-central1'
       - '--member'
