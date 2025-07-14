@@ -1,0 +1,63 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: neuro-lm
+  namespace: 'neurolm-830566'
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress-status: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: '100'
+        autoscaling.knative.dev/minScale: '1'
+        run.googleapis.com/cpu-throttling: 'true'
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containerConcurrency: 1000
+      timeoutSeconds: 300
+      containers:
+      - image: gcr.io/neurolm-830566/neuro-lm:latest
+        ports:
+        - containerPort: 5000
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        env:
+        - name: DATABASE_URL
+          value: postgresql://postgres:N8XdQHcJFXyOTb8S@10.89.128.3:5432/postgres
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openrouter-key
+              key: api-key
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openai-key
+              key: api-key
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: secret-key
+              key: secret
+  traffic:
+  - percent: 100
+    latestRevision: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neuro-lm-policy
+  annotations:
+    run.googleapis.com/ingress: all
+    iam.gke.io/authorized-networks: ""
+spec:
+  selector:
+    serving.knative.dev/service: neuro-lm
+  ports:
+  - port: 80
+    targetPort: 5000
+  type: LoadBalancer
