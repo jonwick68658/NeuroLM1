@@ -1,11 +1,11 @@
 steps:
   # Build the container image using your specific Dockerfile (force clean build)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '--no-cache', '-t', 'gcr.io/$PROJECT_ID/neuro-lm:$COMMIT_SHA', '-f', 'Dockerfile.gcp', '.']
+    args: ['build', '--no-cache', '-t', 'gcr.io/$PROJECT_ID/neurolm1:$COMMIT_SHA', '-f', 'Dockerfile.gcp', '.']
   
   # Push the container image to Container Registry with a unique tag
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/neuro-lm:$COMMIT_SHA']
+    args: ['push', 'gcr.io/$PROJECT_ID/neurolm1:$COMMIT_SHA']
   
   # Deploy to Cloud Run with the CORRECT, SECURE, and COMPLETE configuration
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -15,7 +15,7 @@ steps:
       - 'deploy'
       - 'neurolm1'                     # Correct service name that matches repository
       - '--image'
-      - 'gcr.io/$PROJECT_ID/neuro-lm:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/neurolm1:$COMMIT_SHA'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -50,4 +50,4 @@ steps:
       - 'roles/run.invoker'
 
 images:
-  - 'gcr.io/$PROJECT_ID/neuro-lm:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/neurolm1:$COMMIT_SHA'
