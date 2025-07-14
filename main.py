@@ -2097,6 +2097,7 @@ async def login_page():
             </form>
             <div class="register-link">
                 <p>Don't have an account? <a href="/register">Create one here</a></p>
+                <p>Forgot your password? <a href="/reset-password">Reset it here</a></p>
             </div>
         </div>
     </body>
@@ -2110,26 +2111,34 @@ async def login_user(
     remember_me: bool = Form(False)
 ):
     """Handle user login"""
+    print(f"DEBUG: Login attempt - Username: '{username}', Password length: {len(password)}")
+    
     user_id = verify_user_login(username, password)
     
     if not user_id:
+        print(f"DEBUG: Login failed for username: '{username}'")
         return HTMLResponse("""
         <script>
-            alert('Invalid username or password');
+            alert('Invalid username or password. Please check your credentials and try again.');
             window.location.href = '/login';
         </script>
         """)
+    
+    print(f"DEBUG: Login successful for user: '{username}' (ID: {user_id})")
     
     # Create session in database with extended duration if remember me is checked
     session_id = create_session(user_id, username, extended=remember_me)
     
     if not session_id:
+        print(f"DEBUG: Session creation failed for user: '{username}'")
         return HTMLResponse("""
         <script>
             alert('Failed to create session. Please try again.');
             window.location.href = '/login';
         </script>
         """)
+    
+    print(f"DEBUG: Session created successfully: {session_id}")
     
     # Redirect to chat with session
     response = RedirectResponse(url="/", status_code=302)
@@ -2144,6 +2153,271 @@ async def login_user(
         response.set_cookie(key="session_id", value=session_id, httponly=True)
     
     return response
+
+@app.post("/reset-password")
+async def reset_password(
+    username: str = Form(...),
+    email: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...)
+):
+    """Reset password for existing user"""
+    print(f"DEBUG: Password reset attempt - Username: '{username}', Email: '{email}'")
+    
+    # Validate passwords match
+    if new_password != confirm_password:
+        return HTMLResponse("""
+        <script>
+            alert('Passwords do not match');
+            window.location.href = '/login';
+        </script>
+        """)
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Find user by username AND email (both must match)
+        cursor.execute(
+            "SELECT id, first_name FROM users WHERE username = %s AND email = %s",
+            (username, email)
+        )
+        result = cursor.fetchone()
+        
+        if not result:
+            print(f"DEBUG: User not found for password reset: {username} / {email}")
+            return HTMLResponse("""
+            <script>
+                alert('User not found. Please check your username and email.');
+                window.location.href = '/login';
+            </script>
+            """)
+        
+        user_id, first_name = result
+        
+        # Hash new password
+        new_password_hash = hash_password(new_password)
+        
+        # Update password
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (new_password_hash, user_id)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        print(f"DEBUG: Password reset successful for user: {username}")
+        
+        return HTMLResponse("""
+        <script>
+            alert('Password reset successful! You can now log in with your new password.');
+            window.location.href = '/login';
+        </script>
+        """)
+        
+    except Exception as e:
+        print(f"DEBUG: Password reset error: {e}")
+        return HTMLResponse("""
+        <script>
+            alert('Password reset failed. Please try again.');
+            window.location.href = '/login';
+        </script>
+        """)
+
+@app.get("/reset-password")
+async def reset_password_page():
+    """Serve password reset page"""
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>NeuroLM - Reset Password</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #000000;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+                overflow-y: auto;
+                padding: 1rem 0;
+            }
+            
+            .background-pattern {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-image: url('/static/neural-brain-logo.png');
+                background-size: 40%;
+                background-position: center;
+                background-repeat: no-repeat;
+                opacity: 0.05;
+                filter: blur(1px);
+                z-index: 0;
+            }
+            
+            .reset-container {
+                background: rgba(0, 0, 0, 0.95);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(102, 126, 234, 0.3);
+                border-radius: 20px;
+                padding: 2.5rem;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+                width: 100%;
+                max-width: 420px;
+                position: relative;
+                z-index: 1;
+            }
+            
+            .logo {
+                text-align: center;
+                margin-bottom: 2rem;
+            }
+            
+            .logo h1 {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #667eea 50%, #a855f7 75%, #667eea 100%);
+                background-size: 200% 200%;
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                font-size: 2rem;
+                font-weight: 700;
+            }
+            
+            .logo p {
+                color: #9ca3af;
+                margin-top: 0.5rem;
+                font-size: 1rem;
+            }
+            
+            .form-group {
+                margin-bottom: 1.5rem;
+            }
+            
+            label {
+                display: block;
+                color: #d1d5db;
+                font-weight: 500;
+                margin-bottom: 0.5rem;
+                font-size: 0.9rem;
+            }
+            
+            input[type="text"], input[type="email"], input[type="password"] {
+                width: 100%;
+                padding: 0.75rem;
+                background: rgba(17, 24, 39, 0.8);
+                border: 1px solid rgba(102, 126, 234, 0.3);
+                border-radius: 10px;
+                color: #f3f4f6;
+                font-size: 1rem;
+                transition: all 0.3s ease;
+            }
+            
+            input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus {
+                outline: none;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+            
+            .submit-btn {
+                width: 100%;
+                padding: 0.75rem;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                border-radius: 10px;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                margin-top: 1rem;
+            }
+            
+            .submit-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            }
+            
+            .login-link {
+                text-align: center;
+                margin-top: 1.5rem;
+                color: #9ca3af;
+                font-size: 0.9rem;
+            }
+            
+            .login-link a {
+                color: #667eea;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            
+            .login-link a:hover {
+                text-decoration: underline;
+            }
+            
+            .warning {
+                background: rgba(239, 68, 68, 0.1);
+                border: 1px solid rgba(239, 68, 68, 0.3);
+                border-radius: 10px;
+                padding: 1rem;
+                margin-bottom: 1.5rem;
+                color: #fca5a5;
+                font-size: 0.9rem;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="background-pattern"></div>
+        <div class="reset-container">
+            <div class="logo">
+                <h1>NeuroLM</h1>
+                <p>Reset Your Password</p>
+            </div>
+            
+            <div class="warning">
+                <strong>Security Notice:</strong> Please provide your exact username and email address to reset your password. Both must match your account.
+            </div>
+            
+            <form action="/reset-password" method="post">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="new_password">New Password</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password">Confirm New Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm new password" required>
+                </div>
+                <button type="submit" class="submit-btn">Reset Password</button>
+            </form>
+            
+            <div class="login-link">
+                <p>Remember your password? <a href="/login">Sign in here</a></p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """)
 
 # Serve the chat interface as the main page
 @app.get("/")
