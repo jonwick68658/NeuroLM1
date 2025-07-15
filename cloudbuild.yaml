@@ -29,10 +29,11 @@ steps:
       - '2'                            # YOUR SETTING: Added back your CPU limit
       - '--max-instances'
       - '10'                           # YOUR SETTING: Added back your scaling limit
-      - '--add-cloudsql-instances'
-      - '$PROJECT_ID:us-central1:neurolm-postgres' # MY FIX: The required SQL connection
+
+      - '--set-env-vars'
+      - 'DATABASE_URL=postgresql://neondb_owner:npg_1vX6eAizKNIu@ep-curly-sea-a5lj2hxj.us-east-2.aws.neon.tech/neondb?sslmode=require'
       - '--update-secrets'
-      - 'DATABASE_URL=db-password:latest' # THE SECURE WAY: Use the secret we just created
+      - 'OPENROUTER_API_KEY=openrouter-key:api-key,OPENAI_API_KEY=openai-key:api-key,SECRET_KEY=secret-key:secret'
 
   # Ensure public access is explicitly set (fixes "Forbidden" error)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
