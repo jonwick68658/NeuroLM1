@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSON
 from starlette.middleware.sessions import SessionMiddleware
 # Memory API removed - using intelligent_memory directly
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
 # Git push for first cloud trigger 07/12/2025 11:46am
 import uvicorn
@@ -31,8 +32,30 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Initialize password context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# FastAPI lifespan handler for background service
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan"""
+    # Startup
+    if intelligent_memory_system is not None:
+        try:
+            asyncio.create_task(start_background_riai())
+            print("✅ Background RIAI service started")
+        except Exception as e:
+            print(f"❌ Failed to start background RIAI service: {e}")
+    
+    yield
+    
+    # Shutdown
+    if intelligent_memory_system is not None:
+        try:
+            await stop_background_riai()
+            print("✅ Background RIAI service stopped")
+        except Exception as e:
+            print(f"❌ Failed to stop background RIAI service: {e}")
+
 # Create FastAPI application
-app = FastAPI(title="NeuroLM Memory System", version="1.0.0")
+app = FastAPI(title="NeuroLM Memory System", version="1.0.0", lifespan=lifespan)
 
 # Add session middleware
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -47,6 +70,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Database session management functions
 def create_session(user_id: str, username: str, extended: bool = False) -> Optional[str]:
     """Create a new session in the database and return session_id"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -65,15 +89,18 @@ def create_session(user_id: str, username: str, extended: bool = False) -> Optio
         
         conn.commit()
         cursor.close()
-        conn.close()
         
         return session_id
     except Exception as e:
         print(f"Error creating session: {e}")
         return None
+    finally:
+        if conn:
+            conn.close()
 
 def get_session(session_id: str) -> Optional[Dict]:
     """Get session data from database if valid and not expired"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -85,7 +112,6 @@ def get_session(session_id: str) -> Optional[Dict]:
         
         result = cursor.fetchone()
         cursor.close()
-        conn.close()
         
         if result:
             return {
@@ -96,9 +122,13 @@ def get_session(session_id: str) -> Optional[Dict]:
     except Exception as e:
         print(f"Error getting session: {e}")
         return None
+    finally:
+        if conn:
+            conn.close()
 
 def delete_session(session_id: str) -> bool:
     """Delete a session from the database"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -107,15 +137,18 @@ def delete_session(session_id: str) -> bool:
         
         conn.commit()
         cursor.close()
-        conn.close()
         
         return True
     except Exception as e:
         print(f"Error deleting session: {e}")
         return False
+    finally:
+        if conn:
+            conn.close()
 
 def cleanup_expired_sessions():
     """Remove expired sessions from database"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -124,12 +157,14 @@ def cleanup_expired_sessions():
         
         conn.commit()
         cursor.close()
-        conn.close()
         
         return True
     except Exception as e:
         print(f"Error cleaning up sessions: {e}")
         return False
+    finally:
+        if conn:
+            conn.close()
 
 def get_authenticated_user(request: Request) -> Optional[Dict]:
     """Get authenticated user from database session"""
@@ -163,27 +198,6 @@ except Exception as e:
     intelligent_memory_system = None
 
 # Memory summarizer removed - replaced by RIAI quality-boosted retrieval
-
-# FastAPI event handlers for background service
-@app.on_event("startup")
-async def startup_event():
-    """Initialize background services"""
-    if intelligent_memory_system is not None:
-        try:
-            asyncio.create_task(start_background_riai())
-            print("✅ Background RIAI service started")
-        except Exception as e:
-            print(f"❌ Failed to start background RIAI service: {e}")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean up background services"""
-    if intelligent_memory_system is not None:
-        try:
-            await stop_background_riai()
-            print("✅ Background RIAI service stopped")
-        except Exception as e:
-            print(f"❌ Failed to stop background RIAI service: {e}")
 
 # Note: Sessions cleared on restart - users need to re-login
 
@@ -301,6 +315,7 @@ def init_file_storage():
 # Tool management functions
 def store_user_tool(user_id: str, tool_name: str, function_code: str, schema_json: str, description: Optional[str] = None) -> bool:
     """Store a custom tool for a user"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -316,14 +331,17 @@ def store_user_tool(user_id: str, tool_name: str, function_code: str, schema_jso
         ''', (user_id, tool_name, function_code, schema_json, description or ""))
         conn.commit()
         cursor.close()
-        conn.close()
         return True
     except Exception as e:
         print(f"Error storing user tool: {e}")
         return False
+    finally:
+        if conn:
+            conn.close()
 
 def get_user_tools(user_id: str) -> List[Dict]:
     """Get all active tools for a user"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -346,14 +364,17 @@ def get_user_tools(user_id: str) -> List[Dict]:
             })
         
         cursor.close()
-        conn.close()
         return tools
     except Exception as e:
         print(f"Error getting user tools: {e}")
         return []
+    finally:
+        if conn:
+            conn.close()
 
 def update_tool_usage(user_id: str, tool_name: str, success: bool = True) -> bool:
     """Update tool usage statistics"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -373,11 +394,13 @@ def update_tool_usage(user_id: str, tool_name: str, success: bool = True) -> boo
         
         conn.commit()
         cursor.close()
-        conn.close()
         return True
     except Exception as e:
         print(f"Error updating tool usage: {e}")
         return False
+    finally:
+        if conn:
+            conn.close()
 
 # Initialize file storage on startup
 init_file_storage()
@@ -387,6 +410,7 @@ init_file_storage()
 # Conversation database helper functions
 def create_conversation(user_id: str, title: Optional[str] = None, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Optional[str]:
     """Create a new conversation and return its ID"""
+    conn = None
     try:
         # Clean up any placeholder conversations for this topic/subtopic before creating real one
         cleanup_placeholder_conversations(user_id, topic, sub_topic)
@@ -409,14 +433,17 @@ def create_conversation(user_id: str, title: Optional[str] = None, topic: Option
         ''', (conversation_id, user_id, title, topic, sub_topic, datetime.now(), datetime.now(), 0))
         conn.commit()
         cursor.close()
-        conn.close()
         return conversation_id
     except Exception as e:
         print(f"Error creating conversation: {e}")
         return None
+    finally:
+        if conn:
+            conn.close()
 
 def update_conversation_topic(conversation_id: str, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> bool:
     """Update the topic and sub-topic of an existing conversation"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -430,14 +457,17 @@ def update_conversation_topic(conversation_id: str, topic: Optional[str] = None,
         success = cursor.rowcount > 0
         conn.commit()
         cursor.close()
-        conn.close()
         return success
     except Exception as e:
         print(f"Error updating conversation topic: {e}")
         return False
+    finally:
+        if conn:
+            conn.close()
 
 def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0, topic: Optional[str] = None, sub_topic: Optional[str] = None) -> Dict:
     """Get paginated conversations for a user with previews, optionally filtered by topic/subtopic"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -500,7 +530,6 @@ def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0, topic
             })
         
         cursor.close()
-        conn.close()
         
         return {
             'conversations': conversations,
@@ -511,6 +540,9 @@ def get_user_conversations(user_id: str, limit: int = 20, offset: int = 0, topic
     except Exception as e:
         print(f"Error getting conversations: {e}")
         return {'conversations': [], 'total_count': 0, 'has_more': False, 'next_offset': None}
+    finally:
+        if conn:
+            conn.close()
 
 def save_conversation_message(conversation_id: str, message_type: str, content: str):
     """Save a message to a conversation"""
@@ -2978,19 +3010,20 @@ async def get_user_name_endpoint(request: Request):
         first_name = get_user_first_name(user_id)
         
         # Get user feedback score
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        conn = None
         try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
             cursor.execute("SELECT feedback_score FROM users WHERE id = %s", (user_id,))
             result = cursor.fetchone()
             feedback_score = result[0] if result else 0
             cursor.close()
-            conn.close()
         except Exception as e:
             print(f"ERROR: Failed to get user feedback score: {e}")
             feedback_score = 0
-            cursor.close()
-            conn.close()
+        finally:
+            if conn:
+                conn.close()
         
         return {"first_name": first_name, "feedback_score": feedback_score}
     except HTTPException:
