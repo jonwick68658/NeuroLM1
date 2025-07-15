@@ -31,6 +31,7 @@ class BackgroundRIAIService:
     
     async def get_cached_score(self, response_hash: str) -> Optional[float]:
         """Check if we have a cached R(t) score for this response"""
+        conn = None
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
@@ -42,16 +43,19 @@ class BackgroundRIAIService:
             
             result = cursor.fetchone()
             cursor.close()
-            conn.close()
             
             return result[0] if result else None
                 
         except Exception as e:
             print(f"Error checking cache: {e}")
             return None
+        finally:
+            if conn:
+                conn.close()
     
     async def store_cached_score(self, response_hash: str, r_t_score: float):
         """Store R(t) score in cache for future use"""
+        conn = None
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
@@ -65,13 +69,16 @@ class BackgroundRIAIService:
             
             conn.commit()
             cursor.close()
-            conn.close()
                 
         except Exception as e:
             print(f"Error storing cache: {e}")
+        finally:
+            if conn:
+                conn.close()
     
     async def get_unscored_memories(self, limit: int = 20) -> List[Dict]:
         """Get memories that need R(t) evaluation"""
+        conn = None
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
@@ -96,12 +103,14 @@ class BackgroundRIAIService:
                 })
             
             cursor.close()
-            conn.close()
             return memories
                 
         except Exception as e:
             print(f"Error getting unscored memories: {e}")
             return []
+        finally:
+            if conn:
+                conn.close()
     
     async def evaluate_batch(self, memories: List[Dict]) -> List[Dict]:
         """Evaluate a batch of memories for R(t) scores"""
@@ -191,6 +200,7 @@ class BackgroundRIAIService:
     async def update_memory_scores(self, evaluation_results: List[Dict]):
         """Update memories with R(t) scores and calculate final quality scores"""
         for result in evaluation_results:
+            conn = None
             try:
                 memory_id = result['memory_id']
                 user_id = result['user_id']
@@ -227,12 +237,14 @@ class BackgroundRIAIService:
                 
                 conn.commit()
                 cursor.close()
-                conn.close()
                 
                 print(f"Updated memory {str(memory_id)[:8]}... with R(t)={r_t_score}, final={final_quality_score}")
                 
             except Exception as e:
                 print(f"Error updating memory scores: {e}")
+            finally:
+                if conn:
+                    conn.close()
     
     def calculate_final_quality_score(self, r_t_score: Optional[float], h_t_score: Optional[float]) -> Optional[float]:
         """Calculate final quality score using f(R(t), H(t)) intelligence refinement function"""
